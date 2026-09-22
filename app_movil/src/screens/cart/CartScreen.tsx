@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useCart } from '../../context/CartContext';
@@ -30,12 +30,19 @@ export const CartScreen: React.FC = () => {
     isLoading,
     totalAmount,
     itemCount,
+    fetchCart,
     updateQuantity,
     removeFromCart,
     clearCart,
   } = useCart();
 
   const [operatingItemId, setOperatingItemId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+    }, [fetchCart])
+  );
 
   const handleIncrement = async (itemId: string, currentQty: number) => {
     try {

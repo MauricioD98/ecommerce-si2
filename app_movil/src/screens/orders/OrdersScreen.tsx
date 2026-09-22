@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { Order, OrderStatus } from '../../types';
@@ -68,9 +68,11 @@ export const OrdersScreen: React.FC = () => {
     }
   }, [selectedStatus]);
 
-  useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+  useFocusEffect(
+    useCallback(() => {
+      loadOrders();
+    }, [loadOrders])
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>

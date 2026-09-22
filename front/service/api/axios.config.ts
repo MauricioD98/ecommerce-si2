@@ -4,7 +4,7 @@ import { authService } from "./auth.service";
 import { setAccessToken, clearAuth } from "@/store/slices/authSlices";
 
 export const apiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1",
     headers: {
         "Content-type": "application/json",
     },

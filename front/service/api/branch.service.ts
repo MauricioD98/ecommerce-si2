@@ -7,8 +7,14 @@ export class BranchService {
 
     // Sucursales activas (endpoint público)
     static async getActiveBranches(): Promise<Branch[]> {
-        const response = await apiClient.get<Branch[]>(this.ENDPOINT);
-        return response.data;
+        try {
+            const response = await apiClient.get<any>(this.ENDPOINT);
+            if (Array.isArray(response.data)) return response.data;
+            if (Array.isArray(response.data?.data)) return response.data.data;
+            return [];
+        } catch {
+            return [];
+        }
     }
 
     // Panel admin: todas las sucursales, incluidas las inactivas (ADMIN_SUCURSAL solo recibe la suya)

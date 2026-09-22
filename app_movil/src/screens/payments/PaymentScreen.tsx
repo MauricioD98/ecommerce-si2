@@ -17,12 +17,14 @@ import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Colors, Shadows } from '../../theme/colors';
+import { useCart } from '../../context/CartContext';
 import { getErrorMessage } from '../../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
+  const { fetchCart } = useCart();
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
     const val = Number(amount);
@@ -58,7 +60,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
         const res = await paymentsApi.createIntent({
           orderId,
-          amount: validAmount,
           currency: 'usd',
           description: `Pago de pedido ${orderId}`,
         });
@@ -96,6 +97,11 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
       setTransactionRef(res.data?.transactionId || paymentIntentId);
       setIsSuccess(true);
+      try {
+        await fetchCart();
+      } catch {
+        // Ignorar si falla la sincronización inmediata
+      }
     } catch (err) {
       Alert.alert('Error de Pago', getErrorMessage(err));
     } finally {

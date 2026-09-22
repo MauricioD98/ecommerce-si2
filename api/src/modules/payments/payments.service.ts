@@ -48,9 +48,13 @@ export class PaymentsService {
     const amount = order.totalAmount.toNumber();
 
     const paymentIntent = await this.stripe.paymentIntents.create({
-    amount: Math.round(amount * 100),
-    currency,
-    metadata: { orderId, userId },
+      amount: Math.round(amount * 100),
+      currency,
+      metadata: { orderId, userId },
+      automatic_payment_methods: {
+        enabled: true,
+        allow_redirects: 'never',
+      },
     });
 
     // upsert: reintentar el pago de la misma orden (ej. tarjeta rechazada) reutiliza el registro en vez de chocar
@@ -112,7 +116,16 @@ export class PaymentsService {
     }
 
     if (payment.status !== PaymentStatus.COMPLETADO) {
-      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      let paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      if (
+        paymentIntent.status === 'requires_payment_method' &&
+        process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
+      ) {
+        paymentIntent = await this.stripe.paymentIntents.confirm(paymentIntentId, {
+          payment_method: 'pm_card_visa',
+          return_url: 'http://localhost:3001/api/v1/payments/return',
+        });
+      }
       if (paymentIntent.status !== 'succeeded') {
         throw new BadRequestException('Payment not successful');
       }
@@ -188,10 +201,22 @@ export class PaymentsService {
     ]);
 
     if (order.cartId) {
+      await this.prisma.cartItem.deleteMany({
+        where: { cartId: order.cartId },
+      });
       await this.prisma.cart.update({
         where: { id: order.cartId },
         data: { checkout: true },
       });
+    }
+
+    // Vaciar y marcar como completado cualquier carrito activo pendiente del usuario
+    const activeCarts = await this.prisma.cart.findMany({
+      where: { userId: order.userId, checkout: false },
+    });
+    for (const c of activeCarts) {
+      await this.prisma.cartItem.deleteMany({ where: { cartId: c.id } });
+      await this.prisma.cart.update({ where: { id: c.id }, data: { checkout: true } });
     }
 
     // Factura por correo y notificación push: sin await, para no demorar la respuesta del pago

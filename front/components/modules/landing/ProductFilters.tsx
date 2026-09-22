@@ -25,8 +25,12 @@ export default function ProductFilters() {
     const [collections, setCollections] = useState<CollectionOption[]>([]);
 
     useEffect(() => {
-        CategoryService.getCategories().then(setCategories).catch(() => setCategories([]));
-        CollectionService.getCollections().then(setCollections).catch(() => setCollections([]));
+        CategoryService.getCategories()
+            .then((res) => setCategories(Array.isArray(res) ? res : []))
+            .catch(() => setCategories([]));
+        CollectionService.getCollections()
+            .then((res) => setCollections(Array.isArray(res) ? res : []))
+            .catch(() => setCollections([]));
     }, []);
 
     const category = searchParams.get('category') ?? '';
@@ -90,6 +94,22 @@ export default function ProductFilters() {
 
     const clearAll = () => router.push(pathname, { scroll: false });
 
+    const categoryOptions = (Array.isArray(categories) ? categories : [])
+        .filter((cat) => cat && cat.id)
+        .map((cat) => (
+            <option key={cat.id} value={cat.id}>
+                {cat.name}
+            </option>
+        ));
+
+    const collectionOptions = (Array.isArray(collections) ? collections : [])
+        .filter((col) => col && col.id)
+        .map((col) => (
+            <option key={col.id} value={col.slug || col.id}>
+                {col.name}
+            </option>
+        ));
+
     return (
         <div className={styles.filterBar}>
             <select
@@ -99,11 +119,7 @@ export default function ProductFilters() {
                 aria-label="Filtrar por categoría"
             >
                 <option value="">Categoría</option>
-                {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                    </option>
-                ))}
+                {categoryOptions}
             </select>
 
             <select
@@ -113,11 +129,7 @@ export default function ProductFilters() {
                 aria-label="Filtrar por colección"
             >
                 <option value="">Colección</option>
-                {collections.map((col) => (
-                    <option key={col.id} value={col.slug}>
-                        {col.name}
-                    </option>
-                ))}
+                {collectionOptions}
             </select>
 
             <div className={styles.pillGroup}>

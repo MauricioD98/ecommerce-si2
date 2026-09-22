@@ -159,6 +159,15 @@ export class InventoryService {
       data: { stock: { decrement: quantity } },
     });
     if (result.count === 0) {
+      // Si la sucursal no tiene fila asignada o stock suficiente para la talla, verificar stock global
+      const prod = await tx.product.findUnique({ where: { id: productId } });
+      if (prod && prod.stock >= quantity) {
+        await tx.product.update({
+          where: { id: productId },
+          data: { stock: { decrement: quantity } },
+        });
+        return;
+      }
       throw new BadRequestException(`Insufficient stock for size ${size} in the selected branch`);
     }
     await this.syncGlobalStock(tx, productId);

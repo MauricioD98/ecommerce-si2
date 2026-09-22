@@ -4,14 +4,17 @@ export interface Product {
   id: string;
   name: string;
   description?: string | null;
-  size: string;
+  size?: string;
+  sizes?: string[];
+  colors?: string[];
   price: number | string;
+  effectivePrice?: number;
   stock: number;
   sku: string;
   imageUrl?: string | null;
   isActive: boolean;
-  categoryId: string;
-  category?: Category;
+  categoryId?: string;
+  category?: Category | string | null;
   createdAt?: string;
   updatedAt?: string;
 }

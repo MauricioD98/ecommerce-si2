@@ -96,14 +96,28 @@ export const ProfileScreen: React.FC = () => {
           <Text style={styles.userName}>{fullName}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
 
-          <View style={styles.roleBadge}>
-            <Ionicons
-              name={user?.role === 'ADMIN' ? 'shield-checkmark' : 'person'}
-              size={14}
-              color={Colors.primary}
-            />
-            <Text style={styles.roleText}>{user?.role || 'USUARIO'}</Text>
-          </View>
+          {(() => {
+            const roleName =
+              typeof user?.role === 'object' && user?.role !== null
+                ? (user.role as any).name
+                : typeof user?.role === 'string'
+                ? user.role
+                : 'CLIENTE';
+            const isAdmin =
+              roleName === 'ADMIN' ||
+              roleName === 'Super Admin' ||
+              roleName === 'Admin Sucursal';
+            return (
+              <View style={styles.roleBadge}>
+                <Ionicons
+                  name={isAdmin ? 'shield-checkmark' : 'person'}
+                  size={14}
+                  color={Colors.primary}
+                />
+                <Text style={styles.roleText}>{roleName || 'CLIENTE'}</Text>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Menu Items */}

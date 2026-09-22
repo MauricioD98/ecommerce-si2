@@ -24,12 +24,7 @@ export default async function Page({ params }: PageProps) {
 
 export function generateMetadato() {
     return {
-
         title: 'Detalle del producto',
         description: 'Consulta los detalles del producto',
-        icons: {
-            icon: 'path to asset file'
-        }
-
-    }
+    };
 }

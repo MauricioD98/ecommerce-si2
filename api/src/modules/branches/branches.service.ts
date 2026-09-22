@@ -22,6 +22,13 @@ export class BranchesService {
     });
   }
 
+  async findFirstActive(): Promise<Branch | null> {
+    return await this.prisma.branch.findFirst({
+      where: { isActive: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   // Administración: con alcance global se ven todas; con alcance de sucursal solo la propia
   async findAllForAdmin(actor: AuthUser): Promise<Branch[]> {
     return await this.prisma.branch.findMany({

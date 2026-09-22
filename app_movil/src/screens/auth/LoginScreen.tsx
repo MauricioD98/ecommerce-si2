@@ -28,8 +28,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { login } = useAuth();
-  const [email, setEmail] = useState<string>('admin@gmail.com');
-  const [password, setPassword] = useState<string>('Admin123*');
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -108,36 +108,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.logoBadge}>
             <Ionicons name="bag-handle" size={40} color={Colors.primary} />
           </View>
-          <Text style={styles.appTitle}>E-Commerce Móvil</Text>
+          <Text style={styles.appTitle}>Stella Femme</Text>
           <Text style={styles.subtitle}>Inicia sesión para gestionar tus compras</Text>
-        </View>
-
-        {/* Existing Neon DB Users Quick-Fill */}
-        <View style={styles.quickFillContainer}>
-          <Text style={styles.quickFillTitle}>⚡ Acceso Rápido (Base de Datos Neon):</Text>
-          <View style={styles.quickButtonsRow}>
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => {
-                setEmail('admin@gmail.com');
-                setPassword('Admin123*');
-              }}
-            >
-              <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
-              <Text style={styles.quickBtnText}>admin@gmail.com</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => {
-                setEmail('john.doe@example.com');
-                setPassword('StrongP@ssw0rd!');
-              }}
-            >
-              <Ionicons name="person" size={14} color={Colors.secondary} />
-              <Text style={styles.quickBtnText}>john.doe@example.com</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         <View style={styles.formCard}>
@@ -320,41 +292,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
-  },
-  quickFillContainer: {
-    backgroundColor: Colors.surfaceSubtle,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  quickFillTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  quickButtonsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 6,
-  },
-  quickBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textPrimary,
   },
   formCard: {
     backgroundColor: Colors.surface,

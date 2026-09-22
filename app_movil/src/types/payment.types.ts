@@ -1,6 +1,6 @@
 export interface CreatePaymentIntentPayload {
   orderId: string;
-  amount: number;
+  amount?: number;
   currency?: string;
   description?: string;
 }

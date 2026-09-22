@@ -8,6 +8,7 @@ export interface OrderItem {
   productId: string;
   quantity: number;
   price: number | string;
+  size?: string;
   product?: Product;
   productName?: string;
   subtotal?: number;
@@ -43,12 +44,15 @@ export interface Order {
 export interface CreateOrderItemInput {
   productId: string;
   quantity: number;
-  price: number;
+  price?: number;
+  size: string;
 }
 
 export interface CreateOrderPayload {
   items: CreateOrderItemInput[];
   shippingAddress?: string;
+  fulfillmentType?: 'DELIVERY' | 'PICKUP';
+  branchId?: string;
 }
 
 export interface PaginatedOrdersResponse {

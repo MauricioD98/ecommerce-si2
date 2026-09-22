@@ -30,6 +30,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [quantity, setQuantity] = useState<number>(1);
+  const [selectedSize, setSelectedSize] = useState<string>('');
   const [isAdding, setIsAdding] = useState<boolean>(false);
 
   useEffect(() => {
@@ -38,6 +39,15 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         setIsLoading(true);
         const data = await productsApi.getById(productId);
         setProduct(data);
+        const availableSizes =
+          Array.isArray(data.sizes) && data.sizes.length > 0
+            ? data.sizes
+            : data.size
+            ? [data.size]
+            : [];
+        if (availableSizes.length > 0) {
+          setSelectedSize(availableSizes[0]);
+        }
       } catch (err) {
         Alert.alert('Error', getErrorMessage(err));
         navigation.goBack();
@@ -52,10 +62,11 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!product) return;
     try {
       setIsAdding(true);
-      await addToCart(product.id, quantity);
+      const chosenSize = selectedSize || (product as any)?.sizes?.[0] || 'M';
+      await addToCart(product.id, quantity, chosenSize);
       Alert.alert(
         '¡Producto añadido!',
-        `Se agregaron ${quantity} unidad(es) de ${product.name} al carrito.`,
+        `Se agregaron ${quantity} unidad(es) de ${product.name} (Talla: ${chosenSize}) al carrito.`,
         [
           { text: 'Seguir Comprando', style: 'cancel' },
           {
@@ -119,17 +130,20 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Product Info */}
         <View style={styles.infoCard}>
           <View style={styles.tagsRow}>
-            <View style={styles.tagPill}>
-              <Text style={styles.tagText}>Talla: {product.size}</Text>
-            </View>
-            <View style={styles.skuPill}>
-              <Text style={styles.skuText}>SKU: {product.sku}</Text>
-            </View>
-            {product.category && (
-              <View style={styles.catPill}>
-                <Text style={styles.catText}>{product.category.name}</Text>
+            {product.sku ? (
+              <View style={styles.skuPill}>
+                <Text style={styles.skuText}>SKU: {product.sku}</Text>
               </View>
-            )}
+            ) : null}
+            {product.category ? (
+              <View style={styles.catPill}>
+                <Text style={styles.catText}>
+                  {typeof product.category === 'object' && product.category !== null
+                    ? (product.category as any).name
+                    : String(product.category)}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           <Text style={styles.title}>{product.name}</Text>
@@ -160,6 +174,50 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
 
           <View style={styles.divider} />
+
+          {/* Size Selector */}
+          {(() => {
+            const availableSizes =
+              Array.isArray((product as any).sizes) && (product as any).sizes.length > 0
+                ? (product as any).sizes
+                : product.size
+                ? [product.size]
+                : [];
+            if (availableSizes.length === 0) return null;
+            return (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.sectionTitle}>Talla</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                  {availableSizes.map((s: string) => {
+                    const isSelected = (selectedSize || availableSizes[0]) === s;
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        onPress={() => setSelectedSize(s)}
+                        style={{
+                          paddingHorizontal: 16,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? Colors.primary : Colors.border,
+                          backgroundColor: isSelected ? Colors.primaryLight : Colors.surface,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontWeight: isSelected ? '700' : '500',
+                            color: isSelected ? Colors.primary : Colors.textPrimary,
+                          }}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })()}
 
           <Text style={styles.sectionTitle}>Descripción</Text>
           <Text style={styles.description}>

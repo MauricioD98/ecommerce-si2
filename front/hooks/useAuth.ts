@@ -33,13 +33,15 @@ export function useAuth() {
         }
     }
 
-    // Trae el perfil actual (rol, sucursal y descuento de trabajador). Falla en silencio: es solo informativo
+    // Trae el perfil actual (rol, sucursal y descuento de trabajador). Si el usuario no existe (404/401), limpia la sesión vieja
     const refreshProfile = useCallback(async () => {
         try {
             const profile = await authService.getProfile();
             dispatch(setUser(profile));
         } catch (error) {
-            console.warn("No se pudo actualizar el perfil", error);
+            if (axios.isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 401)) {
+                dispatch(clearAuth());
+            }
         }
     }, [dispatch]);
 

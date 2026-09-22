@@ -5,10 +5,16 @@ import { Collection, CollectionPayload, PaginatedCollections } from "@/types/adm
 export class CollectionService {
     // Público (filtro de la tienda): solo colecciones activas
     static async getCollections(): Promise<CollectionOption[]> {
-        const response = await apiClient.get<{ data: CollectionOption[] }>("/collections", {
-            params: { isActive: true, limit: 100 },
-        });
-        return response.data.data;
+        try {
+            const response = await apiClient.get<any>("/collections", {
+                params: { isActive: true, limit: 100 },
+            });
+            if (Array.isArray(response.data?.data)) return response.data.data;
+            if (Array.isArray(response.data)) return response.data;
+            return [];
+        } catch {
+            return [];
+        }
     }
 
     // Panel admin (selector "Colecciones" del formulario de producto): todas, incluidas inactivas

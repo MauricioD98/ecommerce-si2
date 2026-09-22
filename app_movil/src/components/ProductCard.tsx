@@ -48,9 +48,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Ionicons name="shirt-outline" size={42} color={Colors.textMuted} />
           </View>
         )}
-        <View style={styles.sizeTag}>
-          <Text style={styles.sizeText}>{product.size}</Text>
-        </View>
+        {(() => {
+          const displaySize =
+            Array.isArray((product as any).sizes) && (product as any).sizes.length > 0
+              ? (product as any).sizes.join('/')
+              : product.size;
+          return displaySize ? (
+            <View style={styles.sizeTag}>
+              <Text style={styles.sizeText}>{displaySize}</Text>
+            </View>
+          ) : null;
+        })()}
         {isOutOfStock && (
           <View style={styles.outOfStockOverlay}>
             <Text style={styles.outOfStockText}>Agotado</Text>

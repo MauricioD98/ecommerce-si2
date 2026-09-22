@@ -60,7 +60,7 @@ export default function BranchSelector() {
                         <p className={styles.message}>No hay sucursales disponibles.</p>
                     )}
 
-                    {branches.map((branch) => (
+                    {(branches || []).map((branch) => (
                         <button
                             key={branch.id}
                             type="button"

@@ -5,6 +5,7 @@ export interface CartItem {
   cartId: string;
   productId: string;
   quantity: number;
+  size?: string | null;
   product: Product;
 }
 
@@ -21,6 +22,8 @@ export interface Cart {
 export interface AddCartItemPayload {
   productId: string;
   quantity: number;
+  size?: string;
+  branchId?: string;
 }
 
 export interface UpdateCartItemPayload {

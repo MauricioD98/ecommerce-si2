@@ -51,11 +51,17 @@ export class OrdersService {
     const fulfillmentType = createOrderDto.fulfillmentType ?? FulfillmentType.DELIVERY;
     const userId = user.id;
 
-    if (fulfillmentType === FulfillmentType.PICKUP && !branchId) {
-      throw new BadRequestException('A branch is required for PICKUP orders');
+    let targetBranchId = branchId;
+    if (fulfillmentType === FulfillmentType.PICKUP && !targetBranchId) {
+      const defaultBranch = await this.branchesService.findFirstActive();
+      if (defaultBranch) {
+        targetBranchId = defaultBranch.id;
+      } else {
+        throw new BadRequestException('A branch is required for PICKUP orders');
+      }
     }
-    if (branchId) {
-      await this.branchesService.findActiveOrFail(branchId);
+    if (targetBranchId) {
+      await this.branchesService.findActiveOrFail(targetBranchId);
     }
     // La ubicación de entrega va completa (latitud y longitud) o no va
     if ((latitude === undefined) !== (longitude === undefined)) {
@@ -140,7 +146,7 @@ export class OrdersService {
       shippingCost,
       ...(paymentMethod ? { paymentMethod } : {}),
       fulfillmentType,
-      branchId,
+      branchId: targetBranchId,
       shippingAddress,
       // La ubicación solo tiene sentido en envíos a domicilio
       ...(fulfillmentType === FulfillmentType.DELIVERY ? { latitude, longitude } : {}),
@@ -168,8 +174,8 @@ export class OrdersService {
   })
 
   for (const line of lines) {
-        if (branchId) {
-          await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity);
+        if (targetBranchId) {
+          await this.inventoryService.decrement(tx, line.productId, targetBranchId, line.size, line.quantity);
         } else {
           const result = await tx.product.updateMany({
             where: { id: line.productId, stock: { gte: line.quantity } },
@@ -180,6 +186,7 @@ export class OrdersService {
           }
         }
       }
+
       return newOrder;
 });
 

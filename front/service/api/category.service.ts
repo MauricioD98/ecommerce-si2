@@ -4,8 +4,14 @@ import { CategoryOption, CategoryPayload, PaginatedCategories } from "@/types/ad
 export class CategoryService {
     // El backend pagina; el catálogo tiene pocas categorías, por eso se pide un límite alto
     static async getCategories(): Promise<CategoryOption[]> {
-        const response = await apiClient.get<{ data: CategoryOption[] }>("/categories", { params: { limit: 100 } });
-        return response.data.data;
+        try {
+            const response = await apiClient.get<any>("/categories", { params: { limit: 100 } });
+            if (Array.isArray(response.data?.data)) return response.data.data;
+            if (Array.isArray(response.data)) return response.data;
+            return [];
+        } catch {
+            return [];
+        }
     }
 
     // Panel admin: listado paginado con búsqueda, para la tabla de gestión de categorías

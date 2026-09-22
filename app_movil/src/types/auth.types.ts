@@ -1,10 +1,18 @@
-export type Role = 'USUARIO' | 'ADMIN';
+export type Role =
+  | 'USUARIO'
+  | 'ADMIN'
+  | 'Cliente'
+  | 'Super Admin'
+  | 'Admin Sucursal'
+  | 'Empleado'
+  | { id: string; name: string };
 
 export interface User {
   id: string;
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phone?: string | null;
   role: Role;
   createdAt?: string;
   updatedAt?: string;

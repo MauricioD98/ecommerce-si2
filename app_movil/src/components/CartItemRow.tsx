@@ -61,7 +61,9 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
 
         <View style={styles.metaRow}>
           <View style={styles.sizeTag}>
-            <Text style={styles.sizeText}>Talla: {product?.size || '-'}</Text>
+            <Text style={styles.sizeText}>
+              Talla: {item.size || (product as any)?.sizes?.[0] || product?.size || '-'}
+            </Text>
           </View>
           <Text style={styles.unitPrice}>${unitPrice.toFixed(2)} c/u</Text>
         </View>
