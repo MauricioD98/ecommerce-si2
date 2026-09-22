@@ -52,10 +52,18 @@ export interface RolePayload {
     permissions: string[];
 }
 
+export interface InventorySizeStock {
+    size: string;
+    stock: number;
+}
+
 export interface InventoryItem {
     productId: string;
     branchId: string;
+    // Suma del stock de todas las tallas
     stock: number;
+    // Stock desglosado por talla
+    sizes: InventorySizeStock[];
     productName: string;
     sku: string;
     price: number;
@@ -70,9 +78,10 @@ export interface ProductDiscountPayload {
     discountPercentage: number | null;
 }
 
-// PUT /branches/:branchId/inventory/:productId: stock y descuento de la sucursal
+// PUT /branches/:branchId/inventory/:productId: stock por talla y descuento de la sucursal
+// (el descuento aplica igual a todas las tallas)
 export interface SetInventoryPayload extends ProductDiscountPayload {
-    stock: number;
+    sizes: InventorySizeStock[];
 }
 
 export type OrderStatus = "PENDIENTE" | "PROCESANDO" | "ENVIADO" | "ENTREGADO" | "CANCELADO";
@@ -163,6 +172,8 @@ export interface ProductPayload {
     // Sucursal a la que el producto queda exclusivo. Omitido/null = global (visible en todas).
     // Con un admin de sucursal (sin ALL_BRANCHES) el backend lo ignora y fuerza su propia sucursal.
     branchId?: string | null;
+    // Colecciones a las que pertenece (ej. Otoño-Invierno). Omitido: no se toca; [] las quita todas.
+    collectionIds?: string[];
 }
 
 export interface CategoryOption {
@@ -194,6 +205,38 @@ export interface CategoryPayload {
 
 export interface PaginatedCategories {
     data: Category[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface Collection {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    bannerImageUrl: string | null;
+    isActive: boolean;
+    // Cuántos productos tiene la colección (el backend bloquea el borrado si es > 0)
+    productCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CollectionPayload {
+    name: string;
+    description?: string;
+    // Vacío/omitido: el backend genera el slug a partir del nombre
+    slug?: string;
+    bannerImageUrl?: string;
+    isActive?: boolean;
+}
+
+export interface PaginatedCollections {
+    data: Collection[];
     meta: {
         total: number;
         page: number;

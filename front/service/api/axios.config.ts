@@ -9,6 +9,10 @@ export const apiClient = axios.create({
         "Content-type": "application/json",
     },
     timeout: 10000,
+    // El default de Axios serializa arrays como "sizes[]=S&sizes[]=L". El ValidationPipe global del
+    // backend (whitelist: true) no conoce "sizes[]" como propiedad del DTO y rechaza todo con 400.
+    // Con { indexes: null } serializa "sizes=S&sizes=L" (clave repetida), que es lo que espera Nest.
+    paramsSerializer: { indexes: null },
 });
 
 apiClient.interceptors.request.use(

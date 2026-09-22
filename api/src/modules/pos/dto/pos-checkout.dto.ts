@@ -12,6 +12,11 @@ class PosCheckoutItemDto {
   @IsInt()
   @IsPositive()
   quantity: number;
+
+  @ApiProperty({ example: 'M', description: 'Talla vendida: el stock se descuenta por talla' })
+  @IsString()
+  @IsNotEmpty()
+  size: string;
 }
 
 // Métodos de pago que se cobran físicamente en caja (Stripe queda solo para el checkout web)

@@ -62,7 +62,7 @@ export class PosService {
       : await this.getOrCreateWalkInCustomer();
 
     // Precios y stock siempre desde la BD, con el descuento vigente de esta sucursal (nunca del cliente)
-    const lines: { productId: string; productName: string; quantity: number; unitPrice: number }[] = [];
+    const lines: { productId: string; productName: string; quantity: number; unitPrice: number; size: string }[] = [];
 
     for (const item of dto.items) {
       const product = await this.prisma.product.findUnique({ where: { id: item.productId } });
@@ -70,18 +70,26 @@ export class PosService {
         throw new NotFoundException(`Product with ID ${item.productId} not found`);
       }
 
-      const inventory = await this.inventoryService.getInventory(product.id, branchId);
-      if ((inventory?.stock ?? 0) < item.quantity) {
+      if (!product.sizes.includes(item.size)) {
+        throw new BadRequestException(`Invalid size for product ${product.name}. Available: ${product.sizes.join(', ')}`);
+      }
+
+      const inventoryForSize = await this.inventoryService.getInventoryForSize(product.id, branchId, item.size);
+      if ((inventoryForSize?.stock ?? 0) < item.quantity) {
         throw new BadRequestException(
-          `Insufficient stock for product ${product.name}. Available: ${inventory?.stock ?? 0}, Requested: ${item.quantity}`,
+          `Insufficient stock for size ${item.size} of product ${product.name}. Available: ${inventoryForSize?.stock ?? 0}, Requested: ${item.quantity}`,
         );
       }
+
+      // El descuento sigue siendo agregado (igual en todas las tallas)
+      const inventoryAggregate = await this.inventoryService.getInventory(product.id, branchId);
 
       lines.push({
         productId: product.id,
         productName: product.name,
         quantity: item.quantity,
-        unitPrice: getBranchPrice(product, inventory),
+        unitPrice: getBranchPrice(product, inventoryAggregate),
+        size: item.size,
       });
     }
 
@@ -126,13 +134,14 @@ export class PosService {
               product: { connect: { id: line.productId } },
               quantity: line.quantity,
               price: line.unitPrice,
+              size: line.size,
             })),
           },
         },
       });
 
       for (const line of lines) {
-        await this.inventoryService.decrement(tx, line.productId, branchId, line.quantity);
+        await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity);
       }
 
       return newOrder;
@@ -146,6 +155,7 @@ export class PosService {
         orderNumber: order.orderNumber,
         items: lines.map((line) => ({
           productName: line.productName,
+          size: line.size,
           quantity: line.quantity,
           unitPrice: line.unitPrice,
           subtotal: Math.round(line.unitPrice * line.quantity * 100) / 100,

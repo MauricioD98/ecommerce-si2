@@ -100,7 +100,7 @@ export class CartService {
     const currentQtyInCart = existingItem ? existingItem.quantity : 0;
     const requestedQty = currentQtyInCart + quantity;
 
-    await this.assertStock(product, requestedQty, branchId);
+    await this.assertStock(product, requestedQty, branchId, size);
 
     if (existingItem) {
       await this.prisma.cartItem.update({
@@ -134,7 +134,7 @@ export class CartService {
       throw new NotFoundException('Ítem no encontrado en el carrito');
     }
 
-    await this.assertStock(item.product, dto.quantity, dto.branchId);
+    await this.assertStock(item.product, dto.quantity, dto.branchId, item.size);
 
     await this.prisma.cartItem.update({
       where: { id: itemId },
@@ -174,13 +174,16 @@ export class CartService {
     return this.getOrCreateCart(userId, branchId);
   }
 
-  // Valida el stock de la sucursal indicada; sin sucursal usa el stock global (retrocompatible)
-  private async assertStock(product: Product, requestedQty: number, branchId?: string) {
+  // Valida el stock de la sucursal indicada (por talla si se conoce); sin sucursal usa el stock
+  // global (retrocompatible)
+  private async assertStock(product: Product, requestedQty: number, branchId?: string, size?: string | null) {
     let available = product.stock;
 
     if (branchId) {
       await this.branchesService.findActiveOrFail(branchId);
-      available = await this.inventoryService.getStock(product.id, branchId);
+      available = size
+        ? await this.inventoryService.getStockForSize(product.id, branchId, size)
+        : ((await this.inventoryService.getInventory(product.id, branchId))?.stock ?? 0);
     }
 
     if (requestedQty > available) {

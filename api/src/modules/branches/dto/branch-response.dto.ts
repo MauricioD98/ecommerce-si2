@@ -23,6 +23,14 @@ export class BranchResponseDto {
   updatedAt: Date;
 }
 
+export class InventorySizeStockDto {
+  @ApiProperty({ example: 'M' })
+  size: string;
+
+  @ApiProperty({ example: 10 })
+  stock: number;
+}
+
 export class InventoryResponseDto {
   @ApiProperty()
   productId: string;
@@ -30,8 +38,11 @@ export class InventoryResponseDto {
   @ApiProperty()
   branchId: string;
 
-  @ApiProperty({ example: 25 })
+  @ApiProperty({ example: 25, description: 'Suma del stock de todas las tallas' })
   stock: number;
+
+  @ApiProperty({ type: [InventorySizeStockDto], description: 'Stock desglosado por talla' })
+  sizes: InventorySizeStockDto[];
 
   @ApiProperty({ example: 'Vestido largo rojo de fiesta' })
   productName: string;

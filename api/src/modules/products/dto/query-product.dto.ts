@@ -1,7 +1,10 @@
 
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+
+// Acepta tanto ?sizes=S&sizes=M (array nativo de query) como ?sizes=S (un solo valor)
+const toArray = ({ value }: { value: unknown }) => (value === undefined ? undefined : Array.isArray(value) ? value : [value]);
 
 
 
@@ -78,5 +81,57 @@ export class QueryProductDto {
   @Min(1)
   @IsOptional()
   limit: number = 10;
+
+  @ApiPropertyOptional({
+    description: 'Filter by collection slug (ej. "otono-invierno")',
+    example: 'otono-invierno',
+  })
+  @IsString()
+  @IsOptional()
+  collectionSlug?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by sizes: matches products that have AT LEAST ONE of the given sizes',
+    isArray: true,
+    example: ['S', 'M'],
+  })
+  @Transform(toArray)
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  sizes?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Filter by colors: matches products that have AT LEAST ONE of the given colors',
+    isArray: true,
+    example: ['negro', 'blanco'],
+  })
+  @Transform(toArray)
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  colors?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Minimum price (inclusive)',
+    example: 20,
+    minimum: 0,
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  minPrice?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum price (inclusive)',
+    example: 150,
+    minimum: 0,
+  })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  maxPrice?: number;
 
 }

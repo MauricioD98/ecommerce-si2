@@ -263,16 +263,21 @@ async function main() {
     });
     console.log(`Producto: ${product.sku} - ${product.name} (tallas ${product.sizes.join("/")}, $${product.price}, stock ${product.stock})`);
 
-    // Stock por sucursal: el stock global se reparte entre las sucursales.
-    // Solo se define al crear; si ya existe no se pisa (puede haber cambiado por ventas).
+    // Stock por sucursal y por talla: el stock global se reparte primero entre las sucursales y,
+    // dentro de cada sucursal, entre las tallas del producto. Solo se define al crear; si ya existe
+    // no se pisa (puede haber cambiado por ventas).
     const perBranch = Math.floor(product.stock / branches.length);
-    for (const [index, branch] of branches.entries()) {
-      const stock = index === 0 ? product.stock - perBranch * (branches.length - 1) : perBranch;
-      await prisma.productInventory.upsert({
-        where: { productId_branchId: { productId: product.id, branchId: branch.id } },
-        update: {},
-        create: { productId: product.id, branchId: branch.id, stock },
-      });
+    for (const [branchIndex, branch] of branches.entries()) {
+      const branchStock = branchIndex === 0 ? product.stock - perBranch * (branches.length - 1) : perBranch;
+      const perSize = Math.floor(branchStock / product.sizes.length);
+      for (const [sizeIndex, size] of product.sizes.entries()) {
+        const stock = sizeIndex === 0 ? branchStock - perSize * (product.sizes.length - 1) : perSize;
+        await prisma.productInventory.upsert({
+          where: { productId_branchId_size: { productId: product.id, branchId: branch.id, size } },
+          update: {},
+          create: { productId: product.id, branchId: branch.id, size, stock },
+        });
+      }
     }
   }
 }

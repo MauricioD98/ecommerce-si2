@@ -24,6 +24,20 @@ export class ProductResponseDto {
   sizes: WomenSize[];
 
   @ApiProperty({
+    description: 'Colores disponibles de la prenda',
+    isArray: true,
+    example: ['negro', 'blanco'],
+  })
+  colors: string[];
+
+  @ApiProperty({
+    description: 'Colecciones a las que pertenece el producto',
+    isArray: true,
+    example: [{ id: '550e8400-e29b-41d4-a716-446655440001', name: 'Otoño-Invierno', slug: 'otono-invierno' }],
+  })
+  collections: { id: string; name: string; slug: string }[];
+
+  @ApiProperty({
     description: 'Product description',
     example: 'High quality',
   })
@@ -86,6 +100,12 @@ export class ProductResponseDto {
     example: true,
   })
   isActive: boolean;
+
+  @ApiProperty({
+    description: 'Cantidad de líneas de pedido que referencian este producto (si es > 0, no se puede eliminar; solo desactivar)',
+    example: 0,
+  })
+  orderCount: number;
 
   @ApiProperty({
     description: 'Sucursal a la que el producto es exclusivo (null = global, visible en todas)',

@@ -3,6 +3,7 @@ export type PosPaymentMethod = "CASH" | "PHYSICAL_CARD" | "QR";
 export interface PosCheckoutItem {
     productId: string;
     quantity: number;
+    size: string;
 }
 
 export interface PosCheckoutPayload {
@@ -20,6 +21,7 @@ export interface PosCheckoutPayload {
 
 export interface PosReceiptItem {
     productName: string;
+    size: string;
     quantity: number;
     unitPrice: number;
     subtotal: number;

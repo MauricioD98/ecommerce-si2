@@ -98,6 +98,10 @@ model Product {
   name      String
   description String?
   sizes String[] @default([])
+  // Colores disponibles de la prenda. Mismo modelo que `sizes`: un array simple en el producto, no
+  // una variante independiente. El stock sigue siendo por producto+sucursal (ProductInventory), no
+  // por talla ni por color — ver nota de auditoría en el chat sobre por qué no se creó ProductVariant.
+  colors String[] @default([])
   price     Decimal @db.Decimal(10, 2)
   stock     Int @default(0) // stock global (legado); el stock por sucursal está en ProductInventory
   sku String @unique
@@ -108,6 +112,9 @@ model Product {
   orderItems OrderItem[]
   cartItems CartItem[]
   inventories ProductInventory[]
+  // Colecciones a las que pertenece (ej. "Otoño-Invierno", "Nueva Temporada"). Un producto puede
+  // estar en varias; relación implícita m2m (Prisma crea la tabla puente sola)
+  collections Collection[]
 
   categoryId String
   category Category @relation(fields: [categoryId], references: [id])
@@ -152,8 +159,14 @@ model Branch {
 
 model ProductInventory {
   id        String      @id @default(uuid())
+  // Stock por producto+sucursal+talla (antes era solo producto+sucursal). "size" siempre es una de
+  // las tallas de Product.sizes: cada producto nace sin filas hasta que Inventario le asigna stock
+  // talla por talla.
+  size      String
   stock     Int @default(0)
-  // Descuentos por sucursal: discountPrice tiene prioridad sobre discountPercentage
+  // Descuentos por sucursal: discountPrice tiene prioridad sobre discountPercentage. Se mantienen
+  // iguales entre las tallas de un mismo producto+sucursal (la oferta no varía por talla); el
+  // servicio se encarga de sincronizarlos entre filas.
   discountPrice Decimal? @db.Decimal(10, 2)
   discountPercentage Int?
 
@@ -166,9 +179,31 @@ model ProductInventory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([productId, branchId])
+  @@unique([productId, branchId, size])
   @@index([branchId])
+  @@index([productId])
   @@map("product_inventories")
+}
+
+// Colección de temporada/campaña (ej. "Otoño-Invierno", "Básicos"). Independiente de Category:
+// una categoría es "qué es" la prenda (vestido, blusa); una colección es "para qué campaña" se
+// exhibe. Un producto puede estar en varias colecciones a la vez.
+model Collection {
+  id             String   @id @default(uuid())
+  name           String
+  slug           String   @unique
+  description    String?
+  bannerImageUrl String?
+  isActive       Boolean  @default(true)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("collections")
 }
 
 model Category {

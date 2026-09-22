@@ -23,9 +23,16 @@ export interface Product {
     category: string;
     categoryId: string;
     sizes: string[];
+    // Colores disponibles de la prenda (texto libre, ej. "negro")
+    colors: string[];
+    // Colecciones a las que pertenece (ej. Otoño-Invierno)
+    collections: { id: string; name: string; slug: string }[];
     isActive?: boolean;
     // Sucursal a la que el producto es exclusivo (null = global, visible en todas)
     branchId?: string | null;
+    // Cantidad de líneas de pedido que referencian este producto. Si es > 0, el backend rechaza
+    // eliminarlo (solo se puede desactivar).
+    orderCount: number;
 }
 
 export interface ProductQueryParams {
@@ -34,6 +41,12 @@ export interface ProductQueryParams {
     search?: string;
     category?: string;
     branchId?: string;
+    // Filtros avanzados del catálogo
+    collectionSlug?: string;
+    sizes?: string[];
+    colors?: string[];
+    minPrice?: number;
+    maxPrice?: number;
 }
 
 export interface PaginationMeta {

@@ -14,13 +14,13 @@ class OrderItemDto {
   @IsPositive()
   quantity: number;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 'M',
-    description: 'Talla comprada (si el producto maneja tallas)',
+    description: 'Talla comprada: obligatoria, el stock ahora se descuenta por talla',
   })
-  @IsOptional()
+  @IsNotEmpty()
   @IsString()
-  size?: string;
+  size: string;
 
   @ApiPropertyOptional({
     example: 49.99,

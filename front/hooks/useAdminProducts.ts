@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { ProductService } from "@/service/api/product.service";
 import { CategoryService } from "@/service/api/category.service";
+import { CollectionService } from "@/service/api/collection.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { CategoryOption, ProductPayload } from "@/types/admin.types";
 import { PaginationMeta, Product } from "@/types/product.types";
+import { CollectionOption } from "@/types/collection.types";
 
 const PAGE_SIZE = 10;
 
@@ -87,4 +89,31 @@ export function useCategoryOptions() {
     }, []);
 
     return { categories, isLoading };
+}
+
+// Colecciones (todas, incluidas inactivas) para el selector "Colecciones" del formulario de producto
+export function useCollectionOptions() {
+    const [collections, setCollections] = useState<CollectionOption[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        let active = true;
+
+        CollectionService.getCollectionOptions()
+            .then((data) => {
+                if (active) setCollections(data);
+            })
+            .catch(() => {
+                if (active) setCollections([]);
+            })
+            .finally(() => {
+                if (active) setIsLoading(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    return { collections, isLoading };
 }

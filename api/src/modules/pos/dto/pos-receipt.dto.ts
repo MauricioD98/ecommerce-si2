@@ -5,6 +5,9 @@ export class PosReceiptItemDto {
   productName: string;
 
   @ApiProperty()
+  size: string;
+
+  @ApiProperty()
   quantity: number;
 
   @ApiProperty()

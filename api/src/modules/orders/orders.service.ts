@@ -63,7 +63,7 @@ export class OrdersService {
     }
 
     // Precios calculados en el servidor (descuento de la sucursal), nunca los enviados por el cliente
-    const lines: { productId: string; quantity: number; unitPrice: number; size?: string }[] = [];
+    const lines: { productId: string; quantity: number; unitPrice: number; size: string }[] = [];
 
     for (const item of items) {
       const product = await this.prisma.product.findUnique({
@@ -76,29 +76,31 @@ export class OrdersService {
         );
       }
 
-      if (item.size && !product.sizes.includes(item.size)) {
+      if (!product.sizes.includes(item.size)) {
         throw new BadRequestException(
           `Invalid size for product ${product.name}. Available: ${product.sizes.join(', ')}`,
         );
       }
 
-      // Con sucursal se valida su inventario y se toma su descuento; sin sucursal, el stock global
-      // (retrocompatible) y el precio base
-      const inventory = branchId
-        ? await this.inventoryService.getInventory(product.id, branchId)
+      // Con sucursal se valida el stock de esa talla puntual; sin sucursal, el stock global
+      // (retrocompatible, no distingue talla) y el precio base
+      const inventoryForSize = branchId
+        ? await this.inventoryService.getInventoryForSize(product.id, branchId, item.size)
         : null;
-      const available = branchId ? (inventory?.stock ?? 0) : product.stock;
+      // El descuento del producto sigue siendo agregado (igual en todas las tallas)
+      const inventoryAggregate = branchId ? await this.inventoryService.getInventory(product.id, branchId) : null;
+      const available = branchId ? (inventoryForSize?.stock ?? 0) : product.stock;
 
       if (available < item.quantity) {
         throw new BadRequestException(
-          `Insufficient stock for product ${product.name}. Available: ${available}, Requested:${item.quantity}`,
+          `Insufficient stock for size ${item.size} of product ${product.name}. Available: ${available}, Requested:${item.quantity}`,
         );
       }
 
       lines.push({
         productId: product.id,
         quantity: item.quantity,
-        unitPrice: getBranchPrice(product, inventory),
+        unitPrice: getBranchPrice(product, inventoryAggregate),
         size: item.size,
       });
     }
@@ -167,7 +169,7 @@ export class OrdersService {
 
   for (const line of lines) {
         if (branchId) {
-          await this.inventoryService.decrement(tx, line.productId, branchId, line.quantity);
+          await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity);
         } else {
           const result = await tx.product.updateMany({
             where: { id: line.productId, stock: { gte: line.quantity } },
@@ -365,7 +367,11 @@ async cancel(
     const cancelled = await this.prisma.$transaction(async (tx) => {
   for (const item of order.orderItems) {
     if (order.branchId) {
-      await this.inventoryService.increment(tx, item.productId, order.branchId, item.quantity);
+      // Pedidos creados antes de esta migración pueden no tener talla guardada; sin talla no hay
+      // dónde reponer el stock por talla, así que ese caso queda igual que antes (no se repone)
+      if (item.size) {
+        await this.inventoryService.increment(tx, item.productId, order.branchId, item.size, item.quantity);
+      }
     } else {
       await tx.product.update({
         where: { id: item.productId },

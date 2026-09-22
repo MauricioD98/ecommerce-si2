@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ReportQueryDto, TopProductsQueryDto } from './dto/report-query.dto';
@@ -144,22 +144,32 @@ export class ReportsService {
   }
 
   private async generateSql(prompt: string, scopeBranchId: string | null): Promise<string> {
-    const apiKey = this.config.get<string>('GEMINI_API_KEY');
+    const apiKey = this.config.get<string>('GROQ_API_KEY');
     if (!apiKey) {
-      throw new ServiceUnavailableException('La IA no está configurada. Falta GEMINI_API_KEY en el servidor');
+      throw new ServiceUnavailableException('La IA no está configurada. Falta GROQ_API_KEY en el servidor');
     }
 
+    // SDK de OpenAI apuntando al endpoint compatible de Groq (Llama/GPT-OSS con inferencia casi instantánea)
+    const groq = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.groq.com/openai/v1',
+    });
+
     try {
-      const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({
-        model: this.config.get<string>('GEMINI_MODEL') ?? 'gemini-2.5-flash',
-        // La pregunta del usuario va como contenido; las reglas, como instrucción de sistema
-        systemInstruction: buildSystemPrompt({ branchId: scopeBranchId }, new Date().toISOString().slice(0, 10)),
-        generationConfig: { temperature: 0, maxOutputTokens: 1024 },
+      const completion = await groq.chat.completions.create({
+        model: this.config.get<string>('GROQ_MODEL') ?? 'openai/gpt-oss-120b',
+        temperature: 0,
+        max_tokens: 1024,
+        messages: [
+          // Las reglas y el esquema (incluye REPORT_SCHEMA + BUSINESS_DICTIONARY) van como rol "system"
+          { role: 'system', content: buildSystemPrompt({ branchId: scopeBranchId }, new Date().toISOString().slice(0, 10)) },
+          // La pregunta del usuario va como rol "user"
+          { role: 'user', content: prompt },
+        ],
       });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
+      return completion.choices[0]?.message?.content ?? '';
     } catch (error) {
-      this.logger.error(`Error al consultar Gemini: ${error instanceof Error ? error.message : error}`);
+      this.logger.error(`Error al consultar Groq: ${error instanceof Error ? error.message : error}`);
       throw new ServiceUnavailableException('No se pudo generar la consulta con la IA. Inténtalo de nuevo');
     }
   }

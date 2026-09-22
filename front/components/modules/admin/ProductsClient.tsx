@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import styles from './admin-table.module.scss';
 import ProductFormModal from './ProductFormModal';
-import { useAdminProducts, useCategoryOptions } from '@/hooks/useAdminProducts';
+import { useAdminProducts, useCategoryOptions, useCollectionOptions } from '@/hooks/useAdminProducts';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -29,6 +29,7 @@ export default function ProductsClient() {
         isGlobal ? null : ownBranchId,
     );
     const { categories } = useCategoryOptions();
+    const { collections } = useCollectionOptions();
     // undefined = cerrado, null = crear, Product = editar
     const [editing, setEditing] = useState<Product | null | undefined>(undefined);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -52,7 +53,13 @@ export default function ProductsClient() {
     };
 
     const handleDelete = async (product: Product) => {
-        if (!window.confirm(`¿Eliminar "${product.name}"? Si ya tiene pedidos, en su lugar puedes desactivarlo.`)) return;
+        if (product.orderCount > 0) {
+            window.alert(
+                `"${product.name}" tiene ${product.orderCount} pedido${product.orderCount === 1 ? '' : 's'} asociado${product.orderCount === 1 ? '' : 's'}. Desactívalo en vez de eliminarlo.`,
+            );
+            return;
+        }
+        if (!window.confirm(`¿Eliminar "${product.name}"?`)) return;
 
         setBusyId(product.id);
         setActionError(null);
@@ -167,7 +174,12 @@ export default function ProductsClient() {
                                                     <button
                                                         type="button"
                                                         className={styles.buttonDanger}
-                                                        disabled={busyId === product.id}
+                                                        disabled={busyId === product.id || product.orderCount > 0}
+                                                        title={
+                                                            product.orderCount > 0
+                                                                ? `Tiene ${product.orderCount} pedido${product.orderCount === 1 ? '' : 's'} asociado${product.orderCount === 1 ? '' : 's'}: desactívalo en vez de eliminarlo`
+                                                                : undefined
+                                                        }
                                                         onClick={() => handleDelete(product)}
                                                     >
                                                         <Trash2 size={14} />
@@ -201,6 +213,7 @@ export default function ProductsClient() {
                     key={editing?.id ?? 'new'}
                     product={editing ?? undefined}
                     categories={categories}
+                    collections={collections}
                     isGlobal={isGlobal}
                     ownBranchName={activeBranchName}
                     branches={branches}

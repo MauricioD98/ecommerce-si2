@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Loader2, Mic, MicOff, Send, Sparkles } from 'lucide-react';
+import { FileDown, FileSpreadsheet, FileText, Loader2, Mic, MicOff, Send, Sparkles } from 'lucide-react';
 import styles from './admin-table.module.scss';
 import { DynamicReportEntry, useDynamicReport } from '@/hooks/useReports';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { DynamicReportResult } from '@/types/admin.types';
 
 const EXAMPLES = [
-    '¿Cuáles son los 5 productos más vendidos?',
-    'Ingresos por mes',
-    'Cantidad de pedidos por tipo de entrega',
-    '¿Qué clientes han comprado más?',
+    '¿Cuál fue el ingreso total por sucursal esta semana?',
+    'Los 10 productos con menor stock en almacén',
+    'Rendimiento de ventas por cajero este mes',
+    'Comparativa de cantidad de ventas Web vs POS físico',
+    'Clientes con más compras registradas',
 ];
 
 // Las columnas cambian según la pregunta: se muestran tal cual las devuelve la consulta
@@ -21,6 +22,104 @@ const formatCell = (value: unknown): string => {
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
 };
+
+// Nombre de archivo a partir de la pregunta (sin tildes/símbolos, acotado)
+function buildExportFilename(prompt: string): string {
+    const slug = prompt
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-+|-+$)/g, '')
+        .slice(0, 60);
+    return `stella-femme-${slug || 'reporte'}`;
+}
+
+// Filas con encabezados legibles (sin guiones bajos), en el orden que devolvió la consulta
+function toPrettyRows(result: DynamicReportResult): Record<string, unknown>[] {
+    return result.rows.map((row) => {
+        const pretty: Record<string, unknown> = {};
+        for (const column of result.columns) {
+            pretty[column.replace(/_/g, ' ')] = row[column] ?? null;
+        }
+        return pretty;
+    });
+}
+
+async function exportToExcel(result: DynamicReportResult, filename: string) {
+    const XLSX = await import('xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
+    XLSX.writeFile(workbook, `${filename}.xlsx`);
+}
+
+async function exportToCsv(result: DynamicReportResult, filename: string) {
+    const XLSX = await import('xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
+    XLSX.writeFile(workbook, `${filename}.csv`, { bookType: 'csv' });
+}
+
+async function exportToPdf(result: DynamicReportResult, filename: string, title: string) {
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+    const doc = new jsPDF();
+
+    doc.setFontSize(12);
+    doc.text(title, 14, 15);
+
+    autoTable(doc, {
+        startY: 20,
+        head: [result.columns.map((column) => column.replace(/_/g, ' '))],
+        body: result.rows.map((row) => result.columns.map((column) => formatCell(row[column]))),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [0, 0, 0] },
+    });
+
+    doc.save(`${filename}.pdf`);
+}
+
+function ExportBar({ entry }: { entry: DynamicReportEntry }) {
+    const result = entry.result;
+    const disabled = !result || result.rows.length === 0;
+    const filename = buildExportFilename(entry.prompt);
+
+    return (
+        <div className={styles.exportBar}>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => result && exportToPdf(result, filename, entry.prompt)}
+                title="Exportar a PDF"
+            >
+                <FileText size={14} />
+                PDF
+            </button>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => result && exportToExcel(result, filename)}
+                title="Exportar a Excel"
+            >
+                <FileSpreadsheet size={14} />
+                Excel
+            </button>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => result && exportToCsv(result, filename)}
+                title="Exportar a CSV"
+            >
+                <FileDown size={14} />
+                CSV
+            </button>
+        </div>
+    );
+}
 
 function ResultTable({ result }: { result: DynamicReportResult }) {
     if (result.rows.length === 0) {
@@ -55,8 +154,11 @@ function EntryCard({ entry }: { entry: DynamicReportEntry }) {
     return (
         <div className={styles.tableCard}>
             <div className={styles.chatQuestion}>
-                <Sparkles size={16} />
-                <span>{entry.prompt}</span>
+                <div className={styles.chatQuestionText}>
+                    <Sparkles size={16} />
+                    <span>{entry.prompt}</span>
+                </div>
+                {entry.result && <ExportBar entry={entry} />}
             </div>
 
             {entry.error && <div className={`${styles.errorMessage} ${styles.chatError}`}>{entry.error}</div>}
@@ -64,12 +166,10 @@ function EntryCard({ entry }: { entry: DynamicReportEntry }) {
             {entry.result && (
                 <>
                     <ResultTable result={entry.result} />
-                    <details className={styles.sqlDetails}>
-                        <summary>
-                            {entry.result.rowCount} {entry.result.rowCount === 1 ? 'fila' : 'filas'} · ver consulta SQL
-                        </summary>
-                        <pre>{entry.result.sql}</pre>
-                    </details>
+                    {/* El SQL generado ya no se muestra al usuario final; queda solo en el log del backend (reports.service.ts) */}
+                    <div className={styles.sqlDetails}>
+                        {entry.result.rowCount} {entry.result.rowCount === 1 ? 'fila' : 'filas'}
+                    </div>
                 </>
             )}
         </div>
@@ -154,7 +254,10 @@ export default function DynamicReportPanel() {
                         {!isSupported && (
                             <small>El dictado por voz no está disponible en este navegador (usa Chrome, Edge o Safari).</small>
                         )}
-                        <small>La IA solo puede leer datos: no puede modificar nada. Verás la consulta SQL que se ejecutó.</small>
+                        <small>
+                            Usa tu voz o escribe para generar consultas analíticas en tiempo real sobre las ventas, inventario y
+                            rendimiento de la tienda.
+                        </small>
                     </div>
 
                     <div className={styles.badgeList}>

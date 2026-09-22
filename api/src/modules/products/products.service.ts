@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
-import { Prisma, Category, Product, ProductInventory } from '@prisma/client';
+import { Prisma, Category, Collection, Product } from '@prisma/client';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { InventoryService } from '../branches/inventory.service';
+import { InventoryAggregate, InventoryService } from '../branches/inventory.service';
 import { BulkDiscountDto } from '../branches/dto/bulk-discount.dto';
 import { getBranchPrice } from '../../common/utils/pricing';
 import { hasAllBranches } from '../../common/utils/permission.util';
@@ -46,16 +46,24 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
     throw new BadRequestException('User is not assigned to a branch');
   }
 
+  // collectionIds no es un campo escalar de Product: se conecta aparte vía relación m2m
+  const { collectionIds, ...productData } = createProductDto;
+
   // El catálogo es global: el producto nace con stock 0 en todas las sucursales hasta que se asigne en el inventario
   const product = await this.prisma.product.create({
       data: {
-        ...createProductDto,
+        ...productData,
         branchId,
-        price: new Prisma.Decimal(createProductDto.price),
+        price: new Prisma.Decimal(productData.price),
         stock: 0,
+        ...(collectionIds && collectionIds.length > 0
+          ? { collections: { connect: collectionIds.map((id) => ({ id })) } }
+          : {}),
       },
       include:{
         category:true,
+        collections:true,
+        _count: { select: { orderItems: true } },
       }
     });
 
@@ -72,7 +80,20 @@ async findAll(queryDto: QueryProductDto): Promise<{
     totalPages: number;
   };
 }> {
-  const { category, isActive, search, branchId, inStockOnly, page = 1, limit = 10 } = queryDto;
+  const {
+    category,
+    isActive,
+    search,
+    branchId,
+    inStockOnly,
+    collectionSlug,
+    sizes,
+    colors,
+    minPrice,
+    maxPrice,
+    page = 1,
+    limit = 10,
+  } = queryDto;
 
   const where: Prisma.ProductWhereInput = {};
 
@@ -89,6 +110,27 @@ if (search) {
     { name: { contains: search, mode: 'insensitive' } },
     { description: { contains: search, mode: 'insensitive' } },
   ];
+}
+
+// Colección (ej. "otono-invierno"): un producto puede estar en varias, alcanza con que matchee una
+if (collectionSlug) {
+  where.collections = { some: { slug: collectionSlug } };
+}
+
+// Talla/color: coincide si el producto tiene AL MENOS UNA de las solicitadas
+if (sizes && sizes.length > 0) {
+  where.sizes = { hasSome: sizes };
+}
+
+if (colors && colors.length > 0) {
+  where.colors = { hasSome: colors };
+}
+
+if (minPrice !== undefined || maxPrice !== undefined) {
+  where.price = {
+    ...(minPrice !== undefined ? { gte: new Prisma.Decimal(minPrice) } : {}),
+    ...(maxPrice !== undefined ? { lte: new Prisma.Decimal(maxPrice) } : {}),
+  };
 }
 
 // Catálogo del POS: solo productos con stock físico en esa sucursal
@@ -113,7 +155,7 @@ const products = await this.prisma.product.findMany({
   skip: (page - 1) * limit,
   take: limit,
   orderBy: { createdAt: 'desc' },
-  include: { category: true },
+  include: { category: true, collections: true, _count: { select: { orderItems: true } } },
 });
 
 // Con sucursal, el stock y el descuento salen de su registro de inventario
@@ -143,6 +185,8 @@ async findOne(id: string, branchId?: string): Promise<ProductResponseDto> {
     where: { id },
     include:{
       category:true,
+      collections:true,
+      _count: { select: { orderItems: true } },
     }
   });
 
@@ -242,11 +286,17 @@ async update(
     }
   }
 
-  // 4. Preparar payload para Prisma
-  const updateData: Prisma.ProductUpdateInput = { ...updateProductDto };
+  // 4. Preparar payload para Prisma (collectionIds no es un campo escalar: se maneja aparte)
+  const { collectionIds, ...rest } = updateProductDto;
+  const updateData: Prisma.ProductUpdateInput = { ...rest };
 
   if (updateProductDto.price !== undefined) {
     updateData.price = new Prisma.Decimal(updateProductDto.price);
+  }
+
+  // collectionIds: reemplaza la lista completa de colecciones del producto (incluir [] la vacía)
+  if (collectionIds !== undefined) {
+    updateData.collections = { set: collectionIds.map((collectionId) => ({ id: collectionId })) };
   }
 
   // 5. Ejecutar la actualización
@@ -255,6 +305,8 @@ async update(
     data: updateData,
     include: {
       category: true,
+      collections: true,
+      _count: { select: { orderItems: true } },
     },
   });
 
@@ -302,7 +354,7 @@ async remove(id: string): Promise<{ message: string }> {
 
 if (product.orderItems.length > 0) {
   throw new BadRequestException(
-    'Cannot delete product that is part of existing orders. Consider marking it as inactive only',
+    'No se puede eliminar un producto que tiene pedidos o ventas asociadas. Por favor, desactívalo.',
   );
  }
 
@@ -329,8 +381,8 @@ return { message: 'Product deleted successfully' };
 
 // Sin contexto de sucursal no hay descuento ni stock de sucursal: el descuento vive en ProductInventory
  private formatProduct(
-  product: Product & {category: Category},
-  context?: { inventory: ProductInventory | null },
+  product: Product & {category: Category; collections?: Collection[]; _count?: { orderItems: number }},
+  context?: { inventory: InventoryAggregate | null },
  ): ProductResponseDto {
   const inventory = context?.inventory ?? null;
   const hasDiscount =
@@ -350,6 +402,9 @@ return { message: 'Product deleted successfully' };
       : null,
     category: product.category.name,
     sizes: product.sizes as ProductResponseDto['sizes'],
+    colors: product.colors,
+    collections: (product.collections ?? []).map((c) => ({ id: c.id, name: c.name, slug: c.slug })),
+    orderCount: product._count?.orderItems ?? 0,
   };
 }
 

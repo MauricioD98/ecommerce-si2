@@ -9,6 +9,7 @@ import { PLACEHOLDER_IMAGE } from '@/service/api/product.service';
 import { CategoryOption, ProductPayload } from '@/types/admin.types';
 import { Product } from '@/types/product.types';
 import { Branch } from '@/types/branch.types';
+import { CollectionOption } from '@/types/collection.types';
 
 // Mismas tallas que acepta el backend (enum WomenSize)
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -16,6 +17,7 @@ const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 interface ProductFormModalProps {
     product?: Product;
     categories: CategoryOption[];
+    collections: CollectionOption[];
     // Exclusividad de sucursal: sin alcance global el campo queda bloqueado en la propia (el
     // backend la fuerza igual del lado del servidor); con alcance global se puede elegir cualquiera
     // o dejarlo global.
@@ -26,13 +28,14 @@ interface ProductFormModalProps {
     onSubmit: (payload: ProductPayload) => Promise<void>;
 }
 
-export default function ProductFormModal({ product, categories, isGlobal, ownBranchName, branches, onClose, onSubmit }: ProductFormModalProps) {
+export default function ProductFormModal({ product, categories, collections, isGlobal, ownBranchName, branches, onClose, onSubmit }: ProductFormModalProps) {
     const [name, setName] = useState(product?.name ?? '');
     const [description, setDescription] = useState(product?.description ?? '');
     const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
     const [sku, setSku] = useState(product?.sku ?? '');
     const [price, setPrice] = useState(product ? String(product.price) : '');
     const [sizes, setSizes] = useState<string[]>(product?.sizes ?? []);
+    const [collectionIds, setCollectionIds] = useState<string[]>(product?.collections?.map((c) => c.id) ?? []);
     // El backend devuelve una imagen de reemplazo cuando no hay ninguna: no se muestra como valor
     const [imageUrl, setImageUrl] = useState(product && product.imageUrl !== PLACEHOLDER_IMAGE ? product.imageUrl : '');
     const [isActive, setIsActive] = useState(product?.isActive ?? true);
@@ -45,6 +48,10 @@ export default function ProductFormModal({ product, categories, isGlobal, ownBra
 
     const toggleSize = (size: string) => {
         setSizes((prev) => (prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]));
+    };
+
+    const toggleCollection = (collectionId: string) => {
+        setCollectionIds((prev) => (prev.includes(collectionId) ? prev.filter((id) => id !== collectionId) : [...prev, collectionId]));
     };
 
     const validate = (): string | null => {
@@ -79,6 +86,7 @@ export default function ProductFormModal({ product, categories, isGlobal, ownBra
                 sizes,
                 imageUrl: imageUrl.trim(),
                 isActive,
+                collectionIds,
                 // Sin alcance global no se manda: el backend fuerza la sucursal propia igual, pero
                 // así el payload no sugiere una opción que la UI ni siquiera mostró
                 ...(isGlobal ? { branchId: branchId || null } : {}),
@@ -179,6 +187,29 @@ export default function ProductFormModal({ product, categories, isGlobal, ownBra
                             </button>
                         ))}
                     </div>
+                </div>
+
+                <div className={styles.field}>
+                    <label>Colecciones (opcional)</label>
+                    {collections.length === 0 ? (
+                        <small className={styles.cellSub}>
+                            Todavía no hay colecciones creadas. Andá a Colecciones para crear la primera.
+                        </small>
+                    ) : (
+                        <div className={styles.badgeList} role="group" aria-label="Colecciones del producto">
+                            {collections.map((collection) => (
+                                <button
+                                    key={collection.id}
+                                    type="button"
+                                    aria-pressed={collectionIds.includes(collection.id)}
+                                    className={`${styles.sizeChip} ${collectionIds.includes(collection.id) ? styles.sizeChipActive : ''}`}
+                                    onClick={() => toggleCollection(collection.id)}
+                                >
+                                    {collection.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className={styles.field}>

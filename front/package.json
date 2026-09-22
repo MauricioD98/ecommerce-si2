@@ -14,6 +14,8 @@
     "@stripe/stripe-js": "^9.16.0",
     "axios": "^1.20.0",
     "framer-motion": "^13.3.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.43.0",
     "next": "16.3.4",
@@ -23,7 +25,8 @@
     "react-redux": "^9.3.0",
     "recharts": "^3.10.1",
     "redux-persist": "^6.0.0",
-    "sass": "^1.104.0"
+    "sass": "^1.104.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.22",

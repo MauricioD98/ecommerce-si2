@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import styles from "./product-list.module.scss";
 import { useProducts } from '@/hooks/useProducts';
 import { Product } from '@/types/product.types';
 import ProductCard from './ProductCard';
+import ProductFilters from './ProductFilters';
 import { useBranches } from '@/hooks/useBranches';
 
 export default function ProductList() {
@@ -15,16 +17,37 @@ export default function ProductList() {
   const { isLoading, products, getProducts, error, meta } = useProducts();
   const { selectedBranch, selectedBranchId } = useBranches();
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const searchParams = useSearchParams();
 
-  // Carga el catálogo al entrar y cada vez que cambia la búsqueda, la página o la sucursal (stock por sucursal)
+  // Filtros avanzados (categoría, colección, talla, precio): viven en la URL, ProductFilters
+  // los escribe y acá solo se leen, así el catálogo y los filtros quedan desacoplados
+  const category = searchParams.get('category') || undefined;
+  const collectionSlug = searchParams.get('collection') || undefined;
+  const sizes = searchParams.getAll('size');
+  const minPriceParam = searchParams.get('minPrice');
+  const maxPriceParam = searchParams.get('maxPrice');
+  const filtersKey = searchParams.toString();
+
+  // Cualquier cambio de filtro vuelve a la página 1 (una página 5 de un filtro nuevo casi seguro no existe)
+  useEffect(() => {
+    setPage(1);
+  }, [filtersKey]);
+
+  // Carga el catálogo al entrar y cada vez que cambia la búsqueda, la página, la sucursal o los filtros
   useEffect(() => {
     getProducts({
       search: debouncedSearch || undefined,
       page,
       limit: 12,
       branchId: selectedBranchId || undefined,
+      category,
+      collectionSlug,
+      sizes: sizes.length > 0 ? sizes : undefined,
+      minPrice: minPriceParam ? Number(minPriceParam) : undefined,
+      maxPrice: maxPriceParam ? Number(maxPriceParam) : undefined,
     });
-  }, [debouncedSearch, page, selectedBranchId, getProducts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, page, selectedBranchId, filtersKey, getProducts]);
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,13 +97,15 @@ export default function ProductList() {
           />
         </div>
 
+        <ProductFilters />
+
         {isLoading ? (
           <div className={styles.loading}>Cargando productos...</div>
         ) : products.length === 0 ? (
           <div className={styles.empty}>
             {debouncedSearch
               ? `No se encontraron productos para "${debouncedSearch}"`
-              : 'No se encontraron productos'}
+              : 'No se encontraron productos con estos filtros'}
           </div>
         ) : (
           <>

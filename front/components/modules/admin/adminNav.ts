@@ -1,4 +1,4 @@
-import { Bell, Boxes, Building2, ChartColumn, ClipboardList, LucideIcon, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
+import { Bell, Boxes, Building2, ChartColumn, ClipboardList, Layers, LucideIcon, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
 import { Permission, PermissionValue } from "@/utils/permissions";
 
 export interface AdminNavLink {
@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
     { href: "/admin/staff", icon: Users, permission: Permission.MANAGE_USERS, label: "Usuarios / Empleados", branchLabel: "Mis Empleados" },
     { href: "/admin/products", icon: Shirt, permission: Permission.MANAGE_PRODUCTS, label: "Productos" },
     { href: "/admin/categories", icon: Tags, permission: Permission.MANAGE_PRODUCTS, label: "Categorías" },
+    { href: "/admin/collections", icon: Layers, permission: Permission.MANAGE_PRODUCTS, label: "Colecciones" },
     { href: "/admin/inventory", icon: Boxes, permission: Permission.MANAGE_INVENTORY, label: "Inventario", branchLabel: "Mi Inventario" },
     { href: "/admin/orders", icon: ClipboardList, permission: Permission.VIEW_ORDERS, label: "Pedidos", branchLabel: "Pedidos Locales" },
     { href: "/admin/reports", icon: ChartColumn, permission: Permission.VIEW_REPORTS, label: "Reportes" },

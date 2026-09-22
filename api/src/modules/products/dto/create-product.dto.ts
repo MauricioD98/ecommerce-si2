@@ -38,6 +38,17 @@ export class CreateProductDto {
   })
   sizes: WomenSize[];
 
+  @ApiPropertyOptional({
+    description: 'Colores disponibles de la prenda (texto libre, ej. "negro", "blanco")',
+    isArray: true,
+    example: ['negro', 'blanco'],
+  })
+  @IsArray({ message: 'Los colores deben enviarse como una lista' })
+  @ArrayUnique({ message: 'Los colores no pueden repetirse' })
+  @IsString({ each: true })
+  @IsOptional()
+  colors?: string[];
+
   @ApiProperty({
     description: 'Product description',
     example: 'High quality',
@@ -105,5 +116,16 @@ export class CreateProductDto {
   @IsOptional()
   @IsUUID()
   branchId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Colecciones a las que pertenece el producto (ej. Otoño-Invierno, Básicos). Omitido: sin colecciones',
+    isArray: true,
+    example: ['550e8400-e29b-41d4-a716-446655440001'],
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  collectionIds?: string[];
 
 }

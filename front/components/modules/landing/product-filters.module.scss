@@ -1,0 +1,135 @@
+// Barra horizontal de filtros. Desktop: se acomoda en fila y puede pasar a una segunda línea
+// (flex-wrap). Móvil: no rompe línea, scrollea horizontal (equivalente a overflow-x-auto
+// whitespace-nowrap + scrollbar oculta).
+$breakpoint: 720px;
+
+.filterBar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 2rem;
+    padding-bottom: 0.25rem;
+
+    @media (max-width: $breakpoint) {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; // Firefox
+
+        &::-webkit-scrollbar {
+            display: none; // Chrome/Safari/Edge
+        }
+    }
+}
+
+.dropdown {
+    flex-shrink: 0;
+    padding: 0.5rem 2rem 0.5rem 0.875rem;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5' fill='none' fill-rule='evenodd' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+        no-repeat right 0.875rem center;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: #111;
+    color-scheme: light;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+
+    &:focus {
+        outline: none;
+        border-color: #000;
+    }
+}
+
+.pillGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+
+.pill {
+    flex-shrink: 0;
+    padding: 0.5rem 0.875rem;
+    background: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    // Explícito: sin esto, con el sistema en modo oscuro el navegador le pone su propio texto claro
+    // por defecto a los <button> (ver `color-scheme: dark` en globals.css) y queda invisible.
+    color: #000;
+    color-scheme: light;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+
+    &:hover {
+        border-color: #000;
+    }
+}
+
+.pillActive {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+}
+
+.priceGroup {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+    padding: 0.25rem 0.625rem;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+
+    span {
+        color: #999;
+        font-size: 0.75rem;
+    }
+
+    input {
+        width: 5.5rem;
+        padding: 0.25rem 0.125rem;
+        border: none;
+        font-size: 0.8125rem;
+        font-family: inherit;
+        background: transparent;
+        // Mismo problema que en .pill: sin esto, el input queda con texto claro en modo oscuro del sistema
+        color: #000;
+        color-scheme: light;
+
+        &::placeholder {
+            color: #9ca3af;
+        }
+
+        &:focus {
+            outline: none;
+        }
+    }
+}
+
+.clearPill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    padding: 0.5rem 0.875rem;
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+        background: #f0f0f0;
+    }
+}

@@ -21,7 +21,10 @@ interface InventoryRowEditorProps {
 
 function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }: InventoryRowEditorProps) {
     const { product } = row;
-    const [stock, setStock] = useState(String(row.stock));
+    // Un draft de stock por talla (clave = talla), en vez de un solo input general
+    const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>(
+        () => Object.fromEntries(row.sizes.map((s) => [s.size, String(s.stock)])),
+    );
     const [discountPrice, setDiscountPrice] = useState(toDraft(row.discountPrice));
     const [discountPercentage, setDiscountPercentage] = useState(toDraft(row.discountPercentage));
     const [isSaving, setIsSaving] = useState(false);
@@ -29,11 +32,16 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
     const [message, setMessage] = useState<string | null>(null);
 
     const isDirty =
-        stock !== String(row.stock) ||
+        row.sizes.some((s) => sizeDrafts[s.size] !== String(s.stock)) ||
         toNumberOrNull(discountPrice) !== row.discountPrice ||
         toNumberOrNull(discountPercentage) !== row.discountPercentage;
 
     const markEdited = () => setMessage(null);
+
+    const setSizeDraft = (size: string, value: string) => {
+        setSizeDrafts((prev) => ({ ...prev, [size]: value }));
+        markEdited();
+    };
 
     // Devuelve el descuento validado o un mensaje de error
     const readDiscount = (): { discount: ProductDiscountPayload } | { error: string } => {
@@ -61,13 +69,19 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
         }
     };
 
-    // Guarda stock y descuento de esta sucursal en una sola llamada
+    // Guarda el stock de cada talla y el descuento de esta sucursal en una sola llamada
     const handleSave = () => {
-        const stockValue = Number(stock);
-        if (stock.trim() === '' || !Number.isInteger(stockValue) || stockValue < 0) {
-            setError('El stock debe ser un entero mayor o igual a 0.');
-            return;
+        const sizes: { size: string; stock: number }[] = [];
+        for (const { size } of row.sizes) {
+            const draft = sizeDrafts[size] ?? '';
+            const value = Number(draft);
+            if (draft.trim() === '' || !Number.isInteger(value) || value < 0) {
+                setError(`El stock de la talla ${size} debe ser un entero mayor o igual a 0.`);
+                return;
+            }
+            sizes.push({ size, stock: value });
         }
+
         const result = readDiscount();
         if ('error' in result) {
             setError(result.error);
@@ -75,7 +89,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
         }
 
         run(async () => {
-            await onSave(product.id, { stock: stockValue, ...result.discount });
+            await onSave(product.id, { sizes, ...result.discount });
             return 'Guardado';
         });
     };
@@ -134,15 +148,22 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
                 />
             </td>
             <td>
-                <input
-                    type="number"
-                    min={0}
-                    step={1}
-                    className={`${styles.input} ${styles.inputSmall}`}
-                    value={stock}
-                    onChange={(e) => { setStock(e.target.value); markEdited(); }}
-                    aria-label={`Stock de ${product.name}`}
-                />
+                <div className={styles.sizeStockGroup}>
+                    {row.sizes.map(({ size }) => (
+                        <label key={size} className={styles.sizeStockField}>
+                            <span>{size}</span>
+                            <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                className={`${styles.input} ${styles.inputSmall}`}
+                                value={sizeDrafts[size] ?? ''}
+                                onChange={(e) => setSizeDraft(size, e.target.value)}
+                                aria-label={`Stock de ${product.name}, talla ${size}`}
+                            />
+                        </label>
+                    ))}
+                </div>
             </td>
             <td>
                 <div className={styles.actions}>
@@ -233,7 +254,7 @@ export default function InventoryClient() {
                                     <th className={styles.numeric}>Precio</th>
                                     <th>Precio oferta</th>
                                     <th>% descuento</th>
-                                    <th>Stock</th>
+                                    <th>Stock por talla</th>
                                     <th className={styles.numeric}>Acciones</th>
                                 </tr>
                             </thead>

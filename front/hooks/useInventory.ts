@@ -3,11 +3,14 @@ import { InventoryService } from "@/service/api/inventory.service";
 import { ProductService } from "@/service/api/product.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Product } from "@/types/product.types";
-import { InventoryItem, ProductDiscountPayload, SetInventoryPayload } from "@/types/admin.types";
+import { InventoryItem, InventorySizeStock, ProductDiscountPayload, SetInventoryPayload } from "@/types/admin.types";
 
 export interface InventoryRow {
     product: Product;
+    // Suma del stock de todas las tallas
     stock: number;
+    // Stock por talla (una fila por cada talla que tiene el producto, 0 si no tiene registro todavía)
+    sizes: InventorySizeStock[];
     // Descuento del producto en la sucursal (vive en su registro de inventario)
     discountPrice: number | null;
     discountPercentage: number | null;
@@ -73,9 +76,16 @@ export function useInventory(branchId: string | null) {
 
     const rows: InventoryRow[] = products.map((product) => {
         const inventory = branchId ? inventoryMap[product.id] : undefined;
+        // El producto puede tener tallas sin fila de inventario todavía (nunca se les cargó stock):
+        // se completan en 0 para que siempre haya un input por cada talla del producto.
+        const sizes: InventorySizeStock[] = product.sizes.map((size) => ({
+            size,
+            stock: inventory?.sizes.find((s) => s.size === size)?.stock ?? 0,
+        }));
         return {
             product,
             stock: inventory?.stock ?? 0,
+            sizes,
             discountPrice: inventory?.discountPrice ?? null,
             discountPercentage: inventory?.discountPercentage ?? null,
         };

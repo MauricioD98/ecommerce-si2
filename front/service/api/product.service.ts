@@ -22,6 +22,9 @@ export const normalizeProduct = (raw: RawProduct): Product => ({
     effectivePrice: raw.effectivePrice ?? raw.price,
     imageUrl: raw.imageUrl?.trim() || PLACEHOLDER_IMAGE,
     sizes: raw.sizes ?? [],
+    colors: raw.colors ?? [],
+    collections: raw.collections ?? [],
+    orderCount: raw.orderCount ?? 0,
 } as Product);
 
 const EMPTY_PAGINATION: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 };

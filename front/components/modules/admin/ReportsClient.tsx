@@ -36,7 +36,7 @@ export default function ReportsClient() {
                     className={`${styles.tab} ${tab === 'ai' ? styles.tabActive : ''}`}
                     onClick={() => setTab('ai')}
                 >
-                    Pregúntale a la IA
+                    Reportes Dinámicos
                 </button>
             </div>
 

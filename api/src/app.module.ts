@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './modules/users/users.module';
 import { CategoryModule } from './modules/category/category.module';
+import { CollectionsModule } from './modules/collections/collections.module';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -33,7 +34,7 @@ import { PosModule } from './modules/pos/pos.module';
     limit: 10, // 10 requests per 60 seconds
     },
    ]),
-    PrismaModule, AuthModule, UsersModule, CategoryModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule],
+    PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -15,6 +15,7 @@ import PosReceiptModal from './PosReceiptModal';
 
 interface TicketLine {
     product: Product;
+    size: string;
     quantity: number;
 }
 
@@ -39,6 +40,8 @@ export default function PosClient() {
     const { products, isLoading: isLoadingProducts, error: catalogError } = usePosCatalog(effectiveBranchId, search);
 
     const [ticket, setTicket] = useState<TicketLine[]>([]);
+    // Producto que está mostrando su selector de talla (null = ninguno abierto)
+    const [pendingSizeProductId, setPendingSizeProductId] = useState<string | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('CASH');
     const [amountReceivedInput, setAmountReceivedInput] = useState('');
     const [nit, setNit] = useState('');
@@ -53,33 +56,46 @@ export default function PosClient() {
         debounceRef.current = setTimeout(() => setSearch(value.trim()), 300);
     };
 
-    const addToTicket = (product: Product) => {
+    // El stock por talla lo valida el servidor al cobrar (fuente de verdad); acá solo se usa el
+    // stock agregado del producto como tope aproximado para no dejar sumar de más en la UI.
+    const addToTicket = (product: Product, size: string) => {
         setCheckoutError(null);
+        setPendingSizeProductId(null);
         setTicket((prev) => {
-            const existing = prev.find((line) => line.product.id === product.id);
+            const existing = prev.find((line) => line.product.id === product.id && line.size === size);
             if (existing) {
                 if (existing.quantity >= product.stock) return prev;
                 return prev.map((line) =>
-                    line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line,
+                    line.product.id === product.id && line.size === size ? { ...line, quantity: line.quantity + 1 } : line,
                 );
             }
             if (product.stock <= 0) return prev;
-            return [...prev, { product, quantity: 1 }];
+            return [...prev, { product, size, quantity: 1 }];
         });
     };
 
-    const changeQuantity = (productId: string, delta: number) => {
+    // Producto con una sola talla: se agrega directo. Con varias: abre el selector en la tarjeta.
+    const handleCardClick = (product: Product) => {
+        if (product.stock <= 0) return;
+        if (product.sizes.length <= 1) {
+            addToTicket(product, product.sizes[0] ?? '');
+            return;
+        }
+        setPendingSizeProductId((prev) => (prev === product.id ? null : product.id));
+    };
+
+    const changeQuantity = (productId: string, size: string, delta: number) => {
         setTicket((prev) =>
             prev.map((line) =>
-                line.product.id === productId
+                line.product.id === productId && line.size === size
                     ? { ...line, quantity: Math.min(Math.max(line.quantity + delta, 1), line.product.stock) }
                     : line,
             ),
         );
     };
 
-    const removeLine = (productId: string) => {
-        setTicket((prev) => prev.filter((line) => line.product.id !== productId));
+    const removeLine = (productId: string, size: string) => {
+        setTicket((prev) => prev.filter((line) => !(line.product.id === productId && line.size === size)));
     };
 
     const total = round2(
@@ -93,6 +109,7 @@ export default function PosClient() {
 
     const resetTicketState = () => {
         setTicket([]);
+        setPendingSizeProductId(null);
         setSearchInput('');
         setSearch('');
         setAmountReceivedInput('');
@@ -108,7 +125,7 @@ export default function PosClient() {
         setCheckoutError(null);
         try {
             const response = await PosService.checkout({
-                items: ticket.map((line) => ({ productId: line.product.id, quantity: line.quantity })),
+                items: ticket.map((line) => ({ productId: line.product.id, quantity: line.quantity, size: line.size })),
                 paymentMethod,
                 branchId: effectiveBranchId,
                 ...(paymentMethod === 'CASH' && amountReceived !== null ? { amountReceived } : {}),
@@ -171,20 +188,46 @@ export default function PosClient() {
                         ) : (
                             <div className={styles.productGrid}>
                                 {products.map((product) => (
-                                    <button
-                                        type="button"
-                                        key={product.id}
-                                        className={styles.productCard}
-                                        disabled={product.stock <= 0}
-                                        onClick={() => addToTicket(product)}
-                                    >
-                                        <img src={product.imageUrl} alt={product.name} className={styles.productImage} />
-                                        <span className={styles.productName}>{product.name}</span>
-                                        <span className={styles.productPrice}>${(product.effectivePrice ?? product.price).toFixed(2)}</span>
-                                        <span className={`${styles.stockBadge} ${product.stock <= 0 ? styles.stockBadgeOut : ''}`}>
-                                            {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
-                                        </span>
-                                    </button>
+                                    <div key={product.id} className={styles.productCardWrapper}>
+                                        <button
+                                            type="button"
+                                            className={styles.productCard}
+                                            disabled={product.stock <= 0}
+                                            onClick={() => handleCardClick(product)}
+                                        >
+                                            <img src={product.imageUrl} alt={product.name} className={styles.productImage} />
+                                            <span className={styles.productName}>{product.name}</span>
+                                            <span className={styles.productPrice}>${(product.effectivePrice ?? product.price).toFixed(2)}</span>
+                                            <span className={`${styles.stockBadge} ${product.stock <= 0 ? styles.stockBadgeOut : ''}`}>
+                                                {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
+                                            </span>
+                                        </button>
+
+                                        {pendingSizeProductId === product.id && (
+                                            <div className={styles.sizePicker}>
+                                                <span className={styles.sizePickerLabel}>Talla</span>
+                                                <div className={styles.sizePickerOptions}>
+                                                    {product.sizes.map((size) => (
+                                                        <button
+                                                            key={size}
+                                                            type="button"
+                                                            className={styles.sizePickerOption}
+                                                            onClick={() => addToTicket(product, size)}
+                                                        >
+                                                            {size}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className={styles.sizePickerCancel}
+                                                    onClick={() => setPendingSizeProductId(null)}
+                                                >
+                                                    Cancelar
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -201,21 +244,23 @@ export default function PosClient() {
                         ) : (
                             <div className={styles.ticketLines}>
                                 {ticket.map((line) => (
-                                    <div className={styles.ticketLine} key={line.product.id}>
+                                    <div className={styles.ticketLine} key={`${line.product.id}-${line.size}`}>
                                         <div className={styles.ticketLineInfo}>
-                                            <span className={styles.ticketLineName}>{line.product.name}</span>
+                                            <span className={styles.ticketLineName}>
+                                                {line.product.name} <span className={styles.ticketLineSize}>({line.size})</span>
+                                            </span>
                                             <span className={styles.ticketLinePrice}>
                                                 ${(line.product.effectivePrice ?? line.product.price).toFixed(2)} c/u
                                             </span>
                                         </div>
                                         <div className={styles.ticketLineActions}>
-                                            <button type="button" onClick={() => changeQuantity(line.product.id, -1)} aria-label="Quitar uno">
+                                            <button type="button" onClick={() => changeQuantity(line.product.id, line.size, -1)} aria-label="Quitar uno">
                                                 <Minus size={14} />
                                             </button>
                                             <span>{line.quantity}</span>
                                             <button
                                                 type="button"
-                                                onClick={() => changeQuantity(line.product.id, 1)}
+                                                onClick={() => changeQuantity(line.product.id, line.size, 1)}
                                                 disabled={line.quantity >= line.product.stock}
                                                 aria-label="Agregar uno"
                                             >
@@ -224,7 +269,7 @@ export default function PosClient() {
                                             <button
                                                 type="button"
                                                 className={styles.removeButton}
-                                                onClick={() => removeLine(line.product.id)}
+                                                onClick={() => removeLine(line.product.id, line.size)}
                                                 aria-label="Quitar del ticket"
                                             >
                                                 <Trash2 size={14} />

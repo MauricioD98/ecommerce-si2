@@ -37,7 +37,7 @@ export default function PosReceiptModal({ receipt, onClose }: { receipt: PosRece
 
                     {receipt.items.map((item, index) => (
                         <div className={styles.receiptItem} key={index}>
-                            <span>{item.quantity} x {item.productName}</span>
+                            <span>{item.quantity} x {item.productName} ({item.size})</span>
                             <span>${item.subtotal.toFixed(2)}</span>
                         </div>
                     ))}

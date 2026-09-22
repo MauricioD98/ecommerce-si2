@@ -1,43 +1,40 @@
 .footer {
     width: 100%;
-    border-top: 1px solid #e5e5e5;
+    border-top: 1px solid #e5e7eb;
     background: #fafafa;
     margin-top: auto;
 
     .container {
         max-width: 1280px;
         margin: 0 auto;
-        padding: 3rem 2rem 2rem;
-
+        padding: 3rem 2rem;
 
         .content {
-            display: flex;
-            justify-content: space-between;
-            gap: 4rem;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2.5rem;
             margin-bottom: 2rem;
-            flex-wrap: wrap;
+
+            @media (max-width: 768px) {
+                grid-template-columns: 1fr;
+            }
 
             .brand {
-                flex: 1;
-                min-width: 250px;
-
                 h3 {
                     font-size: 1.5rem;
                     font-weight: 600;
                     margin-bottom: 0.75rem;
+                    letter-spacing: -0.01em;
                 }
 
                 p {
-                    color: #666;
+                    color: #6b7280;
                     font-size: 0.875rem;
                     line-height: 1.6;
                 }
             }
 
             .section {
-                flex: 1;
-                min-width: 150px;
-
                 h4 {
                     font-size: 0.875rem;
                     font-weight: 600;
@@ -47,27 +44,29 @@
 
                 ul {
                     list-style: none;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
 
-                    li {
-                        margin-bottom: 0.5rem;
+                    a {
+                        color: #6b7280;
+                        font-size: 0.875rem;
+                        transition: color 0.2s ease-in-out;
 
-                        a {
-                            color: #666;
-                            font-size: 0.875rem;
-                            transition: color 0.2s ease-in-out;
-
-                            &:hover {
-                                color: #1f2937;
-                            }
+                        &:hover {
+                            color: #000;
                         }
-
                     }
                 }
-
-
             }
         }
 
+        .copyright {
+            color: #9ca3af;
+            font-size: 0.8rem;
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid #e5e7eb;
+        }
     }
-
 }
