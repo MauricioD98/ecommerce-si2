@@ -1,0 +1,39 @@
+.breadcumbs {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.link {
+    color: #1f2937;
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+        color: #111827;
+    }
+}
+
+.separator {
+    color: #9ca3af;
+}
+
+.current {
+    font-weight: 600;
+    color: #111827;
+    pointer-events: none;
+}

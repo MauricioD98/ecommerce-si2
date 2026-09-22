@@ -1,0 +1,325 @@
+.section {
+    min-height: calc(100vh - 200px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent) 0%, color-mix(in srgb, var(--secondary) 15%, transparent) 100%);
+}
+
+.container {
+    background-color: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 2.5rem;
+    box-shadow: 0 4px 6px -1px #000, 0 2px 4px -2px #2a0909;
+}
+
+.title {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.subtitle {
+    color: var(--foreground);
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background-color: color-mix(in srgb, var(--destructive) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent);
+    border-radius: 0.5rem;
+    color: var(--destructive);
+    font-size: 0.875rem;
+    line-height: 1.4;
+
+    svg {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+    }
+
+    span {
+        font-size: inherit;
+        color: inherit;
+    }
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    label {
+        font-weight: 500;
+        color: var(--foreground);
+        font-size: 0.875rem;
+    }
+
+    input {
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        background: var(--background);
+        color: var(--foreground);
+        font-size: 1rem;
+        transition: all 0.2s;
+
+        &:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    }
+}
+
+.submitButton {
+    padding: 0.75rem 1.5rem;
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 1rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+
+    &:hover {
+        background-color: color-mix(in srgb, var(--primary) 85%, #000);
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        background-color: color-mix(in srgb, var(--primary) 70%, #000);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.spinner {
+    width: 1.25rem;
+    height: 1.25rem;
+    animation: spin 1s linear infinite;
+}
+
+.spinnerCircle {
+    opacity: 0.75;
+}
+
+.spinnerPath {
+    opacity: 0.75;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.footerText {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+}
+
+.link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+
+    &:hover {
+        text-decoration: underline;
+    }
+}
+
+
+.fieldError {
+    font-size: 0.8125rem;
+    color: var(--destructive);
+}
+
+.forgotLink {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    cursor: pointer;
+
+    &:hover {
+        color: var(--primary);
+        text-decoration: underline;
+    }
+}
+
+.description {
+    color: var(--muted-foreground);
+    text-align: center;
+    font-size: 0.9375rem;
+    margin-bottom: 1.5rem;
+}
+
+.successMessage {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, #059669 10%, transparent);
+    border: 1px solid color-mix(in srgb, #059669 30%, transparent);
+    color: #059669;
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+
+.inputWrapper {
+    position: relative;
+
+    input {
+        width: 100%;
+        padding-right: 2.75rem;
+    }
+}
+
+.toggleButton {
+    position: absolute;
+    top: 50%;
+    right: 0.75rem;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        color: var(--foreground);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.checklist {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 1rem;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    animation: checklistIn 0.15s ease-out;
+}
+
+@keyframes checklistIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.checkItem {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+
+    svg {
+        flex-shrink: 0;
+    }
+}
+
+.checkItemMet {
+    color: #059669;
+}
+
+// Recuperación de contraseña: campo del código de 6 dígitos y botón secundario tipo enlace
+.otpInput {
+    width: 100%;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 0.6em;
+    padding: 0.75rem 0.5rem 0.75rem 1.1rem;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+}
+
+.linkButton {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-top: 0.75rem;
+    color: #666;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    cursor: pointer;
+    align-self: center;
+}
+
+// Aviso flotante de éxito (recuperación de contraseña)
+.toast {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 1.25rem;
+    background: #166534;
+    color: #fff;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}

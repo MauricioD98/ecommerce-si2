@@ -1,0 +1,376 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+ // output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//Create.Database.Schemas
+//User.model
+// Roles dinámicos: el SUPERADMIN los crea desde el panel y cada uno lleva sus permisos
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions String[] @default([])
+
+  //Relations
+  users User[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model User {
+  id        String      @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName      String?
+  lastName       String?
+  phone          String?
+  refreshToken String?
+  // Recuperación de contraseña: código (OTP) de 6 dígitos como texto (puede empezar con 0), su vencimiento y los intentos fallidos
+  resetPasswordOtp String?
+  resetPasswordAttempts Int @default(0)
+  resetPasswordExpires DateTime?
+  // Bloqueo de login: intentos fallidos consecutivos y hasta cuándo está bloqueada la cuenta
+  loginAttempts Int @default(0)
+  lockedUntil DateTime?
+  employeeDiscount Int @default(0) // % de descuento de trabajador (0-100)
+
+ //Relations
+ roleId String
+ role Role @relation(fields: [roleId], references: [id])
+ branchId String?
+ branch Branch? @relation("StaffBranch", fields: [branchId], references: [id])
+ // Sucursal favorita del cliente (para sus notificaciones); si la sucursal se elimina, queda sin favorita
+ preferredBranchId String?
+ preferredBranch Branch? @relation("PreferredBranch", fields: [preferredBranchId], references: [id], onDelete: SetNull)
+ orders Order[]
+ cashierOrders Order[] @relation("CashierOrders")
+ carts Cart[]
+ payments Payment[]
+ addresses UserAddress[]
+ pushSubscriptions PushSubscription[]
+
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+
+@@index([email])
+@@index([branchId])
+@@index([preferredBranchId])
+@@index([roleId])
+@@map("users")
+} 
+
+// Direcciones guardadas del cliente para envíos a domicilio (con la ubicación exacta del mapa)
+model UserAddress {
+  id        String   @id @default(uuid())
+  title     String   // ej. "Casa", "Trabajo"
+  address   String   // calle y número
+  reference String?  // referencias adicionales
+  latitude  Float
+  longitude Float
+  isDefault Boolean  @default(false)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("user_addresses")
+}
+
+model Product {
+  id        String      @id @default(uuid())
+  name      String
+  description String?
+  sizes String[] @default([])
+  price     Decimal @db.Decimal(10, 2)
+  stock     Int @default(0) // stock global (legado); el stock por sucursal está en ProductInventory
+  sku String @unique
+  imageUrl String?
+  isActive Boolean @default(true)
+
+  //Relations
+  orderItems OrderItem[]
+  cartItems CartItem[]
+  inventories ProductInventory[]
+
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id])
+
+  // Exclusividad de sucursal: null = global (todas las sucursales lo ven); con valor, solo esa
+  // sucursal lo ve en su catálogo. Independiente de ProductInventory: esto decide SI se ve, el
+  // inventario decide CUÁNTO stock hay una vez que ya se ve.
+  branchId String?
+  exclusiveToBranch Branch? @relation(fields: [branchId], references: [id])
+
+  //Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sku])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([branchId])
+  @@map("products")
+}
+
+model Branch {
+  id        String      @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean @default(true)
+
+  //Relations
+  users User[] @relation("StaffBranch")
+  preferredByUsers User[] @relation("PreferredBranch")
+  orders Order[]
+  inventories ProductInventory[]
+  exclusiveProducts Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("branches")
+}
+
+model ProductInventory {
+  id        String      @id @default(uuid())
+  stock     Int @default(0)
+  // Descuentos por sucursal: discountPrice tiene prioridad sobre discountPercentage
+  discountPrice Decimal? @db.Decimal(10, 2)
+  discountPercentage Int?
+
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, branchId])
+  @@index([branchId])
+  @@map("product_inventories")
+}
+
+model Category {
+  id        String      @id @default(uuid())
+  name      String
+  description String?
+  slug String @unique
+  imageUrl String?
+  isActive Boolean @default(true)
+  //Relations
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([slug])
+  @@index([isActive])
+  @@map("categories")
+}
+
+model OrderItem {
+  id        String      @id @default(uuid())
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+  // Talla elegida al comprar (independiente de `Product.sizes`, que son las tallas disponibles)
+  size      String?
+  productId String
+  product Product @relation(fields: [productId], references: [id])
+
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+ } 
+
+model CartItem {
+  id        String      @id @default(uuid())
+  quantity  Int @default(1)
+  // Talla elegida (una fila distinta por producto+talla)
+  size      String?
+  productId String
+  product Product @relation(fields: [productId], references: [id])
+
+  cartId String
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId, size])
+  @@index([cartId])
+  @@index([productId])
+  @@map("cart_items")
+
+}
+
+enum OrderStatus {
+  PENDIENTE
+  PROCESANDO
+  ENVIADO
+  ENTREGADO
+  CANCELADO
+}
+
+
+enum FulfillmentType {
+  DELIVERY
+  PICKUP
+}
+
+// Canal de venta: WEB (e-commerce, cliente final) o POS (caja física de una sucursal)
+enum OrderSource {
+  WEB
+  POS
+}
+
+enum PaymentMethod {
+  STRIPE
+  CASH
+  PHYSICAL_CARD
+  QR
+}
+
+model Order {
+  id        String      @id @default(uuid())
+  orderNumber String @unique @default(cuid())
+  status OrderStatus @default(PENDIENTE)
+  totalAmount Decimal @db.Decimal(10, 2)
+  // Costo de envío ya incluido en totalAmount; queda aparte como registro histórico exacto (0 en PICKUP)
+  shippingCost Decimal @default(0) @db.Decimal(10, 2)
+  // Estado del pago con Stripe, separado del estado de logística (OrderStatus)
+  paymentStatus PaymentStatus @default(PENDIENTE)
+  stripePaymentIntentId String? @unique
+  // Cómo se pagó: STRIPE (web) o CASH/PHYSICAL_CARD (venta física en caja)
+  paymentMethod PaymentMethod @default(STRIPE)
+  // Canal por el que se originó la venta
+  source OrderSource @default(WEB)
+
+  userId    String
+  //Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Empleado que cobró la venta en caja (POS). Null en ventas web
+  cashierId String?
+  cashier User? @relation("CashierOrders", fields: [cashierId], references: [id])
+
+  cartId String?
+  cart Cart? @relation(fields: [cartId], references: [id])
+
+  shippingAddress String?
+  // Ubicación exacta de entrega (solo pedidos DELIVERY)
+  latitude Float?
+  longitude Float?
+  fulfillmentType FulfillmentType @default(DELIVERY)
+  discountApplied Decimal @default(0) @db.Decimal(10, 2)
+
+  // Datos de facturación (venta física en POS). Null en ventas web o cuando el cliente no los pide
+  nit String?
+  razonSocial String?
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id])
+
+  orderItems OrderItem[]
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([branchId])
+  @@index([cashierId])
+  @@index([source])
+  @@map("orders")
+}
+
+model Cart {
+  id        String      @id @default(uuid())
+  userId    String
+  //Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  checkout Boolean @default(false)
+
+  cartItems CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("carts")
+
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  COMPLETADO
+  FALLIDO
+  REEMBOLSADO
+}
+
+// Suscripción Web Push de un navegador/dispositivo. Un usuario puede tener varias (uno por dispositivo)
+model PushSubscription {
+  id       String @id @default(uuid())
+  endpoint String @unique
+  p256dh   String
+  auth     String
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Payment {
+  id        String      @id @default(uuid())
+  amount Decimal @db.Decimal(10, 2)
+  status PaymentStatus @default(PENDIENTE)
+  currency String @default("USD")
+  paymentMethod String?
+  transactionId String?
+
+  userId    String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([transactionId])
+  @@map("payments")
+}

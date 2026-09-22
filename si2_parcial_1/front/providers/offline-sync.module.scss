@@ -1,0 +1,42 @@
+.banner {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.625rem 1rem;
+    background: #000;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+
+    button {
+        flex-shrink: 0;
+        padding: 0.25rem 0.625rem;
+        background: rgba(255, 255, 255, 0.15);
+        border: none;
+        border-radius: 999px;
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+    }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

@@ -1,0 +1,547 @@
+// "Mi cuenta": layout de dashboard (menú lateral en escritorio, pestañas arriba en móvil)
+.page {
+    min-height: calc(100vh - 200px);
+    padding: 2rem 1rem 3rem;
+    background: #f9fafb;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    align-items: start;
+
+    @media (max-width: 800px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Menú lateral */
+.sidebar {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+}
+
+.userBox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    min-width: 0;
+}
+
+.avatar {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    background: #000;
+    color: #fff;
+    font-weight: 600;
+}
+
+// Sin min-width: 0, este hijo de .userBox (flex) crece con el contenido y el correo largo
+// desborda la tarjeta en vez de truncarse (min-width inicial de un flex item es "auto", no 0)
+.userInfo {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+.userName {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.userEmail {
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+
+    @media (max-width: 800px) {
+        flex-direction: row;
+    }
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 0.75rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 0.9375rem;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+
+    &:hover {
+        background: #f3f4f6;
+    }
+
+    @media (max-width: 800px) {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+.tabActive {
+    background: #000;
+    color: #fff;
+
+    &:hover {
+        background: #000;
+    }
+}
+
+/* Contenido */
+.content {
+    min-width: 0;
+}
+
+.card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.75rem;
+
+    @media (max-width: 640px) {
+        padding: 1.25rem;
+    }
+}
+
+.heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--foreground);
+}
+
+.subheading {
+    margin: 0.25rem 0 1.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+}
+
+.headingRow {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    // Separa el botón "Nueva dirección" (y el encabezado) de la lista de tarjetas
+    margin-bottom: 1.5rem;
+
+    .subheading {
+        margin-bottom: 0;
+    }
+
+    > div {
+        min-width: 0;
+    }
+}
+
+/* Formularios */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.125rem;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+
+    @media (max-width: 560px) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+
+    label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--foreground);
+    }
+
+    input,
+    select {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+        background: #fff;
+        color: var(--foreground);
+        font-size: 0.9375rem;
+        font-family: inherit;
+
+        &:focus {
+            outline: none;
+            border-color: #000;
+        }
+
+        &:disabled {
+            background: #f5f5f5;
+            color: var(--muted-foreground);
+            cursor: not-allowed;
+        }
+
+        &[aria-invalid='true'] {
+            border-color: var(--destructive);
+        }
+    }
+}
+
+.hint {
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+}
+
+.fieldError {
+    font-size: 0.8125rem;
+    color: var(--destructive);
+}
+
+/* Botones */
+.primaryButton,
+.secondaryButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.375rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.primaryButton {
+    background: #000;
+    color: #fff;
+    border: 1px solid #000;
+
+    &:hover:not(:disabled) {
+        background: #333;
+    }
+}
+
+.secondaryButton {
+    background: #fff;
+    color: var(--foreground);
+    border: 1px solid var(--border);
+
+    &:hover:not(:disabled) {
+        background: #f5f5f5;
+    }
+}
+
+.linkButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0;
+    background: none;
+    border: none;
+    color: var(--foreground);
+    font-size: 0.8125rem;
+    font-family: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.linkDanger {
+    color: var(--destructive);
+}
+
+/* Alertas */
+.alertError,
+.alertSuccess {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.alertError {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    margin-bottom: 1rem;
+}
+
+.alertSuccess {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+/* Direcciones */
+.empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2.5rem 1rem;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    text-align: center;
+}
+
+.addressGrid {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    padding: 0;
+    margin: 0;
+}
+
+.addressCard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding: 1.125rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: #fff;
+}
+
+.addressCardDefault {
+    border-color: #000;
+    box-shadow: 0 0 0 1px #000;
+}
+
+.addressHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.addressTitle {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 999px;
+    background: #000;
+    color: #fff;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.addressText {
+    font-size: 0.9375rem;
+    color: var(--foreground);
+}
+
+.addressReference {
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+}
+
+.addressCoords {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.addressActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin-top: auto;
+    padding-top: 0.75rem;
+}
+
+/* Modal */
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.modal {
+    width: 100%;
+    max-width: 560px;
+    max-height: 92vh;
+    overflow-y: auto;
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+
+    h2 {
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+}
+
+.iconButton {
+    display: inline-flex;
+    padding: 0.375rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--foreground);
+    cursor: pointer;
+
+    &:hover {
+        background: #f3f4f6;
+    }
+}
+
+// isolation: los paneles de Leaflet usan z-index altos y taparían el modal y los menús
+.mapWrapper {
+    position: relative;
+    z-index: 0;
+    isolation: isolate;
+    height: 280px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+
+    @media (max-width: 640px) {
+        height: 240px;
+    }
+}
+
+.mapPlaceholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #f9fafb;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+}
+
+.mapFooter {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.modalActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* Perfil: tarjetas apiladas (datos personales + seguridad) */
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.inputWrapper {
+    position: relative;
+
+    input {
+        padding-right: 2.75rem;
+    }
+}
+
+.toggleButton {
+    position: absolute;
+    top: 50%;
+    right: 0.5rem;
+    transform: translateY(-50%);
+    display: inline-flex;
+    padding: 0.375rem;
+    border: none;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+
+    &:hover {
+        color: var(--foreground);
+    }
+}
+
+.checklist {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    padding: 0;
+    margin: 0.25rem 0 0;
+}
+
+.checkItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+}
+
+.checkItemMet {
+    color: #166534;
+}

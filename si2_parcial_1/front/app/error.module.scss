@@ -1,0 +1,57 @@
+.page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: #f9fafb;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 360px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    color: var(--muted-foreground);
+
+    svg {
+        color: var(--destructive);
+    }
+
+    h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    p {
+        font-size: 0.9375rem;
+        line-height: 1.5;
+    }
+
+    button {
+        margin-top: 0.5rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.5rem;
+        background: #000;
+        color: #fff;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+
+        &:hover {
+            background: #333;
+        }
+    }
+}
