@@ -140,6 +140,8 @@ model Branch {
   id        String      @id @default(uuid())
   name      String
   address   String?
+  latitude  Float?
+  longitude Float?
   phone     String?
   isActive  Boolean @default(true)
 

@@ -3,6 +3,8 @@ import { FulfillmentType } from "./branch.types";
 export interface BranchPayload {
     name: string;
     address?: string;
+    latitude?: number;
+    longitude?: number;
     phone?: string;
     isActive?: boolean;
 }

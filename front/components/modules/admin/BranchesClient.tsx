@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
@@ -9,6 +10,14 @@ import { useAdminRole } from '@/hooks/useAdminAccess';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Branch } from '@/types/branch.types';
 import { BranchPayload } from '@/types/admin.types';
+import { MapPosition, SANTA_CRUZ_CENTER } from '@/types/address.types';
+
+// Leaflet usa `window`: solo se renderiza en el navegador (evita el "_leaflet_pos"/crash de SSR).
+// Reutiliza el mismo mapa del checkout de clientes (components/modules/checkout/AddressMap.tsx).
+const AddressMap = dynamic(() => import('../checkout/AddressMap'), {
+    ssr: false,
+    loading: () => <div className={styles.mapPlaceholder}>Cargando mapa...</div>,
+});
 
 interface BranchFormModalProps {
     branch?: Branch;
@@ -21,10 +30,36 @@ interface BranchFormModalProps {
 function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchFormModalProps) {
     const [name, setName] = useState(branch?.name ?? '');
     const [address, setAddress] = useState(branch?.address ?? '');
+    // Solo se manda lat/lng si el usuario realmente tocó el mapa (edición) o eligió una ubicación
+    // (creación): así no se pisa una coordenada ya guardada con el valor por defecto de Santa Cruz.
+    const [position, setPosition] = useState<MapPosition | null>(
+        branch?.latitude != null && branch?.longitude != null
+            ? { lat: branch.latitude, lng: branch.longitude }
+            : null,
+    );
+    const [showMap, setShowMap] = useState(false);
+    const [focusKey, setFocusKey] = useState(0);
     const [phone, setPhone] = useState(branch?.phone ?? '');
     const [isActive, setIsActive] = useState(branch?.isActive ?? true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const handleToggleMap = () => {
+        setShowMap((prev) => {
+            const next = !prev;
+            // Al abrir por primera vez sin coordenadas previas, arranca centrado en la ciudad
+            if (next && !position) setPosition(SANTA_CRUZ_CENTER);
+            return next;
+        });
+    };
+
+    const handleLocate = () => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(({ coords }) => {
+            setPosition({ lat: coords.latitude, lng: coords.longitude });
+            setFocusKey((key) => key + 1);
+        });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -39,6 +74,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
             await onSubmit({
                 name: name.trim(),
                 address: address.trim(),
+                ...(position ? { latitude: position.lat, longitude: position.lng } : {}),
                 phone: phone.trim(),
                 ...(canToggleActive ? { isActive } : {}),
             });
@@ -68,14 +104,42 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
 
                 <div className={styles.field}>
                     <label htmlFor="branch-address">Dirección</label>
-                    <input
-                        id="branch-address"
-                        className={styles.input}
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        maxLength={255}
-                        placeholder="Calle, número y zona"
-                    />
+                    <div className={styles.addressRow}>
+                        <input
+                            id="branch-address"
+                            className={styles.input}
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            maxLength={255}
+                            placeholder="Calle, número y zona"
+                        />
+                        <button
+                            type="button"
+                            className={styles.buttonSecondary}
+                            onClick={handleToggleMap}
+                            aria-expanded={showMap}
+                        >
+                            <MapPin size={16} />
+                            Ubicar en mapa
+                        </button>
+                    </div>
+
+                    {showMap && position && (
+                        <>
+                            <div className={styles.mapWrapper}>
+                                <AddressMap position={position} onPositionChange={setPosition} focusKey={focusKey} />
+                            </div>
+                            <div className={styles.mapFooter}>
+                                <button type="button" className={styles.linkButton} onClick={handleLocate}>
+                                    <MapPin size={14} />
+                                    Usar mi ubicación
+                                </button>
+                                <span className={styles.coords}>
+                                    Lat {position.lat.toFixed(5)}, Lng {position.lng.toFixed(5)}
+                                </span>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div className={styles.field}>

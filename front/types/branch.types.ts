@@ -2,6 +2,8 @@ export interface Branch {
     id: string;
     name: string;
     address: string | null;
+    latitude: number | null;
+    longitude: number | null;
     phone: string | null;
     isActive: boolean;
 }

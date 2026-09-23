@@ -8,6 +8,11 @@ import { useEffect } from "react";
 export function useRegisterServiceWorker(): void {
     useEffect(() => {
         if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+        // En dev, Turbopack recompila el grafo de módulos en cada reinicio del servidor; el
+        // CacheFirst de sw.js para _next/static/ seguiría sirviendo chunks viejos para siempre y
+        // rompería con "module factory is not available" en cada reinicio. Solo tiene sentido en
+        // producción, donde los chunks son realmente inmutables entre builds.
+        if (process.env.NODE_ENV !== "production") return;
 
         navigator.serviceWorker.register("/sw.js").catch(() => {
             // Best-effort: si falla (ej. navegador sin soporte real), la app sigue funcionando online

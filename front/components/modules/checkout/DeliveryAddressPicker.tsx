@@ -120,8 +120,10 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
                     onSave={createAddress}
                     onConfirm={(address) => {
                         onAddressChange(address);
-                        // Vuelve a la lista: la dirección confirmada queda seleccionada
-                        setChosenTab('saved');
+                        // rAF antes de cambiar de tab (desmonta el mapa): le da a Leaflet un frame
+                        // para asentar cualquier reposicionamiento pendiente del marcador. Ver el
+                        // cleanup de AddressMap para el fix de fondo del "_leaflet_pos" de undefined.
+                        requestAnimationFrame(() => setChosenTab('saved'));
                     }}
                 />
             )}

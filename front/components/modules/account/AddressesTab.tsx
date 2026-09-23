@@ -39,7 +39,11 @@ export default function AddressesTab() {
         } else {
             await createAddress(payload);
         }
-        setModal(null);
+        // requestAnimationFrame en vez de desmontar ya mismo: si el usuario soltó el marcador justo
+        // antes de tocar "Guardar", Leaflet todavía puede tener un reposicionamiento agendado para el
+        // próximo frame. Cerrar en el frame siguiente le da tiempo a terminar antes de que React
+        // saque el mapa del DOM (ver el cleanup de AddressMap para el fix de fondo).
+        requestAnimationFrame(() => setModal(null));
     };
 
     return (

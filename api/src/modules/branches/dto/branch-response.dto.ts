@@ -10,6 +10,12 @@ export class BranchResponseDto {
   @ApiProperty({ example: 'Calle Libertad #245, Santa Cruz de la Sierra', nullable: true })
   address: string | null;
 
+  @ApiProperty({ example: -17.7833, nullable: true })
+  latitude: number | null;
+
+  @ApiProperty({ example: -63.1821, nullable: true })
+  longitude: number | null;
+
   @ApiProperty({ example: '+591 3 3345678', nullable: true })
   phone: string | null;
 

@@ -254,12 +254,18 @@ export default function PosClient() {
                                             </span>
                                         </div>
                                         <div className={styles.ticketLineActions}>
-                                            <button type="button" onClick={() => changeQuantity(line.product.id, line.size, -1)} aria-label="Quitar uno">
+                                            <button
+                                                type="button"
+                                                className={styles.quantityButton}
+                                                onClick={() => changeQuantity(line.product.id, line.size, -1)}
+                                                aria-label="Quitar uno"
+                                            >
                                                 <Minus size={14} />
                                             </button>
                                             <span>{line.quantity}</span>
                                             <button
                                                 type="button"
+                                                className={styles.quantityButton}
                                                 onClick={() => changeQuantity(line.product.id, line.size, 1)}
                                                 disabled={line.quantity >= line.product.stock}
                                                 aria-label="Agregar uno"

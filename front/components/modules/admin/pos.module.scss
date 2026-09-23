@@ -201,11 +201,18 @@
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 0.375rem;
+    color: #000; // explícito: sin esto hereda el naranja de marca (--primary) del layout, no negro
     font-size: 0.8125rem;
     font-family: inherit;
     cursor: pointer;
 
-    &:hover {
+    // No hay estado "seleccionado" persistente acá (tocar una talla agrega al ticket y cierra el
+    // selector); hover/focus/active hacen de "seleccionada" mientras el vendedor interactúa con
+    // ella. :active se agrega además de :hover porque en tablets táctiles (uso típico del POS)
+    // :hover no siempre dispara antes del tap.
+    &:hover,
+    &:focus-visible,
+    &:active {
         background: #000;
         color: #fff;
         border-color: #000;
@@ -308,6 +315,22 @@
         &:disabled {
             opacity: 0.4;
             cursor: not-allowed;
+        }
+    }
+
+    // Igual que .paymentMethodButton: el ícono de lucide-react usa stroke="currentColor", así que
+    // fijar `color` acá alcanza para pintarlo (sin esto heredaba el naranja de marca del layout,
+    // ver el comentario en .paymentMethodButton). Solo +/-, no .removeButton (mantiene su rojo).
+    .quantityButton {
+        color: #000;
+
+        svg {
+            color: inherit;
+        }
+
+        &:hover:not(:disabled) {
+            background: #000;
+            color: #fff;
         }
     }
 

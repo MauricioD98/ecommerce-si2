@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CreateBranchDto {
   @ApiProperty({
@@ -22,6 +22,24 @@ export class CreateBranchDto {
   @IsOptional()
   @MaxLength(255)
   address?: string;
+
+  @ApiProperty({
+    example: -17.7833,
+    description: 'Latitud de la ubicación exacta (elegida en el mapa)',
+    required: false,
+  })
+  @IsLatitude()
+  @IsOptional()
+  latitude?: number;
+
+  @ApiProperty({
+    example: -63.1821,
+    description: 'Longitud de la ubicación exacta (elegida en el mapa)',
+    required: false,
+  })
+  @IsLongitude()
+  @IsOptional()
+  longitude?: number;
 
   @ApiProperty({
     example: '+591 3 3345678',
