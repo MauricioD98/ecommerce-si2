@@ -18,6 +18,8 @@ export interface Product {
     // Stock mostrado: el de la sucursal seleccionada si existe, si no el global
     stock: number;
     branchStock?: number | null;
+    // Stock por talla en la sucursal seleccionada (null si no se eligió sucursal)
+    stockBySize?: { size: string; stock: number }[] | null;
     sku: string;
     imageUrl: string;
     category: string;

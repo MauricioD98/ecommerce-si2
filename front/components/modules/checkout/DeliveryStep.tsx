@@ -14,6 +14,7 @@ interface DeliveryStepProps {
     deliveryAddress: DeliveryAddress | null;
     onAddressChange: (address: DeliveryAddress | null) => void;
     onContinue: () => void;
+    stockError?: string | null;
 }
 
 export default function DeliveryStep({
@@ -22,6 +23,7 @@ export default function DeliveryStep({
     deliveryAddress,
     onAddressChange,
     onContinue,
+    stockError,
 }: DeliveryStepProps) {
     // La sucursal elegida es la misma del selector del Header: así el stock que ve el cliente coincide con el del pedido
     const { branches, selectedBranchId, selectBranch, isLoading, error } = useBranches();
@@ -113,6 +115,8 @@ export default function DeliveryStep({
                     )}
                 </>
             )}
+
+            {stockError && <p className={styles.error}>{stockError}</p>}
 
             <button type="button" className={styles.continueButton} onClick={onContinue} disabled={!canContinue}>
                 Continuar al pago

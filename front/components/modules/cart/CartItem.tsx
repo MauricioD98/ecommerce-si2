@@ -66,11 +66,13 @@ export default function CartItem({ item }: CartItemProps) {
                         {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                     </span>
 
-                    {product.stock <= 5 && (
+                    {product.stock <= 0 ? (
+                        <span className={styles.lowStock}>Agotado: ya no hay stock disponible</span>
+                    ) : product.stock <= 5 ? (
                         <span className={styles.lowStock}>
                             Solo quedan {product.stock} en stock
                         </span>
-                    )}
+                    ) : null}
                 </div>
 
                 <div className={styles.actions}>

@@ -121,6 +121,16 @@ export default function PosClient() {
     const handleCharge = async () => {
         if (ticket.length === 0 || !effectiveBranchId || isCharging || cashBlocked) return;
 
+        // Última barrera en el cliente antes de enviar el cobro: el stock pudo cambiar mientras
+        // se armaba el ticket (otra caja vendió el último), así que se revalida acá también.
+        const invalidLine = ticket.find((line) => line.product.stock <= 0 || line.quantity > line.product.stock);
+        if (invalidLine) {
+            setCheckoutError(
+                `"${invalidLine.product.name}" (${invalidLine.size}) ya no tiene stock suficiente. Quítalo o ajusta la cantidad del ticket.`,
+            );
+            return;
+        }
+
         setIsCharging(true);
         setCheckoutError(null);
         try {

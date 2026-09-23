@@ -228,6 +228,21 @@
     }
 }
 
+/* Talla sin stock: equivalente a disabled:opacity-50 disabled:cursor-not-allowed
+   disabled:bg-gray-100 disabled:text-gray-400 de Tailwind (este proyecto no usa Tailwind) */
+.sizeButtonDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f3f4f6;
+    color: #9ca3af;
+    text-decoration: line-through;
+
+    &:hover {
+        background-color: #f3f4f6;
+        border-color: #d1d5db;
+    }
+}
+
 /* Precio con descuento de producto */
 .oldPrice {
     margin-left: 0.5rem;

@@ -394,6 +394,7 @@ return { message: 'Product deleted successfully' };
     price: Number(product.price),
     effectivePrice: getBranchPrice(product, inventory),
     branchStock: context ? (inventory?.stock ?? 0) : null,
+    stockBySize: context ? (inventory?.sizes ?? []) : null,
     discount: hasDiscount
       ? {
           discountPrice: inventory.discountPrice != null ? Number(inventory.discountPrice) : null,

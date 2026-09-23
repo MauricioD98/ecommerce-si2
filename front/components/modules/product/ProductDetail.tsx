@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { ScanFace } from 'lucide-react';
 import { Product } from '@/types/product.types';
@@ -10,18 +10,49 @@ import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 export default function ProductDetail({ product }: { product: Product }) {
 
     const { addProductToCart } = useCart();
-    const isInStock = product.stock > 0;
     const hasDiscount = hasProductDiscount(product);
     const [quantity, setQuantity] = useState(1);
     const [selectedSize, setSelectedSize] = useState<string>("");
     const hasSizes = !!product.sizes && product.sizes.length > 0;
+
+    // Stock por talla en la sucursal elegida. Sin sucursal (stockBySize null) no hay forma de saber
+    // el stock de cada talla por separado: se cae al stock agregado del producto para no bloquear
+    // todo el selector.
+    const stockBySize = useMemo(() => {
+        const map = new Map<string, number>();
+        if (product.stockBySize) {
+            for (const row of product.stockBySize) map.set(row.size, row.stock);
+        }
+        return map;
+    }, [product.stockBySize]);
+
+    const getStockForSize = (size: string): number =>
+        product.stockBySize ? (stockBySize.get(size) ?? 0) : product.stock;
+
+    // Auto-selección inteligente: nunca elige de entrada una talla agotada.
+    useEffect(() => {
+        if (!hasSizes) {
+            setSelectedSize("");
+            return;
+        }
+        const firstAvailable = product.sizes!.find((size) => getStockForSize(size) > 0);
+        setSelectedSize(firstAvailable ?? "");
+        setQuantity(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [product.id, product.stockBySize, hasSizes]);
+
+    // Stock relevante para la cantidad/botón de agregar: el de la talla elegida, o el del producto
+    // si no maneja tallas.
+    const relevantStock = hasSizes ? (selectedSize ? getStockForSize(selectedSize) : 0) : product.stock;
+    const isInStock = relevantStock > 0;
+
     const handleDecrement = () => {
         if (quantity > 1) {
             setQuantity(quantity - 1);
         }
     };
     const handleIncrement = () => {
-        if (quantity < product.stock) {
+        if (quantity < relevantStock) {
             setQuantity(quantity + 1);
         }
     };
@@ -39,7 +70,6 @@ export default function ProductDetail({ product }: { product: Product }) {
             }
             addProductToCart(product, hasSizes ? selectedSize : undefined);
             setQuantity(1);
-            alert("Se agregaron " + quantity + " " + product.name + " al carrito");
             alert(`Se agregaron ${quantity} ${product.name} al carrito`);
         }
     }
@@ -64,31 +94,41 @@ export default function ProductDetail({ product }: { product: Product }) {
                             {hasDiscount && <span className={styles.oldPrice}>${product.price.toFixed(2)}</span>}
                             {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                         </p>
+                        {/* Reactivo a la talla elegida: cambia al vuelo si el usuario cambia de talla */}
                         <span className={`${styles.stock} ${!isInStock ? styles.outOfStock : ""}`}>
-                            {
-                                isInStock ? `${product.stock} disponibles en stock` : "Agotado"
-                            }
+                            {isInStock ? `${relevantStock} disponibles en stock` : "Agotado"}
                         </span>
                         <hr className={styles.divider} />
                         <p className={styles.description}>{product.description}</p>
                         <hr className={styles.divider} />
 
                         {
-                            isInStock && hasSizes && (
+                            hasSizes && (
                                 <div className={styles.sizeSection}>
                                     <span className={styles.label}>Talla</span>
                                     <div className={styles.sizeOptions}>
-                                        {product.sizes!.map((size) => (
-                                            <button
-                                                key={size}
-                                                type="button"
-                                                className={`${styles.sizeButton} ${selectedSize === size ? styles.sizeButtonActive : ""}`}
-                                                onClick={() => setSelectedSize(size)}
-                                                aria-pressed={selectedSize === size}
-                                            >
-                                                {size}
-                                            </button>
-                                        ))}
+                                        {product.sizes!.map((size) => {
+                                            const sizeStock = getStockForSize(size);
+                                            const sizeOutOfStock = sizeStock <= 0;
+                                            return (
+                                                <button
+                                                    key={size}
+                                                    type="button"
+                                                    className={[
+                                                        styles.sizeButton,
+                                                        selectedSize === size ? styles.sizeButtonActive : "",
+                                                        sizeOutOfStock ? styles.sizeButtonDisabled : "",
+                                                    ].filter(Boolean).join(" ")}
+                                                    onClick={() => setSelectedSize(size)}
+                                                    disabled={sizeOutOfStock}
+                                                    aria-pressed={selectedSize === size}
+                                                    aria-disabled={sizeOutOfStock}
+                                                    title={sizeOutOfStock ? `Talla ${size} agotada` : undefined}
+                                                >
+                                                    {size}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )
@@ -108,7 +148,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                                         <span className={styles.quantityValue}>{quantity}</span>
                                         <button className={styles.quantityButton}
                                             onClick={handleIncrement}
-                                            disabled={quantity >= product.stock}
+                                            disabled={quantity >= relevantStock}
                                             aria-label="Aumentar cantidad">
                                             +
                                         </button>

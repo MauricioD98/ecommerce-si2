@@ -34,10 +34,12 @@ const cartSlice = createSlice({
     reducers: {
         addToCart: (state: CartState, action: PayloadAction<{ product: Product; selectedSize?: string }>) => {
             const { product, selectedSize } = action.payload;
+            if (product.stock <= 0) return;
             const existing = state.items.find(
                 (i: CartItem) => matches(i, { productId: product.id, selectedSize })
             );
             if (existing) {
+                if (existing.quantity >= product.stock) return;
                 existing.quantity += 1;
             } else {
                 const newItem: CartItem = {
@@ -67,7 +69,7 @@ const cartSlice = createSlice({
             const item = state.items.find(
                 (i: CartItem) => matches(i, action.payload)
             );
-            if (item) {
+            if (item && item.quantity < item.product.stock) {
                 item.quantity += 1;
                 recalcTotals(state);
             }

@@ -22,6 +22,7 @@ export const normalizeProduct = (raw: RawProduct): Product => ({
     effectivePrice: raw.effectivePrice ?? raw.price,
     imageUrl: raw.imageUrl?.trim() || PLACEHOLDER_IMAGE,
     sizes: raw.sizes ?? [],
+    stockBySize: raw.stockBySize ?? null,
     colors: raw.colors ?? [],
     collections: raw.collections ?? [],
     orderCount: raw.orderCount ?? 0,

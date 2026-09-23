@@ -55,6 +55,8 @@ export default function CheckoutClient() {
     const [isSavingOffline, setIsSavingOffline] = useState(false);
     const [offlineError, setOfflineError] = useState<string | null>(null);
 
+    const [stockError, setStockError] = useState<string | null>(null);
+
     const [orderId, setOrderId] = useState<string | undefined>(order?.id); // Extraemos el orderId de la orden creada
     // Total, descuento de empleado y costo de envío calculados por el backend al crear la orden
     const [orderTotal, setOrderTotal] = useState<number | null>(null);
@@ -213,8 +215,19 @@ export default function CheckoutClient() {
                                 onContinue={async () => {
                                     // Precios y stock definitivos de la sucursal elegida antes de pagar
                                     await syncCartProducts(selectedBranchId);
+                                    const invalidItem = items.find(
+                                        (item) => item.product.stock <= 0 || item.quantity > item.product.stock,
+                                    );
+                                    if (invalidItem) {
+                                        setStockError(
+                                            `"${invalidItem.product.name}" ya no tiene stock suficiente (disponible: ${invalidItem.product.stock}). Ajusta la cantidad en tu carrito antes de continuar.`,
+                                        );
+                                        return;
+                                    }
+                                    setStockError(null);
                                     setCurrentStep(2);
                                 }}
+                                stockError={stockError}
                             />
 
                             {renderSummary()}

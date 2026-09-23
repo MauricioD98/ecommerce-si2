@@ -11,6 +11,8 @@ export interface InventoryAggregate {
   stock: number;
   discountPrice: Prisma.Decimal | null;
   discountPercentage: number | null;
+  // Desglose del stock por talla en esa sucursal (lo que de verdad limita cuánto se puede vender de cada talla)
+  sizes: { size: string; stock: number }[];
 }
 
 @Injectable()
@@ -27,6 +29,7 @@ export class InventoryService {
       // Los descuentos se mantienen sincronizados entre tallas: cualquier fila sirve
       discountPrice: rows[0].discountPrice,
       discountPercentage: rows[0].discountPercentage,
+      sizes: rows.map((row) => ({ size: row.size, stock: row.stock })),
     };
   }
 
@@ -52,8 +55,9 @@ export class InventoryService {
     });
     const map: Record<string, InventoryAggregate> = {};
     for (const row of rows) {
-      const current = map[row.productId] ?? { stock: 0, discountPrice: row.discountPrice, discountPercentage: row.discountPercentage };
+      const current = map[row.productId] ?? { stock: 0, discountPrice: row.discountPrice, discountPercentage: row.discountPercentage, sizes: [] };
       current.stock += row.stock;
+      current.sizes.push({ size: row.size, stock: row.stock });
       map[row.productId] = current;
     }
     return map;

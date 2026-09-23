@@ -69,6 +69,13 @@ export class ProductResponseDto {
   branchStock: number | null;
 
   @ApiProperty({
+    description: 'Stock por talla en la sucursal indicada con ?branchId (null si no se indicó sucursal)',
+    example: [{ size: 'S', stock: 0 }, { size: 'M', stock: 12 }],
+    nullable: true,
+  })
+  stockBySize: { size: string; stock: number }[] | null;
+
+  @ApiProperty({
     description: 'Descuento del producto en la sucursal indicada con ?branchId (null si no hay sucursal o descuento)',
     nullable: true,
     example: { discountPrice: 79.99, discountPercentage: null },
