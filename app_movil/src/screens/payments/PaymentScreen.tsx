@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   Alert,
   Image,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
@@ -41,6 +41,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [transactionRef, setTransactionRef] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(4);
+  const hasRedirectedRef = useRef<boolean>(false);
 
   // QR Payment State
   const [qrData, setQrData] = useState<any>(null);
@@ -54,6 +55,8 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const [cvc, setCvc] = useState<string>('123');
 
   const handleGoToCatalog = useCallback(() => {
+    if (hasRedirectedRef.current) return;
+    hasRedirectedRef.current = true;
     navigation.reset({
       index: 0,
       routes: [
@@ -68,19 +71,17 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     if (!isSuccess) return;
 
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleGoToCatalog();
-          return 0;
-        }
-        return prev - 1;
-      });
+    if (countdown <= 0) {
+      handleGoToCatalog();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev - 1);
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isSuccess, handleGoToCatalog]);
+    return () => clearTimeout(timer);
+  }, [isSuccess, countdown, handleGoToCatalog]);
 
   useEffect(() => {
     const initPayment = async () => {
