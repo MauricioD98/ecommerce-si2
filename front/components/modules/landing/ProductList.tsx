@@ -49,6 +49,29 @@ export default function ProductList() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, page, selectedBranchId, filtersKey, getProducts]);
 
+  // Recarga automática al haber cambios de inventario (compras) o al volver a enfocar la ventana
+  useEffect(() => {
+    const handleRefresh = () => {
+      getProducts({
+        search: debouncedSearch || undefined,
+        page,
+        limit: 12,
+        branchId: selectedBranchId || undefined,
+        category,
+        collectionSlug,
+        sizes: sizes.length > 0 ? sizes : undefined,
+        minPrice: minPriceParam ? Number(minPriceParam) : undefined,
+        maxPrice: maxPriceParam ? Number(maxPriceParam) : undefined,
+      });
+    };
+    window.addEventListener('inventory-changed', handleRefresh);
+    window.addEventListener('focus', handleRefresh);
+    return () => {
+      window.removeEventListener('inventory-changed', handleRefresh);
+      window.removeEventListener('focus', handleRefresh);
+    };
+  }, [debouncedSearch, page, selectedBranchId, filtersKey, getProducts, category, collectionSlug, sizes, minPriceParam, maxPriceParam]);
+
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;

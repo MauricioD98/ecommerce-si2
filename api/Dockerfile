@@ -9,6 +9,9 @@ COPY package*.json ./
 COPY prisma ./prisma/
 COPY prisma.config.ts ./
 
+# Variable para que prisma generate no falle durante el build
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+
 # Instalar TODAS las dependencias (incluyendo devDependencies para compilar)
 RUN npm install --legacy-peer-deps
 

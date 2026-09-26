@@ -30,8 +30,8 @@ export function useCart() {
     // Descuento de producto -> subtotal -> descuento de trabajador (si el usuario lo tiene) -> total
     const totals = calculateCartTotals(items, getEmployeeDiscountPercent(user));
 
-    const addProductToCart = async (product: Product, selectedSize?: string) => {
-        dispatch(addToCartAction({ product, selectedSize }));
+    const addProductToCart = async (product: Product, selectedSize?: string, quantity: number = 1) => {
+        dispatch(addToCartAction({ product, selectedSize, quantity }));
     };
 
     const decrementProductQuantity = async (productId: string, selectedSize?: string) => {

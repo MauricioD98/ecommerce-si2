@@ -61,7 +61,7 @@ export default function CartClient() {
                     <div className={styles.itemsList}>
                         {
                             items.map((item: CartItem) => (
-                                <CartItemComponent key={item.product.id} item={item} />
+                                <CartItemComponent key={`${item.productId}-${item.selectedSize ?? 'default'}`} item={item} />
                             ))
                         }
                     </div>

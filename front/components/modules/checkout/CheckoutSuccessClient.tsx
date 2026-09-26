@@ -53,6 +53,19 @@ export default function CheckoutSuccessClient() {
                 clearAllCart();
                 setStatus('success');
 
+                if (typeof window !== 'undefined') {
+                    if ('caches' in window) {
+                        caches.keys().then((keys) => {
+                            keys.filter((k) => k.startsWith('sf-api')).forEach((k) => caches.delete(k));
+                        }).catch(() => undefined);
+                    }
+                    if (navigator.serviceWorker?.controller) {
+                        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_API_CACHE' });
+                    }
+                    window.dispatchEvent(new CustomEvent('inventory-changed'));
+                }
+                router.refresh();
+
                 // Best-effort: solo para mostrar el número de pedido, no bloquea la confirmación
                 OrderService.getOrder(orderId)
                     .then((response) => active && setOrderNumber(response.data.id))
@@ -71,6 +84,26 @@ export default function CheckoutSuccessClient() {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orderId, paymentIntentId, redirectStatus]);
+
+    // Redirección automática a la página principal tras compra exitosa
+    const [countdown, setCountdown] = useState<number>(4);
+
+    useEffect(() => {
+        if (status !== 'success') return;
+
+        const timer = setInterval(() => {
+            setCountdown((prev) => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    window.location.href = '/';
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [status]);
 
     if (status === 'confirming') {
         return (
@@ -114,7 +147,16 @@ export default function CheckoutSuccessClient() {
                                 Tu pedido #<strong>{orderNumber}</strong> ha sido confirmado.
                             </p>
                         )}
-                        <button type="button" className={styles.continueButton} onClick={() => router.push('/')}>
+                        <p style={{ marginTop: '0.75rem', marginBottom: '1.25rem', color: '#6b7280', fontSize: '0.95rem' }}>
+                            Redirigiendo a la tienda en {countdown} segundos...
+                        </p>
+                        <button
+                            type="button"
+                            className={styles.continueButton}
+                            onClick={() => {
+                                window.location.href = '/';
+                            }}
+                        >
                             Volver a la tienda
                         </button>
                     </div>

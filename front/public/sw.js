@@ -9,7 +9,7 @@
 // nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
 // (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const API_CACHE = `sf-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;
@@ -55,7 +55,7 @@ self.addEventListener('activate', (event) => {
 // inicia sesión podría ver, por una fracción de segundo (StaleWhileRevalidate sirve lo cacheado
 // antes de que la red responda) u offline del todo, los datos de la cuenta anterior.
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'CLEAR_USER_CACHE') {
+  if (event.data?.type === 'CLEAR_USER_CACHE' || event.data?.type === 'CLEAR_API_CACHE') {
     event.waitUntil(caches.delete(API_CACHE));
   }
 });
@@ -71,6 +71,23 @@ function controlledFailureResponse() {
     statusText: 'Offline',
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// NetworkFirst: intenta la red primero (datos frescos de stock/precios); si falla la red (offline),
+// cae a la última copia en caché para mantener la app utilizable sin conexión.
+async function networkFirst(request, cacheName, onMiss) {
+  const cache = await caches.open(cacheName);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return onMiss ? onMiss() : Response.error();
+  }
 }
 
 // StaleWhileRevalidate: responde de caché al instante (si existe) y actualiza en segundo plano.
@@ -146,13 +163,10 @@ self.addEventListener('fetch', (event) => {
 
   // Toda la API (catálogo, perfil, pedidos, sucursales...): puede ser cross-origin (la API vive en
   // otro host/puerto que el frontend en dev), por eso se filtra por pathname y no por origin.
-  // StaleWhileRevalidate: si la vio online, queda disponible offline (catálogo, "Mi cuenta",
-  // "Mis pedidos"); si nunca la vio, Response.error() -> axios lo recibe como error de red y cada
-  // hook ya lo atrapa y muestra "No podemos cargar esta información sin conexión a Internet."
-  // (service/api/error.utils.ts). Ver el listener "message" arriba: esta caché se borra al cerrar
-  // sesión para no filtrar datos de una cuenta a la siguiente en un dispositivo compartido.
+  // NetworkFirst: si hay internet, SIEMPRE pide datos frescos a la red (el stock y precios siempre
+  // están al día); si no hay conexión (offline), sirve la última copia guardada en caché.
   if (url.pathname.startsWith('/api/v1/')) {
-    event.respondWith(staleWhileRevalidate(request, API_CACHE));
+    event.respondWith(networkFirst(request, API_CACHE));
     return;
   }
 

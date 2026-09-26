@@ -7,6 +7,8 @@ export const apiClient = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1",
     headers: {
         "Content-type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
     },
     timeout: 10000,
     // El default de Axios serializa arrays como "sizes[]=S&sizes[]=L". El ValidationPipe global del

@@ -16,15 +16,21 @@ export default function CartItem({ item }: CartItemProps) {
     const { decrementProductQuantity, incrementProductQuantity, removeFromCart } = useCart();
     const { product, quantity, selectedSize } = item;
 
+    let maxStock = product.stock;
+    if (selectedSize && product.stockBySize) {
+        const row = product.stockBySize.find((s) => s.size === selectedSize);
+        if (row !== undefined) maxStock = row.stock;
+    }
+
     const handleDecrement = async () => {
         await decrementProductQuantity(product.id, selectedSize);
     };
 
     const handleIncrement = async () => {
-        if (quantity < product.stock) {
+        if (quantity < maxStock) {
             await incrementProductQuantity(product.id, selectedSize);
         } else {
-            alert(`Solo hay ${product.stock} artículos disponibles en stock`);
+            alert(`Solo hay ${maxStock} artículos disponibles en stock`);
         }
     };
 
@@ -66,11 +72,11 @@ export default function CartItem({ item }: CartItemProps) {
                         {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                     </span>
 
-                    {product.stock <= 0 ? (
+                    {maxStock <= 0 ? (
                         <span className={styles.lowStock}>Agotado: ya no hay stock disponible</span>
-                    ) : product.stock <= 5 ? (
+                    ) : maxStock <= 5 ? (
                         <span className={styles.lowStock}>
-                            Solo quedan {product.stock} en stock
+                            Solo quedan {maxStock} en stock
                         </span>
                     ) : null}
                 </div>
@@ -87,7 +93,7 @@ export default function CartItem({ item }: CartItemProps) {
 
                         <button className={styles.quantityButton}
                             onClick={handleIncrement}
-                            disabled={quantity >= product.stock}
+                            disabled={quantity >= maxStock}
                             aria-label="Aumentar cantidad">
                             +
                         </button>

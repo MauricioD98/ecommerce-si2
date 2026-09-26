@@ -1,23 +1,31 @@
 'use client';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Product } from '@/types/product.types';
 import Link from 'next/link';
-import Image from 'next/image'; // 1. Importación agregada
+import Image from 'next/image';
 import styles from "./product-card.module.scss";
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
+import { useCart } from '@/hooks/useCart';
 
 export default function ProductCard({ product }: { product: Product }) {
+    const { items } = useCart();
     const id = product.id;
-    const isInStock = product.stock > 0;
+
+    const inCartQty = useMemo(() => {
+        return items
+            .filter((item) => item.productId === id)
+            .reduce((sum, item) => sum + item.quantity, 0);
+    }, [items, id]);
+
+    const availableStock = Math.max(0, product.stock - inCartQty);
+    const isInStock = availableStock > 0;
     const hasDiscount = hasProductDiscount(product);
 
     return (
-        // 2. Comillas invertidas (backticks) para interpolar la variable id
         <Link href={`/${id}`} className={styles.card}>
-            {/*image */}
             <div className={styles.imageWrapper}>
                 <Image
-                    src={product.imageUrl.trimEnd() ?? "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png"}
+                    src={product.imageUrl?.trimEnd() || "https://upload.wikimedia.org/wikipedia/commons/a/a3/Image-not-found.png"}
                     alt={product.name}
                     width={400}
                     height={400}
@@ -25,7 +33,6 @@ export default function ProductCard({ product }: { product: Product }) {
                 />
             </div>
 
-            {/*content */}
             <div className={styles.content}>
                 <span className={styles.category}>
                     {product.category}
@@ -38,11 +45,10 @@ export default function ProductCard({ product }: { product: Product }) {
                         {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
                     </span>
 
-                    {/* 3. Sintaxis de template literal corregida y variable isInStock bien escrita */}
                     <span
                         className={`${styles.stock} ${!isInStock ? styles.outOfStock : ""}`}
                     >
-                        {isInStock ? product.stock + " en stock" : "Agotado"}
+                        {isInStock ? `${availableStock} en stock` : "Agotado"}
                     </span>
                 </div>
             </div>

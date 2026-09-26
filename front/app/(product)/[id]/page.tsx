@@ -5,7 +5,8 @@ import { icons } from 'lucide-react';
 import { title } from 'process';
 import React from 'react';
 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface PageProps {
     params: Promise<{ id: string }>;

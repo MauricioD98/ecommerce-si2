@@ -32,23 +32,36 @@ const cartSlice = createSlice({
     name: "cart",
     initialState,
     reducers: {
-        addToCart: (state: CartState, action: PayloadAction<{ product: Product; selectedSize?: string }>) => {
-            const { product, selectedSize } = action.payload;
-            if (product.stock <= 0) return;
+        addToCart: (
+            state: CartState,
+            action: PayloadAction<{ product: Product; selectedSize?: string; quantity?: number }>
+        ) => {
+            const { product, selectedSize, quantity = 1 } = action.payload;
+            if (quantity <= 0) return;
+
+            let maxStock = product.stock;
+            if (selectedSize && product.stockBySize) {
+                const sizeRow = product.stockBySize.find((s) => s.size === selectedSize);
+                if (sizeRow !== undefined) maxStock = sizeRow.stock;
+            }
+            if (maxStock <= 0) return;
+
             const existing = state.items.find(
                 (i: CartItem) => matches(i, { productId: product.id, selectedSize })
             );
             if (existing) {
-                if (existing.quantity >= product.stock) return;
-                existing.quantity += 1;
+                existing.quantity = Math.min(existing.quantity + quantity, maxStock);
+                existing.updateAt = new Date().toISOString();
             } else {
+                const initialQty = Math.min(quantity, maxStock);
+                if (initialQty <= 0) return;
                 const newItem: CartItem = {
                     id: crypto.randomUUID(),
                     cartId: "",
                     productId: product.id,
                     product,
                     price: getEffectivePrice(product),
-                    quantity: 1,
+                    quantity: initialQty,
                     selectedSize,
                     CreatedAt: new Date().toISOString(),
                     updateAt: new Date().toISOString(),
@@ -69,8 +82,17 @@ const cartSlice = createSlice({
             const item = state.items.find(
                 (i: CartItem) => matches(i, action.payload)
             );
-            if (item && item.quantity < item.product.stock) {
+            if (!item) return;
+
+            let maxStock = item.product.stock;
+            if (item.selectedSize && item.product.stockBySize) {
+                const sizeRow = item.product.stockBySize.find((s) => s.size === item.selectedSize);
+                if (sizeRow !== undefined) maxStock = sizeRow.stock;
+            }
+
+            if (item.quantity < maxStock) {
                 item.quantity += 1;
+                item.updateAt = new Date().toISOString();
                 recalcTotals(state);
             }
         },

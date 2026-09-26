@@ -27,7 +27,15 @@ async function bootstrap() {
     origin: process.env.ALLOWED_ORIGINS?.split(',')??'http://localhost:3000',
     credentials:true,
     methods: ['GET','POST','PUT','DELETE', 'PATCH','OPTIONS'],
-    allowedHeaders: ['Content-Type','Authorization','Accept'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With'],
+  });
+
+  // Deshabilitar caché del navegador/proxies para respuestas dinámicas (stock, precios, órdenes)
+  app.use((_req: any, res: any, next: () => void) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
   });
 
   //Enable Swagger

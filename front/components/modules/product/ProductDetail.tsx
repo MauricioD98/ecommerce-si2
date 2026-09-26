@@ -9,15 +9,13 @@ import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 
 export default function ProductDetail({ product }: { product: Product }) {
 
-    const { addProductToCart } = useCart();
+    const { addProductToCart, items } = useCart();
     const hasDiscount = hasProductDiscount(product);
     const [quantity, setQuantity] = useState(1);
     const [selectedSize, setSelectedSize] = useState<string>("");
     const hasSizes = !!product.sizes && product.sizes.length > 0;
 
-    // Stock por talla en la sucursal elegida. Sin sucursal (stockBySize null) no hay forma de saber
-    // el stock de cada talla por separado: se cae al stock agregado del producto para no bloquear
-    // todo el selector.
+    // Stock base por talla en la sucursal elegida
     const stockBySize = useMemo(() => {
         const map = new Map<string, number>();
         if (product.stockBySize) {
@@ -29,22 +27,61 @@ export default function ProductDetail({ product }: { product: Product }) {
     const getStockForSize = (size: string): number =>
         product.stockBySize ? (stockBySize.get(size) ?? 0) : product.stock;
 
-    // Auto-selección inteligente: nunca elige de entrada una talla agotada.
+    // Cantidad de este producto que ya está reservada en el carrito (total y por talla)
+    const cartQtyBySize = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const item of items) {
+            if (item.productId === product.id && item.selectedSize) {
+                map.set(item.selectedSize, (map.get(item.selectedSize) ?? 0) + item.quantity);
+            }
+        }
+        return map;
+    }, [items, product.id]);
+
+    const totalInCart = useMemo(() => {
+        return items
+            .filter((item) => item.productId === product.id)
+            .reduce((sum, item) => sum + item.quantity, 0);
+    }, [items, product.id]);
+
+    // Stock disponible real restando lo que el usuario ya tiene en el carrito
+    const getAvailableStockForSize = (size: string): number => {
+        const baseStock = getStockForSize(size);
+        const inCart = cartQtyBySize.get(size) ?? 0;
+        return Math.max(0, baseStock - inCart);
+    };
+
+    // Stock relevante para la talla elegida (o stock total sin tallas)
+    const relevantStock = hasSizes
+        ? (selectedSize ? getAvailableStockForSize(selectedSize) : 0)
+        : Math.max(0, product.stock - totalInCart);
+
+    const isInStock = relevantStock > 0;
+
+    // Auto-selección inteligente: nunca elige de entrada una talla agotada (o agotada en carrito).
     useEffect(() => {
         if (!hasSizes) {
             setSelectedSize("");
             return;
         }
-        const firstAvailable = product.sizes!.find((size) => getStockForSize(size) > 0);
-        setSelectedSize(firstAvailable ?? "");
-        setQuantity(1);
+        const currentStillAvailable = selectedSize && getAvailableStockForSize(selectedSize) > 0;
+        if (!currentStillAvailable) {
+            const firstAvailable = product.sizes!.find((size) => getAvailableStockForSize(size) > 0);
+            setSelectedSize(firstAvailable ?? "");
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [product.id, product.stockBySize, hasSizes]);
+    }, [product.id, product.stockBySize, hasSizes, items]);
 
-    // Stock relevante para la cantidad/botón de agregar: el de la talla elegida, o el del producto
-    // si no maneja tallas.
-    const relevantStock = hasSizes ? (selectedSize ? getStockForSize(selectedSize) : 0) : product.stock;
-    const isInStock = relevantStock > 0;
+    // Ajustar la cantidad seleccionada si el stock disponible cambia (ej. al agregar al carrito)
+    useEffect(() => {
+        if (relevantStock <= 0) {
+            setQuantity(0);
+        } else if (quantity > relevantStock) {
+            setQuantity(relevantStock);
+        } else if (quantity < 1 && relevantStock > 0) {
+            setQuantity(1);
+        }
+    }, [relevantStock, quantity]);
 
     const handleDecrement = () => {
         if (quantity > 1) {
@@ -63,16 +100,16 @@ export default function ProductDetail({ product }: { product: Product }) {
     };
 
     const handleAddToCart = () => {
-        if (isInStock) {
+        if (isInStock && quantity > 0) {
             if (hasSizes && !selectedSize) {
                 alert("Por favor, selecciona una talla");
                 return;
             }
-            addProductToCart(product, hasSizes ? selectedSize : undefined);
-            setQuantity(1);
-            alert(`Se agregaron ${quantity} ${product.name} al carrito`);
+            const qtyToAdd = Math.min(quantity, relevantStock);
+            addProductToCart(product, hasSizes ? selectedSize : undefined, qtyToAdd);
+            alert(`Se agregaron ${qtyToAdd} ${product.name} al carrito`);
         }
-    }
+    };
 
     return (
         <section className={styles.section}>
@@ -94,7 +131,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                             {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
                             {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                         </p>
-                        {/* Reactivo a la talla elegida: cambia al vuelo si el usuario cambia de talla */}
+                        {/* Reactivo a la talla elegida y a lo ya puesto en el carrito */}
                         <span className={`${styles.stock} ${!isInStock ? styles.outOfStock : ""}`}>
                             {isInStock ? `${relevantStock} disponibles en stock` : "Agotado"}
                         </span>
@@ -108,7 +145,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                                     <span className={styles.label}>Talla</span>
                                     <div className={styles.sizeOptions}>
                                         {product.sizes!.map((size) => {
-                                            const sizeStock = getStockForSize(size);
+                                            const sizeStock = getAvailableStockForSize(size);
                                             const sizeOutOfStock = sizeStock <= 0;
                                             return (
                                                 <button
@@ -123,7 +160,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                                                     disabled={sizeOutOfStock}
                                                     aria-pressed={selectedSize === size}
                                                     aria-disabled={sizeOutOfStock}
-                                                    title={sizeOutOfStock ? `Talla ${size} agotada` : undefined}
+                                                    title={sizeOutOfStock ? `Talla ${size} agotada (o en tu carrito)` : undefined}
                                                 >
                                                     {size}
                                                 </button>

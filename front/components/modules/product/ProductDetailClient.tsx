@@ -16,11 +16,25 @@ export default function ProductDetailClient({
     const { getProduct, product, isLoading, error } = useProducts();
     const selectedBranchId = useSelectedBranchId();
 
-    // Recarga el detalle al cambiar de sucursal para mostrar su stock
+    // Recarga el detalle al cambiar de sucursal, al completar un pago o al retomar foco
     useEffect(() => {
         if (productId) {
             getProduct(productId, selectedBranchId);
         }
+    }, [productId, selectedBranchId, getProduct]);
+
+    useEffect(() => {
+        const handleRefresh = () => {
+            if (productId) {
+                getProduct(productId, selectedBranchId);
+            }
+        };
+        window.addEventListener('inventory-changed', handleRefresh);
+        window.addEventListener('focus', handleRefresh);
+        return () => {
+            window.removeEventListener('inventory-changed', handleRefresh);
+            window.removeEventListener('focus', handleRefresh);
+        };
     }, [productId, selectedBranchId, getProduct]);
 
     if (isLoading) {
