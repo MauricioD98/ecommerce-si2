@@ -4,6 +4,9 @@ import {
   CreatePaymentIntentResponse,
   ConfirmPaymentPayload,
   PaymentDetails,
+  GenerateQrResponse,
+  QrStatusResponse,
+  ConfirmQrPayload,
 } from '../types';
 
 export const paymentsApi = {
@@ -14,6 +17,21 @@ export const paymentsApi = {
 
   confirmPayment: async (payload: ConfirmPaymentPayload): Promise<{ success: boolean; data: PaymentDetails; message: string }> => {
     const response = await apiClient.post<{ success: boolean; data: PaymentDetails; message: string }>('/payments/confirm', payload);
+    return response.data;
+  },
+
+  generateQr: async (orderId: string): Promise<GenerateQrResponse> => {
+    const response = await apiClient.post<GenerateQrResponse>('/payments/qr/generate', { orderId });
+    return response.data;
+  },
+
+  getQrStatus: async (orderId: string): Promise<QrStatusResponse> => {
+    const response = await apiClient.get<QrStatusResponse>(`/payments/qr/status/${orderId}`);
+    return response.data;
+  },
+
+  confirmQrPayment: async (payload: ConfirmQrPayload): Promise<{ success: boolean; data: any; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; data: any; message: string }>('/payments/qr/confirm', payload);
     return response.data;
   },
 
@@ -34,3 +52,4 @@ export const paymentsApi = {
     return response.data;
   },
 };
+

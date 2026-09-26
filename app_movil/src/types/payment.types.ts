@@ -31,3 +31,35 @@ export interface PaymentDetails {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface GenerateQrPayload {
+  orderId: string;
+}
+
+export interface GenerateQrResponse {
+  success: boolean;
+  message: string;
+  data: {
+    orderId: string;
+    orderNumber: number;
+    amount: number;
+    qrDataUrl: string;
+    confirmUrl: string;
+    status: string;
+  };
+}
+
+export interface QrStatusResponse {
+  success: boolean;
+  status: string;
+  isPaid: boolean;
+  orderId: string;
+  orderNumber: number;
+  totalAmount: number;
+}
+
+export interface ConfirmQrPayload {
+  orderId: string;
+  transactionId?: string;
+}
+

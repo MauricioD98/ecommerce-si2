@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,12 +33,18 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     const val = Number(amount);
     return isNaN(val) || val <= 0 ? 0 : val;
   });
+  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'qr'>('stripe');
   const [clientSecret, setClientSecret] = useState<string>('');
   const [paymentIntentId, setPaymentIntentId] = useState<string>('');
   const [isLoadingIntent, setIsLoadingIntent] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [transactionRef, setTransactionRef] = useState<string>('');
+
+  // QR Payment State
+  const [qrData, setQrData] = useState<any>(null);
+  const [isLoadingQr, setIsLoadingQr] = useState<boolean>(false);
+  const [isConfirmingQr, setIsConfirmingQr] = useState<boolean>(false);
 
   // Card Inputs
   const [cardHolder, setCardHolder] = useState<string>('Mauricio Daniel');
@@ -66,7 +75,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
         if (res.data?.clientSecret) {
           setClientSecret(res.data.clientSecret);
-          // Stripe client_secret is formatted like "pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_YrKJ..."
           const piId = res.data.clientSecret.split('_secret_')[0];
           setPaymentIntentId(piId);
         }
@@ -80,6 +88,69 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     initPayment();
   }, [orderId, amount]);
 
+  const loadQr = useCallback(async () => {
+    try {
+      setIsLoadingQr(true);
+      const res = await paymentsApi.generateQr(orderId);
+      if (res.data) {
+        setQrData(res.data);
+      }
+    } catch (err) {
+      Alert.alert('Error QR', getErrorMessage(err));
+    } finally {
+      setIsLoadingQr(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (selectedMethod === 'qr' && !qrData && !isLoadingQr) {
+      loadQr();
+    }
+  }, [selectedMethod, qrData, isLoadingQr, loadQr]);
+
+  // Polling para QR
+  useEffect(() => {
+    if (selectedMethod !== 'qr' || isSuccess) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await paymentsApi.getQrStatus(orderId);
+        if (res.isPaid || res.status === 'COMPLETADO') {
+          clearInterval(interval);
+          setTransactionRef(`QR-${orderId}`);
+          setIsSuccess(true);
+          try {
+            await fetchCart();
+          } catch {
+            // Ignorar
+          }
+        }
+      } catch {
+        // Silencioso durante polling
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [selectedMethod, orderId, isSuccess, fetchCart]);
+
+  const handleSimulateQrPayment = async () => {
+    try {
+      setIsConfirmingQr(true);
+      await paymentsApi.confirmQrPayment({ orderId });
+      setTransactionRef(`QR-${orderId}`);
+      setIsSuccess(true);
+      try {
+        await fetchCart();
+      } catch {
+        // Ignorar
+      }
+    } catch (err) {
+      Alert.alert('Error al simular pago', getErrorMessage(err));
+    } finally {
+      setIsConfirmingQr(false);
+    }
+  };
+
   const handleProcessPayment = async () => {
     if (!paymentIntentId) {
       Alert.alert('Error', 'No se ha inicializado la intención de pago.');
@@ -88,8 +159,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
     try {
       setIsProcessing(true);
-      // In a real Stripe mobile SDK, the client secret is passed to Stripe PaymentSheet.
-      // With our NestJS API, confirming the payment intent verifies and transitions order to PROCESANDO.
       const res = await paymentsApi.confirmPayment({
         paymentIntentId,
         orderId,
@@ -123,20 +192,26 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.successTitle}>¡Pago Exitoso!</Text>
           <Text style={styles.successDesc}>
             Tu pago por un monto de Bs ${currentAmount.toFixed(2)} ha sido procesado
-            satisfactoriamente con Stripe. Tu pedido ya está en preparación.
+            satisfactoriamente con {selectedMethod === 'qr' ? 'código QR' : 'Stripe'}. Tu pedido ya está en preparación.
           </Text>
 
           <View style={styles.receiptCard}>
             <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Referencia</Text>
-              <Text style={styles.receiptValue} numberOfLines={1}>
-                {transactionRef || 'STRIPE-OK'}
+              <Text style={styles.receiptLabel}>Método</Text>
+              <Text style={styles.receiptValue}>
+                {selectedMethod === 'qr' ? 'QR Simple (Demo)' : 'Tarjeta Stripe'}
               </Text>
             </View>
             <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Estado</Text>
+              <Text style={styles.receiptLabel}>Referencia</Text>
+              <Text style={styles.receiptValue} numberOfLines={1}>
+                {transactionRef || (selectedMethod === 'qr' ? 'QR-PAGO' : 'STRIPE-OK')}
+              </Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Estado en BD</Text>
               <Text style={[styles.receiptValue, { color: Colors.success }]}>
-                Aprobado
+                Aprobado (Procesando)
               </Text>
             </View>
           </View>
@@ -167,88 +242,189 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.amountLabel}>Monto a Facturar</Text>
           <Text style={styles.amountValue}>Bs ${currentAmount.toFixed(2)}</Text>
           <View style={styles.stripeBadge}>
-            <Ionicons name="lock-closed" size={14} color={Colors.primary} />
-            <Text style={styles.stripeBadgeText}>Conexión Segura con Stripe</Text>
+            <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
+            <Text style={styles.stripeBadgeText}>Pago Seguro Stella Femme</Text>
           </View>
         </View>
 
-        {/* Credit Card Simulation Card */}
-        <View style={styles.creditCard}>
-          <View style={styles.cardChipRow}>
-            <Ionicons name="hardware-chip-outline" size={32} color="#F8FAFC" />
-            <Text style={styles.cardBrand}>VISA</Text>
-          </View>
+        {/* Method Selector Tabs */}
+        <View style={styles.methodSelector}>
+          <TouchableOpacity
+            style={[styles.methodTab, selectedMethod === 'stripe' && styles.methodTabActive]}
+            onPress={() => setSelectedMethod('stripe')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="card-outline"
+              size={18}
+              color={selectedMethod === 'stripe' ? Colors.primary : Colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.methodTabText,
+                selectedMethod === 'stripe' && styles.methodTabTextActive,
+              ]}
+            >
+              Tarjeta Stripe
+            </Text>
+          </TouchableOpacity>
 
-          <Text style={styles.cardNumberText}>{cardNumber}</Text>
-
-          <View style={styles.cardFooter}>
-            <View>
-              <Text style={styles.cardSubText}>TITULAR</Text>
-              <Text style={styles.cardHolderText}>{cardHolder}</Text>
-            </View>
-            <View>
-              <Text style={styles.cardSubText}>VENCE</Text>
-              <Text style={styles.cardHolderText}>{expiry}</Text>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[styles.methodTab, selectedMethod === 'qr' && styles.methodTabActive]}
+            onPress={() => setSelectedMethod('qr')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="qr-code-outline"
+              size={18}
+              color={selectedMethod === 'qr' ? Colors.primary : Colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.methodTabText,
+                selectedMethod === 'qr' && styles.methodTabTextActive,
+              ]}
+            >
+              QR Simple
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Card Inputs */}
-        <View style={styles.inputsCard}>
-          <Input
-            label="Nombre del Titular"
-            value={cardHolder}
-            onChangeText={setCardHolder}
-            icon="person-outline"
-          />
+        {selectedMethod === 'stripe' ? (
+          <>
+            {/* Credit Card Simulation Card */}
+            <View style={styles.creditCard}>
+              <View style={styles.cardChipRow}>
+                <Ionicons name="hardware-chip-outline" size={32} color="#F8FAFC" />
+                <Text style={styles.cardBrand}>VISA</Text>
+              </View>
 
-          <Input
-            label="Número de Tarjeta (Prueba)"
-            value={cardNumber}
-            onChangeText={setCardNumber}
-            icon="card-outline"
-            keyboardType="number-pad"
-          />
+              <Text style={styles.cardNumberText}>{cardNumber}</Text>
 
-          <View style={styles.row}>
-            <View style={styles.col}>
+              <View style={styles.cardFooter}>
+                <View>
+                  <Text style={styles.cardSubText}>TITULAR</Text>
+                  <Text style={styles.cardHolderText}>{cardHolder}</Text>
+                </View>
+                <View>
+                  <Text style={styles.cardSubText}>VENCE</Text>
+                  <Text style={styles.cardHolderText}>{expiry}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Card Inputs */}
+            <View style={styles.inputsCard}>
               <Input
-                label="Expiración"
-                value={expiry}
-                onChangeText={setExpiry}
-                placeholder="MM/AA"
-                icon="calendar-outline"
+                label="Nombre del Titular"
+                value={cardHolder}
+                onChangeText={setCardHolder}
+                icon="person-outline"
               />
-            </View>
-            <View style={styles.col}>
+
               <Input
-                label="CVC"
-                value={cvc}
-                onChangeText={setCvc}
-                placeholder="123"
-                icon="lock-closed-outline"
+                label="Número de Tarjeta (Prueba)"
+                value={cardNumber}
+                onChangeText={setCardNumber}
+                icon="card-outline"
                 keyboardType="number-pad"
-                isPassword
+              />
+
+              <View style={styles.row}>
+                <View style={styles.col}>
+                  <Input
+                    label="Expiración"
+                    value={expiry}
+                    onChangeText={setExpiry}
+                    placeholder="MM/AA"
+                    icon="calendar-outline"
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Input
+                    label="CVC"
+                    value={cvc}
+                    onChangeText={setCvc}
+                    placeholder="123"
+                    icon="lock-closed-outline"
+                    keyboardType="number-pad"
+                    isPassword
+                  />
+                </View>
+              </View>
+
+              <Button
+                title={`Pagar Bs ${currentAmount.toFixed(2)}`}
+                onPress={handleProcessPayment}
+                isLoading={isProcessing}
+                variant="primary"
+                size="lg"
+                style={styles.payBtn}
+                icon={
+                  <Ionicons name="checkmark-circle-outline" size={20} color={Colors.textWhite} />
+                }
               />
             </View>
-          </View>
+          </>
+        ) : (
+          /* QR Payment Section */
+          <View style={styles.qrCard}>
+            <View style={styles.qrBadge}>
+              <Ionicons name="school-outline" size={14} color="#059669" />
+              <Text style={styles.qrBadgeText}>Proyecto Universitario • QR Demo</Text>
+            </View>
 
-          <Button
-            title={`Pagar Bs ${currentAmount.toFixed(2)}`}
-            onPress={handleProcessPayment}
-            isLoading={isProcessing}
-            variant="primary"
-            size="lg"
-            style={styles.payBtn}
-            icon={
-              <Ionicons name="checkmark-circle-outline" size={20} color={Colors.textWhite} />
-            }
-          />
-        </View>
+            <Text style={styles.qrTitle}>Escanea para pagar</Text>
+            <Text style={styles.qrSubtitle}>
+              Apunta la cámara de otro dispositivo al código QR o pulsa el botón para simular el pago instantáneo en la base de datos.
+            </Text>
+
+            {isLoadingQr ? (
+              <View style={styles.qrLoadingBox}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.qrLoadingText}>Generando código QR seguro...</Text>
+              </View>
+            ) : qrData?.qrDataUrl ? (
+              <>
+                <View style={styles.qrFrame}>
+                  <Image
+                    source={{ uri: qrData.qrDataUrl }}
+                    style={styles.qrImage}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                <View style={styles.liveIndicator}>
+                  <View style={styles.pulseDot} />
+                  <Text style={styles.liveIndicatorText}>Esperando escaneo en tiempo real...</Text>
+                </View>
+
+                <Button
+                  title="Simular Escaneo y Pago"
+                  onPress={handleSimulateQrPayment}
+                  isLoading={isConfirmingQr}
+                  variant="primary"
+                  size="lg"
+                  style={styles.simulateBtn}
+                  icon={<Ionicons name="flash" size={18} color={Colors.textWhite} />}
+                />
+              </>
+            ) : (
+              <Button
+                title="Generar Código QR"
+                onPress={loadQr}
+                variant="primary"
+                size="md"
+                style={{ marginTop: 16 }}
+              />
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -399,5 +575,122 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textPrimary,
     maxWidth: '60%',
+  },
+  methodSelector: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  methodTabActive: {
+    backgroundColor: Colors.surface,
+    ...Shadows.sm,
+  },
+  methodTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+  methodTabTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  qrCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.sm,
+  },
+  qrBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    gap: 6,
+    marginBottom: 12,
+  },
+  qrBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  qrTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  qrSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+  },
+  qrFrame: {
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    marginBottom: 16,
+    ...Shadows.sm,
+  },
+  qrImage: {
+    width: 220,
+    height: 220,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 20,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
+  liveIndicatorText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  simulateBtn: {
+    width: '100%',
+  },
+  qrLoadingBox: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  qrLoadingText: {
+    fontSize: 14,
+    color: Colors.textMuted,
   },
 });

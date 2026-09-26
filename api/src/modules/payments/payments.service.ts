@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
-import { OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import * as QRCode from 'qrcode';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { CreatePaymentIntentResponse, PaymentResponseDto, PaymentApiResponseDto } from './dto/payment-response.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
@@ -102,6 +103,21 @@ export class PaymentsService {
     confirmPaymentDto: ConfirmPaymentDto,
   ): Promise<{ success: boolean; data: PaymentResponseDto; message: string }> {
     const { paymentIntentId, orderId } = confirmPaymentDto;
+
+    // Soporte para pagos QR en confirmPayment
+    if (paymentIntentId.startsWith('QR_') || paymentIntentId.startsWith('QR-')) {
+      await this.markQrPaymentSucceeded(orderId, paymentIntentId);
+      const updatedPayment = await this.prisma.payment.findFirst({
+        where: { orderId },
+      });
+      if (updatedPayment) {
+        return {
+          success: true,
+          data: this.mapToPaymentResponse(updatedPayment),
+          message: 'Payment confirmed successfully',
+        };
+      }
+    }
 
     const payment = await this.prisma.payment.findFirst({
   where: {
@@ -323,9 +339,166 @@ export class PaymentsService {
     };
   }
 
+  async generateQrPayment(orderId: string, origin?: string): Promise<{
+    orderId: string;
+    orderNumber: string;
+    amount: number;
+    qrDataUrl: string;
+    confirmUrl: string;
+    status: PaymentStatus;
+  }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
 
+    const amount = Number(order.totalAmount);
+    const transactionId = `QR-${order.orderNumber}-${Date.now()}`;
 
+    await this.prisma.payment.upsert({
+      where: { orderId },
+      create: {
+        orderId,
+        userId: order.userId,
+        amount: order.totalAmount,
+        currency: 'BOB',
+        status: order.paymentStatus === PaymentStatus.COMPLETADO ? PaymentStatus.COMPLETADO : PaymentStatus.PENDIENTE,
+        paymentMethod: 'QR',
+        transactionId,
+      },
+      update: {
+        paymentMethod: 'QR',
+        amount: order.totalAmount,
+      },
+    });
 
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { paymentMethod: PaymentMethod.QR },
+    });
+
+    // La URL codificada en el QR dirige a la confirmación de pago
+    const publicUrl = origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+    const confirmUrl = `${publicUrl}/checkout/qr-confirm?orderId=${orderId}`;
+
+    const qrDataUrl = await QRCode.toDataURL(confirmUrl, {
+      margin: 2,
+      width: 320,
+      color: {
+        dark: '#111827',
+        light: '#FFFFFF',
+      },
+    });
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      amount,
+      qrDataUrl,
+      confirmUrl,
+      status: order.paymentStatus,
+    };
+  }
+
+  async markQrPaymentSucceeded(orderId: string, customTxId?: string): Promise<any> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+
+    if (order.paymentStatus === PaymentStatus.COMPLETADO) {
+      return order;
+    }
+
+    const transactionId = customTxId || order.payment?.transactionId || `QR-${order.orderNumber}-${Date.now()}`;
+
+    const [, updatedOrder] = await this.prisma.$transaction([
+      this.prisma.payment.upsert({
+        where: { orderId },
+        create: {
+          orderId,
+          userId: order.userId,
+          amount: order.totalAmount,
+          currency: 'BOB',
+          status: PaymentStatus.COMPLETADO,
+          paymentMethod: 'QR',
+          transactionId,
+        },
+        update: {
+          status: PaymentStatus.COMPLETADO,
+          paymentMethod: 'QR',
+          transactionId,
+        },
+      }),
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentStatus: PaymentStatus.COMPLETADO,
+          status: OrderStatus.PROCESANDO,
+          paymentMethod: PaymentMethod.QR,
+        },
+      }),
+    ]);
+
+    if (updatedOrder.cartId) {
+      await this.prisma.cartItem.deleteMany({
+        where: { cartId: updatedOrder.cartId },
+      });
+      await this.prisma.cart.update({
+        where: { id: updatedOrder.cartId },
+        data: { checkout: true },
+      });
+    }
+
+    const activeCarts = await this.prisma.cart.findMany({
+      where: { userId: updatedOrder.userId, checkout: false },
+    });
+    for (const c of activeCarts) {
+      await this.prisma.cartItem.deleteMany({ where: { cartId: c.id } });
+      await this.prisma.cart.update({ where: { id: c.id }, data: { checkout: true } });
+    }
+
+    void this.sendInvoiceEmail(orderId);
+    void this.notificationsService
+      .sendPushNotification(updatedOrder.userId, {
+        title: 'Stella Femme - Pago QR Confirmado',
+        body: `Tu pago por QR del pedido ${updatedOrder.orderNumber} fue confirmado exitosamente.`,
+        url: `/account/orders/${updatedOrder.id}`,
+      })
+      .catch(() => undefined);
+
+    return updatedOrder;
+  }
+
+  async getQrPaymentStatus(orderId: string): Promise<{
+    success: boolean;
+    status: PaymentStatus;
+    isPaid: boolean;
+    orderId: string;
+    orderNumber: string;
+    totalAmount: number;
+  }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+
+    return {
+      success: true,
+      status: order.paymentStatus,
+      isPaid: order.paymentStatus === PaymentStatus.COMPLETADO,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      totalAmount: Number(order.totalAmount),
+    };
+  }
 
   private mapToPaymentResponse(payment: {
   id: string;

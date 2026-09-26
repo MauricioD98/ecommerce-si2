@@ -5,7 +5,7 @@ import CheckoutSteps from './CheckoutSteps';
 import CheckoutHeader from './CheckoutHeader';
 import DeliveryStep from './DeliveryStep';
 import styles from './checkout.module.scss';
-import { CreditCard, WifiOff } from 'lucide-react';
+import { CreditCard, WifiOff, QrCode } from 'lucide-react';
 
 // IMPORTANTE: Asegúrate de que las rutas de importación apunten a los archivos reales en tu proyecto
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,7 @@ import { useBranches } from '@/hooks/useBranches';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { StripePaymentProvider, StripePaymentForm, StripePaymentPlaceholder } from './stripe-payment-form';
 import PaymentMethodCard from './PaymentMethodCard'; // Debes tener este componente creado
+import QrPaymentSection from './QrPaymentSection';
 import { OrderItem, CreateOrderRequest } from '@/types/orders.types';
 import { CartItem } from '@/types/cart.types';
 import { FulfillmentType } from '@/types/branch.types';
@@ -88,20 +89,16 @@ export default function CheckoutClient() {
         }
     }, [currentStep, selectedPayment, isOnline]);
 
-    const preparePayment = useCallback(async (forceRetry = false) => {
-        if (currentStep !== 2 || selectedPayment !== 'stripe' || isCreatingOrder || clientSecret) {
-            return;
-        }
+    const ensureOrderCreated = useCallback(async (forceRetry = false): Promise<string | null> => {
+        let activeOrderId = orderId;
 
-        setIsCreatingOrder(true);
-        setStripeError(null);
-        setOrderFailed(false);
+        // Crear la orden si no existe aún o si se fuerza reintento
+        if (!activeOrderId || forceRetry) {
+            setIsCreatingOrder(true);
+            setStripeError(null);
+            setOrderFailed(false);
 
-        try {
-            let activeOrderId = orderId;
-
-            // 1. Crear la orden si no existe aún o si se fuerza reintento
-            if (!activeOrderId || forceRetry) {
+            try {
                 const cartItems: OrderItem[] = items.map((item: CartItem) => ({
                     productId: item.product?.id || item.productId,
                     quantity: item.quantity,
@@ -112,6 +109,7 @@ export default function CheckoutClient() {
                     items: cartItems,
                     fulfillmentType,
                     branchId: selectedBranchId ?? undefined,
+                    paymentMethod: selectedPayment === 'qr' ? 'QR' : undefined,
                     ...(!isPickup && deliveryAddress
                         ? {
                             shippingAddress: formatShippingAddress(deliveryAddress),
@@ -130,10 +128,31 @@ export default function CheckoutClient() {
                 setOrderTotal(Number(createdOrder.total));
                 setOrderDiscount(Number(createdOrder.discountApplied ?? 0));
                 setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
+                return activeOrderId ?? null;
+            } catch (error) {
+                console.error("Error al preparar la orden:", error);
+                setOrderFailed(true);
+                return null;
+            } finally {
+                setIsCreatingOrder(false);
             }
+        }
 
-            // 2. Iniciar el PaymentIntent de Stripe para esta orden
-            if (activeOrderId && !clientSecret) {
+        return activeOrderId ?? null;
+    }, [orderId, items, createOrder, fulfillmentType, selectedBranchId, selectedPayment, isPickup, deliveryAddress]);
+
+    const preparePayment = useCallback(async (forceRetry = false) => {
+        if (currentStep !== 2 || selectedPayment !== 'stripe' || isCreatingOrder || clientSecret) {
+            return;
+        }
+
+        const activeOrderId = await ensureOrderCreated(forceRetry);
+        if (!activeOrderId) return;
+
+        // Iniciar el PaymentIntent de Stripe para esta orden
+        if (!clientSecret) {
+            setIsCreatingOrder(true);
+            try {
                 const paymentCreated = await createPaymentIntent({
                     orderId: activeOrderId,
                     description: "Pago de orden en Stella Femme",
@@ -143,14 +162,14 @@ export default function CheckoutClient() {
                 if (!paymentCreated) {
                     throw new Error("No se pudo inicializar la pasarela de pago.");
                 }
+            } catch (error) {
+                console.error("Error al preparar Stripe:", error);
+                setOrderFailed(true);
+            } finally {
+                setIsCreatingOrder(false);
             }
-        } catch (error) {
-            console.error("Error al preparar el pago:", error);
-            setOrderFailed(true);
-        } finally {
-            setIsCreatingOrder(false);
         }
-    }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, orderId, items, createOrder, fulfillmentType, selectedBranchId, isPickup, deliveryAddress, createPaymentIntent]);
+    }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, ensureOrderCreated, createPaymentIntent]);
 
     useEffect(() => {
         if (currentStep === 2 && selectedPayment === 'stripe' && !clientSecret && !orderFailed && !isCreatingOrder) {
@@ -158,10 +177,20 @@ export default function CheckoutClient() {
         }
     }, [currentStep, selectedPayment, clientSecret, orderFailed, isCreatingOrder, preparePayment]);
 
+    useEffect(() => {
+        if (currentStep === 2 && selectedPayment === 'qr' && !orderId && !orderFailed && !isCreatingOrder) {
+            ensureOrderCreated();
+        }
+    }, [currentStep, selectedPayment, orderId, orderFailed, isCreatingOrder, ensureOrderCreated]);
+
     const handleRetry = () => {
         setOrderFailed(false);
         setStripeError(null);
-        preparePayment(true);
+        if (selectedPayment === 'stripe') {
+            preparePayment(true);
+        } else if (selectedPayment === 'qr') {
+            ensureOrderCreated(true);
+        }
     };
 
     // La confirmación real del pago (idempotente) y la limpieza del carrito ocurren en /checkout/success:
@@ -334,7 +363,28 @@ export default function CheckoutClient() {
                                                 />
                                             )}
                                         </PaymentMethodCard>
-                                    ) : (
+                                    ) : null}
+
+                                    {isOnline && (
+                                        <PaymentMethodCard
+                                            method="qr"
+                                            selectedMethod={selectedPayment}
+                                            onSelect={handlePaymentMethodSelect}
+                                            icon={<QrCode />}
+                                            title="Pago con QR Simple (Demo)"
+                                            description="Escanea el código QR con tu celular o simula el pago al instante"
+                                        >
+                                            <QrPaymentSection
+                                                orderId={orderId}
+                                                amount={payableTotal}
+                                                isLoadingOrder={isCreatingOrder}
+                                                onSuccess={handlePaymentSuccess}
+                                                onError={handlePaymentError}
+                                            />
+                                        </PaymentMethodCard>
+                                    )}
+
+                                    {!isOnline && (
                                         <PaymentMethodCard
                                             method="offline"
                                             selectedMethod={selectedPayment}
