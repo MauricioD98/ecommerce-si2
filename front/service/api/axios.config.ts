@@ -3,14 +3,24 @@ import axios from "axios";
 import { authService } from "./auth.service";
 import { setAccessToken, clearAuth } from "@/store/slices/authSlices";
 
+export const getApiBaseUrl = (): string => {
+    if (typeof window !== "undefined") {
+        const hostname = window.location.hostname;
+        if (!hostname.includes("localhost") && !hostname.includes("127.0.0.1") && !hostname.includes("10.0.") && !hostname.includes("192.168.")) {
+            return "https://stella-api.wonderfulriver-db5286cd.eastus.azurecontainerapps.io/api/v1";
+        }
+    }
+    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+};
+
 export const apiClient = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1",
+    baseURL: getApiBaseUrl(),
     headers: {
         "Content-type": "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
     },
-    timeout: 10000,
+    timeout: 15000,
     // El default de Axios serializa arrays como "sizes[]=S&sizes[]=L". El ValidationPipe global del
     // backend (whitelist: true) no conoce "sizes[]" como propiedad del DTO y rechaza todo con 400.
     // Con { indexes: null } serializa "sizes=S&sizes=L" (clave repetida), que es lo que espera Nest.
@@ -19,6 +29,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
     (config) => {
+        config.baseURL = getApiBaseUrl();
         const state = store.getState();
         const token = state.auth.accessToken;
 

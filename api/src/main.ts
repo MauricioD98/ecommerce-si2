@@ -23,10 +23,27 @@ async function bootstrap() {
   );
 
   //Enable CORS
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',')??'http://localhost:3000',
-    credentials:true,
-    methods: ['GET','POST','PUT','DELETE', 'PATCH','OPTIONS'],
+    origin: (origin, callback) => {
+      // Permitir peticiones sin Origin (como apps móviles, curl, o SSR)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        allowedOrigins.includes('*') ||
+        origin.includes('azurecontainerapps.io') ||
+        origin.includes('localhost')
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With'],
   });
 

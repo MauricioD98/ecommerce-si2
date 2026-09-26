@@ -9,7 +9,7 @@
 // nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
 // (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const API_CACHE = `sf-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;

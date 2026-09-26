@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiClient } from "./axios.config";
+import { apiClient, getApiBaseUrl } from "./axios.config";
 import { User, AutoResponse, LoginCredential, RegisterCredential, UpdateProfilePayload } from "@/types/auth.types";
 
 export const authService = {
@@ -17,7 +17,7 @@ export const authService = {
             // El backend espera el refresh token en el header Authorization (no en el body).
             // Se usa axios "limpio" para que el interceptor no lo reemplace por el access token.
             const response = await axios.post<AutoResponse>(
-                `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+                `${getApiBaseUrl()}/auth/refresh`,
                 undefined,
                 { headers: { Authorization: `Bearer ${refreshToken}` }, timeout: 10000 }
             );
