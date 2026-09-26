@@ -109,7 +109,7 @@ export default function CheckoutClient() {
                     items: cartItems,
                     fulfillmentType,
                     branchId: selectedBranchId ?? undefined,
-                    paymentMethod: selectedPayment === 'qr' ? 'QR' : undefined,
+                    paymentMethod: selectedPayment === 'qr' ? 'QR' : 'STRIPE',
                     ...(!isPickup && deliveryAddress
                         ? {
                             shippingAddress: formatShippingAddress(deliveryAddress),

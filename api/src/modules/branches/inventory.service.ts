@@ -170,6 +170,16 @@ export class InventoryService {
           where: { id: productId },
           data: { stock: { decrement: quantity } },
         });
+        const anyInv = await tx.productInventory.findFirst({
+          where: { productId, size, stock: { gte: quantity } },
+        });
+        if (anyInv) {
+          await tx.productInventory.update({
+            where: { id: anyInv.id },
+            data: { stock: { decrement: quantity } },
+          });
+        }
+        await this.syncGlobalStock(tx, productId);
         return;
       }
       throw new BadRequestException(`Insufficient stock for size ${size} in the selected branch`);

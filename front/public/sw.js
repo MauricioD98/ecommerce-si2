@@ -9,7 +9,7 @@
 // nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
 // (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
 
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const API_CACHE = `sf-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;
@@ -78,7 +78,7 @@ function controlledFailureResponse() {
 async function networkFirst(request, cacheName, onMiss) {
   const cache = await caches.open(cacheName);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response && response.ok) {
       cache.put(request, response.clone());
     }

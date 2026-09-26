@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { Permissions } from '../../common/decorators/permissions.decorator';
@@ -78,6 +78,7 @@ export class ProductsController {
       }
     }
   })
+  @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
   async findAll(@Query() queryDto: QueryProductDto) {
   return await this.productsService.findAll(queryDto);
     }
@@ -95,6 +96,7 @@ export class ProductsController {
     status: 404,
     description: "Product not found"
   })  
+  @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
   async findOne(
     @Param('id') id: string,
     @Query('branchId', new ParseUUIDPipe({ optional: true })) branchId?: string,

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/decorators/guards/optional-jwt-auth.guard';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { GetUser } from '../../common/decorators/get-user.decorator';
@@ -40,7 +41,7 @@ export class PaymentsController {
   }
 
   @Post('confirm')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
   summary: "Confirm payment",
@@ -56,7 +57,7 @@ export class PaymentsController {
  })
  async confirmPayment(
     @Body() confirmPaymentDto: ConfirmPaymentDto,
-    @GetUser('id') userId: string,
+    @GetUser('id') userId?: string,
   ) {
     return await this.paymentsService.confirmPayment(userId, confirmPaymentDto);
   }

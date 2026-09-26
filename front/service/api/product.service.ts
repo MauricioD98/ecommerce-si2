@@ -45,7 +45,16 @@ export class ProductService {
             data?: RawProduct[];
             meta?: PaginationMeta;
             pagination?: PaginationMeta;
-        }>(this.ENDPOINT, { params });
+        }>(this.ENDPOINT, {
+            params: {
+                ...params,
+                _t: Date.now(),
+            },
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+            },
+        });
 
         return {
             data: (response.data.data ?? []).map(normalizeProduct),
@@ -101,7 +110,14 @@ export class ProductService {
 
     static async getProductById(id: string, branchId?: string | null): Promise<Product> {
         const response = await apiClient.get<RawProduct>(`${this.ENDPOINT}/${id}`, {
-            params: branchId ? { branchId } : undefined,
+            params: {
+                ...(branchId ? { branchId } : {}),
+                _t: Date.now(),
+            },
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+            },
         });
         return normalizeProduct(response.data);
     }

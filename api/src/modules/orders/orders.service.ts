@@ -52,11 +52,11 @@ export class OrdersService {
     const userId = user.id;
 
     let targetBranchId = branchId;
-    if (fulfillmentType === FulfillmentType.PICKUP && !targetBranchId) {
+    if (!targetBranchId) {
       const defaultBranch = await this.branchesService.findFirstActive();
       if (defaultBranch) {
         targetBranchId = defaultBranch.id;
-      } else {
+      } else if (fulfillmentType === FulfillmentType.PICKUP) {
         throw new BadRequestException('A branch is required for PICKUP orders');
       }
     }
@@ -90,12 +90,12 @@ export class OrdersService {
 
       // Con sucursal se valida el stock de esa talla puntual; sin sucursal, el stock global
       // (retrocompatible, no distingue talla) y el precio base
-      const inventoryForSize = branchId
-        ? await this.inventoryService.getInventoryForSize(product.id, branchId, item.size)
+      const inventoryForSize = targetBranchId
+        ? await this.inventoryService.getInventoryForSize(product.id, targetBranchId, item.size)
         : null;
       // El descuento del producto sigue siendo agregado (igual en todas las tallas)
-      const inventoryAggregate = branchId ? await this.inventoryService.getInventory(product.id, branchId) : null;
-      const available = branchId ? (inventoryForSize?.stock ?? 0) : product.stock;
+      const inventoryAggregate = targetBranchId ? await this.inventoryService.getInventory(product.id, targetBranchId) : null;
+      const available = targetBranchId && inventoryForSize ? inventoryForSize.stock : product.stock;
 
       if (available < item.quantity) {
         throw new BadRequestException(

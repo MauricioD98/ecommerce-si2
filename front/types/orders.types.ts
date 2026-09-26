@@ -16,8 +16,8 @@ export interface CreateOrderRequest {
     longitude?: number;
     fulfillmentType: FulfillmentType;
     branchId?: string;
-    // Solo para checkout sin Stripe (pedido guardado offline y sincronizado luego). Omitido, usa STRIPE.
-    paymentMethod?: "QR";
+    // Método de pago para la orden: QR o STRIPE
+    paymentMethod?: "QR" | "STRIPE";
 }
 
 export interface OrderItemDetail {

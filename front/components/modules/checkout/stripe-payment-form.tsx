@@ -98,7 +98,7 @@ export function StripePaymentForm({
                 // Error de validación/tarjeta (ej. incompleta, rechazada): se queda local, junto al botón.
                 // No se propaga con onError() para no duplicar el mismo texto en el panel del padre.
                 setErrorMessage(error.message || "Algo salió mal al procesar el pago");
-            } else if (paymentIntent?.status === "succeeded") {
+            } else if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "processing") {
                 onSuccess(paymentIntent.id);
             }
         } catch {

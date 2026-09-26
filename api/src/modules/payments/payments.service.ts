@@ -99,7 +99,7 @@ export class PaymentsService {
   // Endpoint usado por el frontend justo después de stripe.confirmPayment, para feedback inmediato.
   // Es idempotente: el webhook puede llegar antes o después y no debe pisarle el resultado a este flujo.
   async confirmPayment(
-    userId: string,
+    userId: string | undefined,
     confirmPaymentDto: ConfirmPaymentDto,
   ): Promise<{ success: boolean; data: PaymentResponseDto; message: string }> {
     const { paymentIntentId, orderId } = confirmPaymentDto;
@@ -119,15 +119,19 @@ export class PaymentsService {
       }
     }
 
-    const payment = await this.prisma.payment.findFirst({
-  where: {
-    orderId,
-    userId,
-    transactionId: paymentIntentId,
-        },
+    let payment = await this.prisma.payment.findFirst({
+      where: {
+        orderId,
+        ...(userId ? { userId } : {}),
+      },
     });
     if (!payment) {
-  throw new NotFoundException('payment not found');
+      payment = await this.prisma.payment.findFirst({
+        where: { orderId },
+      });
+    }
+    if (!payment) {
+      throw new NotFoundException('payment not found');
     }
 
     if (payment.status !== PaymentStatus.COMPLETADO) {
@@ -136,13 +140,14 @@ export class PaymentsService {
         paymentIntent.status === 'requires_payment_method' &&
         process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
       ) {
+        const publicUrl = process.env.FRONTEND_URL || 'https://stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io';
         paymentIntent = await this.stripe.paymentIntents.confirm(paymentIntentId, {
           payment_method: 'pm_card_visa',
-          return_url: 'http://localhost:3001/api/v1/payments/return',
+          return_url: `${publicUrl}/checkout/success?orderId=${orderId}`,
         });
       }
-      if (paymentIntent.status !== 'succeeded') {
-        throw new BadRequestException('Payment not successful');
+      if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'processing') {
+        throw new BadRequestException(`Payment not successful (status: ${paymentIntent.status})`);
       }
       await this.markPaymentSucceeded(paymentIntent);
     }
@@ -150,11 +155,10 @@ export class PaymentsService {
     const updatedPayment = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
 
     return {
-        success: true,
-        data: this.mapToPaymentResponse(updatedPayment),
-        message: 'Payment confirmed successfully',
-        };
-
+      success: true,
+      data: this.mapToPaymentResponse(updatedPayment),
+      message: 'Payment confirmed successfully',
+    };
   }
 
   // Fuente de verdad de los webhooks de Stripe: valida la firma y procesa el evento
@@ -190,26 +194,45 @@ export class PaymentsService {
   // Idempotente: llamado tanto por /confirm como por el webhook, cualquiera que llegue primero
   private async markPaymentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
     const orderId = paymentIntent.metadata?.orderId;
-    if (!orderId) {
-      this.logger.warn(`PaymentIntent ${paymentIntent.id} sin metadata.orderId`);
-      return;
+    let payment = orderId
+      ? await this.prisma.payment.findFirst({ where: { orderId } })
+      : await this.prisma.payment.findFirst({ where: { transactionId: paymentIntent.id } });
+
+    if (!payment && orderId) {
+      const ord = await this.prisma.order.findUnique({ where: { id: orderId } });
+      if (ord) {
+        payment = await this.prisma.payment.create({
+          data: {
+            orderId: ord.id,
+            userId: ord.userId,
+            amount: ord.totalAmount,
+            currency: paymentIntent.currency.toUpperCase(),
+            status: PaymentStatus.COMPLETADO,
+            paymentMethod: 'STRIPE',
+            transactionId: paymentIntent.id,
+          },
+        });
+      }
     }
 
-    const payment = await this.prisma.payment.findFirst({
-      where: { orderId, transactionId: paymentIntent.id },
-    });
     if (!payment || payment.status === PaymentStatus.COMPLETADO) return;
+    const targetOrderId = orderId || payment.orderId;
 
     const [, order] = await this.prisma.$transaction([
       this.prisma.payment.update({
         where: { id: payment.id },
-        data: { status: PaymentStatus.COMPLETADO },
+        data: {
+          status: PaymentStatus.COMPLETADO,
+          paymentMethod: 'STRIPE',
+          transactionId: paymentIntent.id,
+        },
       }),
       this.prisma.order.update({
-        where: { id: orderId },
+        where: { id: targetOrderId },
         data: {
           paymentStatus: PaymentStatus.COMPLETADO,
           status: OrderStatus.PROCESANDO,
+          paymentMethod: PaymentMethod.STRIPE,
           stripePaymentIntentId: paymentIntent.id,
         },
       }),
@@ -371,6 +394,7 @@ export class PaymentsService {
       update: {
         paymentMethod: 'QR',
         amount: order.totalAmount,
+        transactionId,
       },
     });
 
@@ -380,7 +404,7 @@ export class PaymentsService {
     });
 
     // La URL codificada en el QR dirige a la confirmación de pago
-    const publicUrl = origin || process.env.FRONTEND_URL || 'http://localhost:3000';
+    const publicUrl = origin || process.env.FRONTEND_URL || 'https://stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io';
     const confirmUrl = `${publicUrl}/checkout/qr-confirm?orderId=${orderId}`;
 
     const qrDataUrl = await QRCode.toDataURL(confirmUrl, {
@@ -415,7 +439,11 @@ export class PaymentsService {
       return order;
     }
 
-    const transactionId = customTxId || order.payment?.transactionId || `QR-${order.orderNumber}-${Date.now()}`;
+    const transactionId = (customTxId && !customTxId.startsWith('pi_'))
+      ? customTxId
+      : (order.payment?.transactionId && order.payment.transactionId.startsWith('QR-')
+          ? order.payment.transactionId
+          : `QR-${order.orderNumber}-${Date.now()}`);
 
     const [, updatedOrder] = await this.prisma.$transaction([
       this.prisma.payment.upsert({
