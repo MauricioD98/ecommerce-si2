@@ -134,13 +134,9 @@ export default function QrPaymentSection({
 
     return (
         <div className={styles.qrContainer}>
-            <div className={styles.demoBadge}>
-                <span>🎓 Proyecto Universitario • QR Demo</span>
-            </div>
-
             <h3 className={styles.title}>Escanea el código QR para pagar</h3>
             <p className={styles.subtitle}>
-                Abre la cámara de tu teléfono móvil para escanear el código QR o haz clic en simular escaneo para completar la compra de prueba.
+                Abre la cámara de tu teléfono móvil para escanear el código QR o haz clic en simular escaneo para completar el pago.
             </p>
 
             <div className={styles.qrFrame}>

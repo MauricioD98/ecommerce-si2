@@ -199,7 +199,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Método</Text>
               <Text style={styles.receiptValue}>
-                {selectedMethod === 'qr' ? 'QR Simple (Demo)' : 'Tarjeta Stripe'}
+                {selectedMethod === 'qr' ? 'QR Simple' : 'Tarjeta Stripe'}
               </Text>
             </View>
             <View style={styles.receiptRow}>
@@ -369,11 +369,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         ) : (
           /* QR Payment Section */
           <View style={styles.qrCard}>
-            <View style={styles.qrBadge}>
-              <Ionicons name="school-outline" size={14} color="#059669" />
-              <Text style={styles.qrBadgeText}>Proyecto Universitario • QR Demo</Text>
-            </View>
-
             <Text style={styles.qrTitle}>Escanea para pagar</Text>
             <Text style={styles.qrSubtitle}>
               Apunta la cámara de otro dispositivo al código QR o pulsa el botón para simular el pago instantáneo en la base de datos.

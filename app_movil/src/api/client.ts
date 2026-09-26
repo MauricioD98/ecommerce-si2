@@ -129,7 +129,16 @@ apiClient.interceptors.response.use(
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
-    if (typeof data === 'string') return data;
+    if (typeof data === 'string') {
+      const match = data.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (match) {
+        return match[1].trim();
+      }
+      if (data.includes('<html')) {
+        return `Error del servidor (${error.response?.status || 500}).`;
+      }
+      return data;
+    }
     if (data?.message) {
       if (Array.isArray(data.message)) {
         return data.message.join(', ');

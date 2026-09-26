@@ -127,7 +127,7 @@ export default function QrConfirmClient() {
                             fontSize: '12px',
                             marginBottom: '16px',
                         }}>
-                            Simulación Exitosa • Stella Femme
+                            Pago Verificado • Stella Femme
                         </div>
 
                         <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.5, margin: '0 0 20px' }}>
@@ -150,7 +150,7 @@ export default function QrConfirmClient() {
                             )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#94a3b8' }}>
                                 <span>Método de Pago:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>QR Simple (Demo)</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>QR Simple</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#94a3b8' }}>
                                 <span>Estado en BD:</span>

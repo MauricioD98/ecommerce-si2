@@ -371,8 +371,8 @@ export default function CheckoutClient() {
                                             selectedMethod={selectedPayment}
                                             onSelect={handlePaymentMethodSelect}
                                             icon={<QrCode />}
-                                            title="Pago con QR Simple (Demo)"
-                                            description="Escanea el código QR con tu celular o simula el pago al instante"
+                                            title="Pago con QR Simple"
+                                            description="Escanea el código QR con tu celular o confirma el pago al instante"
                                         >
                                             <QrPaymentSection
                                                 orderId={orderId}

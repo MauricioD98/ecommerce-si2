@@ -144,11 +144,11 @@ export class PaymentsController {
   <div class="card">
     <div class="icon">✓</div>
     <h1>¡Pago QR Confirmado!</h1>
-    <div class="badge">Simulación Exitosa • Stella Femme</div>
+    <div class="badge">Pago Verificado • Stella Femme</div>
     <p>El pago de este pedido fue procesado y registrado con éxito en la base de datos.</p>
     <div class="details">
       <div class="row"><span>N° Pedido:</span><span>#${order.orderNumber}</span></div>
-      <div class="row"><span>Método:</span><span>QR Simple (Demo)</span></div>
+      <div class="row"><span>Método:</span><span>QR Simple</span></div>
       <div class="row"><span>Estado:</span><span class="status-ok">PAGADO (PROCESANDO)</span></div>
       <div class="row"><span>Total:</span><span>Bs ${totalFormatted}</span></div>
     </div>
