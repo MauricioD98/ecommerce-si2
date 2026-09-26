@@ -15,8 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useCart } from '../../context/CartContext';
+import { useBranch } from '../../context/BranchContext';
 import { ordersApi } from '../../api/orders.api';
-import { branchesApi, Branch } from '../../api/branches.api';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -27,34 +27,21 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
 export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
   const { cart, totalAmount } = useCart();
+  const { branches, selectedBranch, selectedBranchId, isLoadingBranches } = useBranch();
   const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
   const [shippingAddress, setShippingAddress] = useState<string>('Av. Principal #123, Ciudad');
-  const [branches, setBranches] = useState<Branch[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [isLoadingBranches, setIsLoadingBranches] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const cartItems = cart?.cartItems || [];
   const shippingCost = fulfillmentType === 'DELIVERY' ? 15.0 : 0.0;
   const payableTotal = totalAmount + shippingCost;
 
-  useEffect(() => {
-    const loadBranches = async () => {
-      try {
-        setIsLoadingBranches(true);
-        const data = await branchesApi.getActive();
-        setBranches(data);
-        if (data && data.length > 0) {
-          setSelectedBranchId(data[0].id);
-        }
-      } catch (err) {
-        console.warn('Error loading branches:', err);
-      } finally {
-        setIsLoadingBranches(false);
-      }
-    };
-    loadBranches();
-  }, []);
+  // Solo debe aparecer la sucursal donde se realizó el pedido
+  const activeBranch =
+    selectedBranch ||
+    branches.find((b) => b.id === selectedBranchId) ||
+    (branches.length > 0 ? branches[0] : null);
+  const displayedBranches = activeBranch ? [activeBranch] : [];
 
   const handleCreateOrder = async () => {
     if (fulfillmentType === 'DELIVERY' && !shippingAddress.trim()) {
@@ -62,7 +49,8 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    if (fulfillmentType === 'PICKUP' && !selectedBranchId) {
+    const pickupBranchId = activeBranch?.id || selectedBranchId;
+    if (fulfillmentType === 'PICKUP' && !pickupBranchId) {
       Alert.alert('Sucursal requerida', 'Por favor selecciona la sucursal donde retirarás tu pedido.');
       return;
     }
@@ -86,7 +74,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
         items: itemsPayload,
         shippingAddress: fulfillmentType === 'DELIVERY' ? shippingAddress.trim() : undefined,
         fulfillmentType,
-        branchId: fulfillmentType === 'PICKUP' ? (selectedBranchId || undefined) : undefined,
+        branchId: fulfillmentType === 'PICKUP' ? (pickupBranchId || undefined) : undefined,
       });
 
       // Calculate amount safely (supports total from DTO and totalAmount from Prisma)
@@ -202,46 +190,41 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.sectionTitle}>Sucursal de Retiro</Text>
               </View>
               <Text style={styles.sectionDesc}>
-                Elige la sucursal donde retirarás tu compra sin costo adicional:
+                Tu pedido será preparado en la sucursal donde realizaste tu pedido:
               </Text>
               {isLoadingBranches ? (
                 <ActivityIndicator color={Colors.primary} style={{ marginVertical: 14 }} />
-              ) : branches.length === 0 ? (
-                <Text style={styles.emptyBranchText}>No se encontraron sucursales disponibles.</Text>
+              ) : displayedBranches.length === 0 ? (
+                <Text style={styles.emptyBranchText}>No se encontró la sucursal del pedido.</Text>
               ) : (
                 <View style={styles.branchesList}>
-                  {branches.map((b) => {
-                    const isSelected = selectedBranchId === b.id;
-                    return (
-                      <TouchableOpacity
-                        key={b.id}
-                        style={[
-                          styles.branchItem,
-                          isSelected && styles.branchItemSelected,
-                        ]}
-                        onPress={() => setSelectedBranchId(b.id)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons
-                          name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                          size={20}
-                          color={isSelected ? Colors.primary : Colors.textMuted}
-                          style={{ marginTop: 2 }}
-                        />
-                        <View style={{ flex: 1, marginLeft: 10 }}>
-                          <Text style={[styles.branchName, isSelected && styles.branchNameSelected]}>
-                            {b.name}
-                          </Text>
-                          {b.address ? (
-                            <Text style={styles.branchAddress}>{b.address}</Text>
-                          ) : null}
-                          {b.phone ? (
-                            <Text style={styles.branchPhone}>Tel: {b.phone}</Text>
-                          ) : null}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
+                  {displayedBranches.map((b) => (
+                    <View
+                      key={b.id}
+                      style={[
+                        styles.branchItem,
+                        styles.branchItemSelected,
+                      ]}
+                    >
+                      <Ionicons
+                        name="radio-button-on"
+                        size={20}
+                        color={Colors.primary}
+                        style={{ marginTop: 2 }}
+                      />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.branchName, styles.branchNameSelected]}>
+                          {b.name}
+                        </Text>
+                        {b.address ? (
+                          <Text style={styles.branchAddress}>{b.address}</Text>
+                        ) : null}
+                        {b.phone ? (
+                          <Text style={styles.branchPhone}>Tel: {b.phone}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
                 </View>
               )}
             </View>

@@ -10,6 +10,8 @@ export interface Product {
   price: number | string;
   effectivePrice?: number;
   stock: number;
+  branchStock?: number | null;
+  stockBySize?: Array<{ size: string; stock: number }> | null;
   sku: string;
   imageUrl?: string | null;
   isActive: boolean;
@@ -25,6 +27,7 @@ export interface ProductsQuery {
   search?: string;
   category?: string;
   categoryId?: string;
+  branchId?: string;
   minPrice?: number;
   maxPrice?: number;
   sortBy?: string;

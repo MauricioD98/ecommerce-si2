@@ -15,6 +15,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { Product } from '../../types';
 import { productsApi } from '../../api/products.api';
 import { useCart } from '../../context/CartContext';
+import { useBranch } from '../../context/BranchContext';
 import { Header } from '../../components/Header';
 import { Button } from '../../components/Button';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
@@ -26,6 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
 export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { productId } = route.params;
   const { addToCart, itemCount } = useCart();
+  const { selectedBranchId, selectedBranch } = useBranch();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -37,7 +39,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     const fetchProduct = async () => {
       try {
         setIsLoading(true);
-        const data = await productsApi.getById(productId);
+        const data = await productsApi.getById(productId, selectedBranchId || undefined);
         setProduct(data);
         const availableSizes =
           Array.isArray(data.sizes) && data.sizes.length > 0
@@ -56,10 +58,21 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       }
     };
     fetchProduct();
-  }, [productId, navigation]);
+  }, [productId, selectedBranchId, navigation]);
+
+  const currentStock = React.useMemo(() => {
+    if (!product) return 0;
+    if (product.stockBySize && product.stockBySize.length > 0 && selectedSize) {
+      const match = product.stockBySize.find((s) => s.size === selectedSize);
+      return match ? match.stock : 0;
+    }
+    return product.stock;
+  }, [product, selectedSize]);
+
+  const isOutOfStock = currentStock <= 0;
 
   const handleAddToCart = async () => {
-    if (!product) return;
+    if (!product || isOutOfStock) return;
     try {
       setIsAdding(true);
       const chosenSize = selectedSize || (product as any)?.sizes?.[0] || 'M';
@@ -86,7 +99,6 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return <LoadingSpinner message="Cargando detalles del producto..." fullScreen />;
   }
 
-  const isOutOfStock = product.stock <= 0;
   const unitPrice = Number(product.price);
   const total = (unitPrice * quantity).toFixed(2);
 
@@ -130,6 +142,12 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Product Info */}
         <View style={styles.infoCard}>
           <View style={styles.tagsRow}>
+            {selectedBranch ? (
+              <View style={styles.branchPill}>
+                <Ionicons name="location-sharp" size={12} color={Colors.primary} />
+                <Text style={styles.branchPillText}>{selectedBranch.name}</Text>
+              </View>
+            ) : null}
             {product.sku ? (
               <View style={styles.skuPill}>
                 <Text style={styles.skuText}>SKU: {product.sku}</Text>
@@ -168,7 +186,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                   { color: isOutOfStock ? Colors.error : Colors.success },
                 ]}
               >
-                {isOutOfStock ? 'Sin existencias' : `${product.stock} disponibles`}
+                {isOutOfStock ? 'Sin existencias' : `${currentStock} disponibles`}
               </Text>
             </View>
           </View>
@@ -190,6 +208,8 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
                   {availableSizes.map((s: string) => {
                     const isSelected = (selectedSize || availableSizes[0]) === s;
+                    const sizeStock = product.stockBySize?.find((row) => row.size === s)?.stock;
+                    const isSizeOutOfStock = sizeStock !== undefined ? sizeStock <= 0 : false;
                     return (
                       <TouchableOpacity
                         key={s}
@@ -200,16 +220,25 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                           borderRadius: 8,
                           borderWidth: 1.5,
                           borderColor: isSelected ? Colors.primary : Colors.border,
-                          backgroundColor: isSelected ? Colors.primaryLight : Colors.surface,
+                          backgroundColor: isSelected
+                            ? Colors.primaryLight
+                            : isSizeOutOfStock
+                            ? Colors.surfaceSubtle
+                            : Colors.surface,
+                          opacity: isSizeOutOfStock ? 0.6 : 1,
                         }}
                       >
                         <Text
                           style={{
                             fontWeight: isSelected ? '700' : '500',
-                            color: isSelected ? Colors.primary : Colors.textPrimary,
+                            color: isSelected
+                              ? Colors.primary
+                              : isSizeOutOfStock
+                              ? Colors.textMuted
+                              : Colors.textPrimary,
                           }}
                         >
-                          {s}
+                          {s} {isSizeOutOfStock ? '(Agotado)' : ''}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -243,10 +272,10 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={[
                     styles.stepperBtn,
-                    quantity >= product.stock && styles.stepperBtnDisabled,
+                    quantity >= currentStock && styles.stepperBtnDisabled,
                   ]}
-                  onPress={() => setQuantity((prev) => Math.min(product.stock, prev + 1))}
-                  disabled={quantity >= product.stock}
+                  onPress={() => setQuantity((prev) => Math.min(currentStock, prev + 1))}
+                  disabled={quantity >= currentStock}
                 >
                   <Ionicons name="add" size={18} color={Colors.textPrimary} />
                 </TouchableOpacity>
@@ -350,6 +379,20 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   tagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  branchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  branchPillText: {
     fontSize: 12,
     fontWeight: '700',
     color: Colors.primary,
