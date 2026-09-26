@@ -134,4 +134,10 @@ export class QueryProductDto {
   @IsOptional()
   maxPrice?: number;
 
+  @ApiPropertyOptional({
+    description: 'Cache buster or timestamp',
+  })
+  @IsOptional()
+  _t?: any;
+
 }

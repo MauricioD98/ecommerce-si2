@@ -46,10 +46,7 @@ export class ProductService {
             meta?: PaginationMeta;
             pagination?: PaginationMeta;
         }>(this.ENDPOINT, {
-            params: {
-                ...params,
-                _t: Date.now(),
-            },
+            params,
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
@@ -110,10 +107,7 @@ export class ProductService {
 
     static async getProductById(id: string, branchId?: string | null): Promise<Product> {
         const response = await apiClient.get<RawProduct>(`${this.ENDPOINT}/${id}`, {
-            params: {
-                ...(branchId ? { branchId } : {}),
-                _t: Date.now(),
-            },
+            params: branchId ? { branchId } : undefined,
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
