@@ -27,7 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
-  const { fetchCart } = useCart();
+  const { fetchCart, clearCart } = useCart();
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
     const val = Number(amount);
@@ -40,6 +40,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [transactionRef, setTransactionRef] = useState<string>('');
+  const [countdown, setCountdown] = useState<number>(4);
 
   // QR Payment State
   const [qrData, setQrData] = useState<any>(null);
@@ -51,6 +52,35 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const [cardNumber, setCardNumber] = useState<string>('4242 •••• •••• 4242');
   const [expiry, setExpiry] = useState<string>('12/28');
   const [cvc, setCvc] = useState<string>('123');
+
+  const handleGoToCatalog = useCallback(() => {
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'Main',
+          params: { screen: 'ShopTab' },
+        },
+      ],
+    });
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!isSuccess) return;
+
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleGoToCatalog();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isSuccess, handleGoToCatalog]);
 
   useEffect(() => {
     const initPayment = async () => {
@@ -120,9 +150,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           setTransactionRef(`QR-${orderId}`);
           setIsSuccess(true);
           try {
-            await fetchCart();
+            await clearCart();
           } catch {
-            // Ignorar
+            await fetchCart();
           }
         }
       } catch {
@@ -131,7 +161,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [selectedMethod, orderId, isSuccess, fetchCart]);
+  }, [selectedMethod, orderId, isSuccess, clearCart, fetchCart]);
 
   const handleSimulateQrPayment = async () => {
     try {
@@ -140,9 +170,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       setTransactionRef(`QR-${orderId}`);
       setIsSuccess(true);
       try {
-        await fetchCart();
+        await clearCart();
       } catch {
-        // Ignorar
+        await fetchCart();
       }
     } catch (err) {
       Alert.alert('Error al simular pago', getErrorMessage(err));
@@ -167,9 +197,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       setTransactionRef(res.data?.transactionId || paymentIntentId);
       setIsSuccess(true);
       try {
-        await fetchCart();
+        await clearCart();
       } catch {
-        // Ignorar si falla la sincronización inmediata
+        await fetchCart();
       }
     } catch (err) {
       Alert.alert('Error de Pago', getErrorMessage(err));
@@ -191,7 +221,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
           <Text style={styles.successTitle}>¡Pago Exitoso!</Text>
           <Text style={styles.successDesc}>
-            Tu pago por un monto de Bs ${currentAmount.toFixed(2)} ha sido procesado
+            Tu pago por un monto de Bs {currentAmount.toFixed(2)} ha sido procesado
             satisfactoriamente con {selectedMethod === 'qr' ? 'código QR' : 'Stripe'}. Tu pedido ya está en preparación.
           </Text>
 
@@ -216,13 +246,31 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           </View>
 
+          {/* Redirection Notice Box */}
+          <View style={styles.redirectNoticeBox}>
+            <Ionicons name="time-outline" size={18} color={Colors.primary} />
+            <Text style={styles.redirectNoticeText}>
+              Redirigiendo al catálogo en{' '}
+              <Text style={styles.redirectCountdownBold}>{countdown}</Text> segundos...
+            </Text>
+          </View>
+
           <Button
-            title="Ver Estado de Mi Pedido"
-            onPress={() => navigation.replace('OrderDetail', { orderId })}
+            title="Volver al Catálogo Ahora"
+            onPress={handleGoToCatalog}
             variant="primary"
             size="lg"
-            style={{ width: '100%' }}
+            style={{ width: '100%', marginBottom: 14 }}
+            icon={<Ionicons name="bag-handle-outline" size={20} color={Colors.textWhite} />}
           />
+
+          <TouchableOpacity
+            style={styles.viewOrderBtn}
+            onPress={() => navigation.replace('OrderDetail', { orderId })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.viewOrderText}>Ver Estado de Mi Pedido</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -554,7 +602,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: 32,
+    marginBottom: 20,
   },
   receiptRow: {
     flexDirection: 'row',
@@ -570,6 +618,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textPrimary,
     maxWidth: '60%',
+  },
+  redirectNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 16,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  redirectNoticeText: {
+    fontSize: 13,
+    color: Colors.primary,
+    fontWeight: '600',
+  },
+  redirectCountdownBold: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: Colors.primary,
+  },
+  viewOrderBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  viewOrderText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   methodSelector: {
     flexDirection: 'row',
