@@ -70,20 +70,20 @@ export default function CartClient() {
                         <h2>Resumen del pedido</h2>
                         <div className={styles.summaryRow}>
                             <span>Subtotal</span>
-                            <span>${totals.listSubtotal.toFixed(2)}</span>
+                            <span>Bs {totals.listSubtotal.toFixed(2)}</span>
                         </div>
 
                         {totals.productDiscount > 0 && (
                             <div className={`${styles.summaryRow} ${styles.discountRow}`}>
                                 <span>Descuento en productos</span>
-                                <span>-${totals.productDiscount.toFixed(2)}</span>
+                                <span>-Bs {totals.productDiscount.toFixed(2)}</span>
                             </div>
                         )}
 
                         {totals.employeeDiscount > 0 && (
                             <div className={`${styles.summaryRow} ${styles.discountRow}`}>
                                 <span>Descuento de empleado ({totals.employeeDiscountPercent}%)</span>
-                                <span>-${totals.employeeDiscount.toFixed(2)}</span>
+                                <span>-Bs {totals.employeeDiscount.toFixed(2)}</span>
                             </div>
                         )}
 
@@ -102,7 +102,7 @@ export default function CartClient() {
 
                         <div className={styles.summaryTotal}>
                             <span>Total</span>
-                            <span>${totalPrice.toFixed(2)}</span>
+                            <span>Bs {totalPrice.toFixed(2)}</span>
                         </div>
 
                         <button className={styles.checkoutButton} onClick={handleCheckout}>

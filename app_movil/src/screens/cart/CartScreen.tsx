@@ -159,7 +159,7 @@ export const CartScreen: React.FC = () => {
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>${totalAmount.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>Bs ${totalAmount.toFixed(2)}</Text>
             </View>
 
             <View style={styles.summaryRow}>
@@ -171,7 +171,7 @@ export const CartScreen: React.FC = () => {
 
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total a Pagar</Text>
-              <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>Bs ${totalAmount.toFixed(2)}</Text>
             </View>
 
             <Button

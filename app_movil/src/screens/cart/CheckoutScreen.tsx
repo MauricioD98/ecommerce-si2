@@ -146,7 +146,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
                 >
                   Envío a Domicilio
                 </Text>
-                <Text style={styles.methodCost}>$15.00 USD</Text>
+                <Text style={styles.methodCost}>Bs 15.00</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -267,7 +267,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
                       Talla: {item.size || (item.product as any)?.sizes?.[0] || item.product?.size || '-'} • Cantidad: {item.quantity}
                     </Text>
                   </View>
-                  <Text style={styles.itemPrice}>${subtotal}</Text>
+                  <Text style={styles.itemPrice}>Bs {subtotal}</Text>
                 </View>
               );
             })}
@@ -276,7 +276,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.summaryLine}>
               <Text style={styles.summaryLabel}>Subtotal productos</Text>
-              <Text style={styles.summaryValue}>${totalAmount.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>Bs ${totalAmount.toFixed(2)}</Text>
             </View>
 
             <View style={styles.summaryLine}>
@@ -287,7 +287,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
                   shippingCost === 0 && { color: Colors.success, fontWeight: '700' },
                 ]}
               >
-                {shippingCost === 0 ? 'Gratis ($0.00)' : `$${shippingCost.toFixed(2)}`}
+                {shippingCost === 0 ? 'Gratis (Bs 0.00)' : `Bs ${shippingCost.toFixed(2)}`}
               </Text>
             </View>
 
@@ -295,7 +295,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Total a Pagar</Text>
-              <Text style={styles.totalAmount}>${payableTotal.toFixed(2)}</Text>
+              <Text style={styles.totalAmount}>Bs ${payableTotal.toFixed(2)}</Text>
             </View>
           </View>
 
@@ -308,7 +308,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           <Button
-            title={`Confirmar Pedido y Pagar ($${payableTotal.toFixed(2)})`}
+            title={`Confirmar Pedido y Pagar (Bs ${payableTotal.toFixed(2)})`}
             onPress={handleCreateOrder}
             isLoading={isSubmitting}
             variant="primary"

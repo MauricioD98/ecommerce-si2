@@ -136,9 +136,9 @@ export default function OrdersClient() {
                                                 </td>
                                                 <td className={styles.numeric}>
                                                     <div className={styles.cellMain}>
-                                                        <span className={styles.cellTitle}>${Number(order.total).toFixed(2)}</span>
+                                                        <span className={styles.cellTitle}>Bs {Number(order.total).toFixed(2)}</span>
                                                         {order.discountApplied > 0 && (
-                                                            <span className={styles.cellSub}>Desc. empleado -${Number(order.discountApplied).toFixed(2)}</span>
+                                                            <span className={styles.cellSub}>Desc. empleado -Bs {Number(order.discountApplied).toFixed(2)}</span>
                                                         )}
                                                     </div>
                                                 </td>

@@ -87,7 +87,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                                                 {item.size ? `Talla: ${item.size} · ` : ''}Cantidad: {item.quantity}
                                             </span>
                                         </div>
-                                        <span className={styles.itemSubtotal}>${item.subtotal.toFixed(2)}</span>
+                                        <span className={styles.itemSubtotal}>Bs {item.subtotal.toFixed(2)}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -96,18 +96,18 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                                 {order.discountApplied > 0 && (
                                     <div className={styles.totalsRow}>
                                         <span>Descuento de empleado</span>
-                                        <span>-${Number(order.discountApplied).toFixed(2)}</span>
+                                        <span>-Bs {Number(order.discountApplied).toFixed(2)}</span>
                                     </div>
                                 )}
                                 {order.fulfillmentType === 'DELIVERY' && (
                                     <div className={styles.totalsRow}>
                                         <span>Costo de envío</span>
-                                        <span>${Number(order.shippingCost).toFixed(2)}</span>
+                                        <span>Bs {Number(order.shippingCost).toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className={styles.totalsRowFinal}>
                                     <span>Total</span>
-                                    <span>${Number(order.total).toFixed(2)}</span>
+                                    <span>Bs {Number(order.total).toFixed(2)}</span>
                                 </div>
                             </div>
                         </>

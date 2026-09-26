@@ -13,7 +13,7 @@ LogBox.ignoreLogs([
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={{ flex: 1 }}>
       <AuthProvider>
         <CartProvider>
           <StatusBar style="dark" />

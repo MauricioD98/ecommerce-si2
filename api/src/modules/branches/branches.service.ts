@@ -11,7 +11,25 @@ export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createBranchDto: CreateBranchDto): Promise<Branch> {
-    return await this.prisma.branch.create({ data: createBranchDto });
+    const branch = await this.prisma.branch.create({ data: createBranchDto });
+    const products = await this.prisma.product.findMany({ select: { id: true, sizes: true } });
+    if (products.length > 0) {
+      const inventoryData = products.flatMap((p) =>
+        (p.sizes || []).map((size) => ({
+          branchId: branch.id,
+          productId: p.id,
+          size,
+          stock: 10,
+        }))
+      );
+      if (inventoryData.length > 0) {
+        await this.prisma.productInventory.createMany({
+          data: inventoryData,
+          skipDuplicates: true,
+        });
+      }
+    }
+    return branch;
   }
 
   // Público: solo sucursales activas

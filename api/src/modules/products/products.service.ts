@@ -67,6 +67,30 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
       }
     });
 
+    if (product.sizes.length > 0) {
+      const activeBranches = await this.prisma.branch.findMany({ where: { isActive: true }, select: { id: true } });
+      if (activeBranches.length > 0) {
+        const inventoryData = activeBranches.flatMap((b) =>
+          product.sizes.map((size) => ({
+            branchId: b.id,
+            productId: product.id,
+            size,
+            stock: 10,
+          }))
+        );
+        await this.prisma.productInventory.createMany({
+          data: inventoryData,
+          skipDuplicates: true,
+        });
+        const totalInitialStock = 10 * activeBranches.length * product.sizes.length;
+        await this.prisma.product.update({
+          where: { id: product.id },
+          data: { stock: totalInitialStock },
+        });
+        product.stock = totalInitialStock;
+      }
+    }
+
     return this.formatProduct(product);
  }
 

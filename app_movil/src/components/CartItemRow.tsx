@@ -65,7 +65,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
               Talla: {item.size || (product as any)?.sizes?.[0] || product?.size || '-'}
             </Text>
           </View>
-          <Text style={styles.unitPrice}>${unitPrice.toFixed(2)} c/u</Text>
+          <Text style={styles.unitPrice}>Bs {unitPrice.toFixed(2)} c/u</Text>
         </View>
 
         <View style={styles.bottomRow}>
@@ -99,7 +99,7 @@ export const CartItemRow: React.FC<CartItemRowProps> = ({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.totalPrice}>${itemTotal}</Text>
+          <Text style={styles.totalPrice}>Bs {itemTotal}</Text>
         </View>
       </View>
     </View>

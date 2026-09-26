@@ -152,11 +152,11 @@ export const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemName}>{name}</Text>
                   <Text style={styles.itemMeta}>
-                    Cant: {item.quantity} • ${price} c/u
+                    Cant: {item.quantity} • Bs {price} c/u
                   </Text>
                 </View>
 
-                <Text style={styles.itemSubtotal}>${subtotal}</Text>
+                <Text style={styles.itemSubtotal}>Bs {subtotal}</Text>
               </View>
             );
           })}
@@ -165,7 +165,7 @@ export const OrderDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Facturado</Text>
-            <Text style={styles.totalAmount}>${total}</Text>
+            <Text style={styles.totalAmount}>Bs {total}</Text>
           </View>
         </View>
 

@@ -121,7 +121,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
                     <span className={styles.cellSub}>SKU: {product.sku}</span>
                 </div>
             </td>
-            <td className={styles.numeric}>${Number(product.price).toFixed(2)}</td>
+            <td className={styles.numeric}>Bs {Number(product.price).toFixed(2)}</td>
             <td>
                 <input
                     type="number"

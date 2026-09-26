@@ -16,7 +16,7 @@ export interface InvoiceData {
   total: number;
 }
 
-const money = (value: number): string => `$${value.toFixed(2)}`;
+const money = (value: number): string => `Bs ${value.toFixed(2)}`;
 
 @Injectable()
 export class InvoiceService {

@@ -61,8 +61,8 @@ export default function CartItem({ item }: CartItemProps) {
                         <span className={styles.size}>Talla: {selectedSize}</span>
                     )}
                     <span className={styles.price}>
-                        ${unitPrice.toFixed(2)}
-                        {hasDiscount && <span className={styles.oldPrice}>${product.price.toFixed(2)}</span>}
+                        Bs {unitPrice.toFixed(2)}
+                        {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
                         {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                     </span>
 
@@ -93,7 +93,7 @@ export default function CartItem({ item }: CartItemProps) {
                         </button>
                     </div>
 
-                    <div className={styles.itemTotal}>${itemTotal.toFixed(2)}</div>
+                    <div className={styles.itemTotal}>Bs {itemTotal.toFixed(2)}</div>
 
                     <button className={styles.removeButton} onClick={handleRemove} aria-label="Quitar artículo">
                         <Trash2 size={18} />

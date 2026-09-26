@@ -72,7 +72,7 @@ export class MailService {
     return this.send({
       to: params.to,
       subject: `Tu factura del pedido #${params.orderNumber}`,
-      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `$${params.total.toFixed(2)}`),
+      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`),
       attachments: [{ filename: params.filename, content: params.pdf, contentType: 'application/pdf' }],
     });
   }

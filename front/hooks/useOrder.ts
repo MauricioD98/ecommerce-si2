@@ -19,14 +19,18 @@ export function useOrder() {
             setError(null);
             try {
                 if (guestCart.length > 0) {
-                    await CartService.mergeCart(
-                        guestCart.map((item: any) => ({
-                            productId: item.product?.id || item.productId,
-                            quantity: item.quantity,
-                            selectedSize: item.selectedSize,
-                        })),
-                        data.branchId
-                    );
+                    try {
+                        await CartService.mergeCart(
+                            guestCart.map((item: any) => ({
+                                productId: item.product?.id || item.productId,
+                                quantity: item.quantity,
+                                selectedSize: item.selectedSize,
+                            })),
+                            data.branchId
+                        );
+                    } catch (cartErr) {
+                        console.warn("No se pudo pre-sincronizar el carrito del servidor (continuando):", cartErr);
+                    }
                 }
 
                 const response = await OrderService.createOrder(data);

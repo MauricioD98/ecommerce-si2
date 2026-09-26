@@ -75,6 +75,7 @@ export function StripePaymentForm({
     const stripe = useStripe();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isReady, setIsReady] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -96,12 +97,12 @@ export function StripePaymentForm({
             if (error) {
                 // Error de validación/tarjeta (ej. incompleta, rechazada): se queda local, junto al botón.
                 // No se propaga con onError() para no duplicar el mismo texto en el panel del padre.
-                setErrorMessage(error.message || "Algo salió mal");
+                setErrorMessage(error.message || "Algo salió mal al procesar el pago");
             } else if (paymentIntent?.status === "succeeded") {
                 onSuccess(paymentIntent.id);
             }
         } catch {
-            setErrorMessage("Ocurrió un error inesperado. Inténtalo de nuevo.");
+            setErrorMessage("Ocurrió un error inesperado al procesar el pago. Inténtalo de nuevo.");
         } finally {
             setIsProcessing(false);
         }
@@ -109,31 +110,34 @@ export function StripePaymentForm({
 
     return (
         <form onSubmit={handleSubmit} className={styles.form}>
+            {!isReady && (
+                <div className={styles.loadingSkeleton}>
+                    <Loader2 className={styles.spinner} />
+                    <span>Cargando formulario de pago seguro de Stripe...</span>
+                </div>
+            )}
+
             <PaymentElement
+                onReady={() => setIsReady(true)}
                 onLoadError={(event) => {
-                    // Este es el "Unhandled payment Element loaderror": casi siempre clientSecret/llave pública
-                    // de cuentas de Stripe distintas, o clientSecret vencido/inválido. Es un fallo bloqueante
-                    // (el formulario no funciona), así que solo se avisa al padre, no aquí abajo del botón.
                     onError(event.error?.message || 'No se pudo cargar el formulario de pago. Verifica la configuración de Stripe.');
                 }}
             />
 
-            {/* Único lugar para el error de pago (validación de Stripe al confirmar): Stripe ya marca
-                los campos incompletos dentro del propio PaymentElement, esto solo cubre el resultado general */}
             {errorMessage && <p className={styles.errorMessage}>{errorMessage}</p>}
 
             <div className={styles.submitContainer}>
                 <button
                     type="submit"
-                    disabled={!stripe || isProcessing}
+                    disabled={!stripe || !isReady || isProcessing}
                     className={styles.submitButton}
                 >
                     {isProcessing ? (
                         <>
-                            <Loader2 className={styles.spinner} /> Procesando...
+                            <Loader2 className={styles.spinner} /> Procesando pago...
                         </>
                     ) : (
-                        `Pagar $${amount.toFixed(2)}`
+                        `Pagar Bs ${amount.toFixed(2)}`
                     )}
                 </button>
             </div>
@@ -141,27 +145,40 @@ export function StripePaymentForm({
     );
 }
 
-// Botón de pago mostrado mientras aún no existe el clientSecret (la orden se está creando).
-// La animación de carga vive únicamente dentro del botón.
+// Botón de pago / estado mostrado mientras se genera el clientSecret o si hubo que reintentar
 export function StripePaymentPlaceholder({
     amount,
     isLoading,
+    onRetry,
 }: {
     amount: number;
     isLoading: boolean;
+    onRetry?: () => void;
 }) {
     return (
         <div className={styles.form}>
+            {isLoading && (
+                <div className={styles.loadingSkeleton}>
+                    <Loader2 className={styles.spinner} />
+                    <span>Iniciando pasarela de pago segura con Stripe...</span>
+                </div>
+            )}
             <div className={styles.submitContainer}>
-                <button type="button" disabled className={styles.submitButton}>
-                    {isLoading ? (
-                        <>
-                            <Loader2 className={styles.spinner} /> Preparando pago...
-                        </>
-                    ) : (
-                        `Pagar $${amount.toFixed(2)}`
-                    )}
-                </button>
+                {onRetry ? (
+                    <button type="button" onClick={onRetry} className={styles.retryButton}>
+                        Reintentar preparar pago
+                    </button>
+                ) : (
+                    <button type="button" disabled className={styles.submitButton}>
+                        {isLoading ? (
+                            <>
+                                <Loader2 className={styles.spinner} /> Preparando pago...
+                            </>
+                        ) : (
+                            `Pagar Bs ${amount.toFixed(2)}`
+                        )}
+                    </button>
+                )}
             </div>
         </div>
     );

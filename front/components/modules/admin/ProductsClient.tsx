@@ -152,7 +152,7 @@ export default function ProductsClient() {
                                                     ))}
                                                 </div>
                                             </td>
-                                            <td className={styles.numeric}>${Number(product.price).toFixed(2)}</td>
+                                            <td className={styles.numeric}>Bs {Number(product.price).toFixed(2)}</td>
                                             {!isGlobal && (
                                                 <td className={styles.numeric}>
                                                     <span className={`${styles.badge} ${product.stock <= 0 ? styles.badgeDanger : styles.badgeSuccess}`}>

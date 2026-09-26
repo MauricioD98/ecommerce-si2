@@ -34,8 +34,8 @@ export default function ProductCard({ product }: { product: Product }) {
                 <p className={styles.description}>{product.description}</p>
                 <div className={styles.footer}>
                     <span className={styles.price}>
-                        ${getEffectivePrice(product).toFixed(2)}
-                        {hasDiscount && <span className={styles.oldPrice}>${product.price.toFixed(2)}</span>}
+                        Bs {getEffectivePrice(product).toFixed(2)}
+                        {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
                     </span>
 
                     {/* 3. Sintaxis de template literal corregida y variable isInStock bien escrita */}

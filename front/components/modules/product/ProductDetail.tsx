@@ -90,8 +90,8 @@ export default function ProductDetail({ product }: { product: Product }) {
                         <span className={styles.category}>{product.category}</span>
                         <h1 className={styles.title}> {product.name}</h1>
                         <p className={styles.price}>
-                            ${getEffectivePrice(product).toFixed(2)}
-                            {hasDiscount && <span className={styles.oldPrice}>${product.price.toFixed(2)}</span>}
+                            Bs {getEffectivePrice(product).toFixed(2)}
+                            {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
                             {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
                         </p>
                         {/* Reactivo a la talla elegida: cambia al vuelo si el usuario cambia de talla */}

@@ -1,0 +1,44 @@
+services:
+  # ── API NestJS ───────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: stella-femme-api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./api/.env # Lee el .env que ya tienes en api/
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    networks:
+      - stella-network
+
+  # ── Frontend Next.js ─────────────────────────────────────────────────────────
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        # Las variables NEXT_PUBLIC_* se embeben en el build — deben pasarse aquí
+        NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_51UIJqOEZbg8keB70wHRqFCaUjPnbgCeHD7oOsy3JrE9G9GSCYvSCv4QmwsvjqoqwBDdkEaSdUX2cz7lZb6DqX9vT00zW3pyuBf
+    container_name: stella-femme-front
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_51UIJqOEZbg8keB70wHRqFCaUjPnbgCeHD7oOsy3JrE9G9GSCYvSCv4QmwsvjqoqwBDdkEaSdUX2cz7lZb6DqX9vT00zW3pyuBf
+    depends_on:
+      - api
+    networks:
+      - stella-network
+
+networks:
+  stella-network:
+    driver: bridge

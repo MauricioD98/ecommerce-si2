@@ -55,7 +55,7 @@ export default function OrdersTab() {
                                             <span className={`${styles.badge} ${styles[ORDER_STATUS_BADGE_CLASS[status]]}`}>
                                                 {ORDER_STATUS_LABELS[status] ?? status}
                                             </span>
-                                            <span className={styles.orderCardTotal}>${Number(order.total).toFixed(2)}</span>
+                                            <span className={styles.orderCardTotal}>Bs {Number(order.total).toFixed(2)}</span>
                                             <ChevronRight size={18} className={styles.chevron} />
                                         </div>
                                     </button>

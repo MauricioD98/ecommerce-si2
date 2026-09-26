@@ -207,7 +207,7 @@ export default function PosClient() {
                                         >
                                             <img src={product.imageUrl} alt={product.name} className={styles.productImage} />
                                             <span className={styles.productName}>{product.name}</span>
-                                            <span className={styles.productPrice}>${(product.effectivePrice ?? product.price).toFixed(2)}</span>
+                                            <span className={styles.productPrice}>Bs {(product.effectivePrice ?? product.price).toFixed(2)}</span>
                                             <span className={`${styles.stockBadge} ${product.stock <= 0 ? styles.stockBadgeOut : ''}`}>
                                                 {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
                                             </span>
@@ -260,7 +260,7 @@ export default function PosClient() {
                                                 {line.product.name} <span className={styles.ticketLineSize}>({line.size})</span>
                                             </span>
                                             <span className={styles.ticketLinePrice}>
-                                                ${(line.product.effectivePrice ?? line.product.price).toFixed(2)} c/u
+                                                Bs ${(line.product.effectivePrice ?? line.product.price).toFixed(2)} c/u
                                             </span>
                                         </div>
                                         <div className={styles.ticketLineActions}>
@@ -350,7 +350,7 @@ export default function PosClient() {
                                 </div>
                                 <div className={`${styles.changeRow} ${cashBlocked ? styles.changeRowInsufficient : ''}`}>
                                     <span>Cambio</span>
-                                    <span>{change !== null ? `$${change.toFixed(2)}` : '—'}</span>
+                                    <span>{change !== null ? `Bs ${change.toFixed(2)}` : '—'}</span>
                                 </div>
                             </div>
                         )}
@@ -359,7 +359,7 @@ export default function PosClient() {
 
                         <div className={styles.ticketTotal}>
                             <span>Total</span>
-                            <span>${total.toFixed(2)}</span>
+                            <span>Bs ${total.toFixed(2)}</span>
                         </div>
 
                         <button
@@ -368,7 +368,7 @@ export default function PosClient() {
                             disabled={ticket.length === 0 || isCharging || cashBlocked}
                             onClick={handleCharge}
                         >
-                            {isCharging ? 'Cobrando...' : `Cobrar $${total.toFixed(2)}`}
+                            {isCharging ? 'Cobrando...' : `Cobrar Bs ${total.toFixed(2)}`}
                         </button>
                     </aside>
                 </div>

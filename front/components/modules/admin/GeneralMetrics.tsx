@@ -13,7 +13,7 @@ const RANGES = [
     { days: 90, label: 'Últimos 90 días' },
 ];
 
-const money = (value: number) => `$${value.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const money = (value: number) => `Bs ${value.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function GeneralMetrics() {
     const { isGlobal } = useAdminRole();
@@ -74,7 +74,7 @@ export default function GeneralMetrics() {
                                 <BarChart data={overview.salesByDay} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                                     <XAxis dataKey="date" tickFormatter={(date: string) => date.slice(5)} tick={{ fontSize: 12 }} minTickGap={16} />
-                                    <YAxis tick={{ fontSize: 12 }} width={56} tickFormatter={(value: number) => `$${value}`} />
+                                    <YAxis tick={{ fontSize: 12 }} width={56} tickFormatter={(value: number) => `Bs ${value}`} />
                                     <Tooltip
                                         formatter={(value) => [money(Number(value)), 'Ingresos']}
                                         labelFormatter={(label) => `Fecha: ${label}`}

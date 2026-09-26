@@ -38,30 +38,30 @@ export default function PosReceiptModal({ receipt, onClose }: { receipt: PosRece
                     {receipt.items.map((item, index) => (
                         <div className={styles.receiptItem} key={index}>
                             <span>{item.quantity} x {item.productName} ({item.size})</span>
-                            <span>${item.subtotal.toFixed(2)}</span>
+                            <span>Bs ${item.subtotal.toFixed(2)}</span>
                         </div>
                     ))}
 
                     <hr className={styles.receiptDivider} />
                     <div className={styles.receiptItem}>
                         <span>Subtotal</span>
-                        <span>${receipt.subtotal.toFixed(2)}</span>
+                        <span>Bs ${receipt.subtotal.toFixed(2)}</span>
                     </div>
                     {receipt.discountApplied > 0 && (
                         <div className={styles.receiptItem}>
                             <span>Descuento</span>
-                            <span>-${receipt.discountApplied.toFixed(2)}</span>
+                            <span>-Bs ${receipt.discountApplied.toFixed(2)}</span>
                         </div>
                     )}
                     <div className={`${styles.receiptItem} ${styles.receiptTotal}`}>
                         <span>Total</span>
-                        <span>${receipt.total.toFixed(2)}</span>
+                        <span>Bs ${receipt.total.toFixed(2)}</span>
                     </div>
                     <p className={styles.receiptLine}>Pago: {PAYMENT_METHOD_LABEL[receipt.paymentMethod] ?? receipt.paymentMethod}</p>
                     {receipt.paymentMethod === 'CASH' && receipt.amountReceived != null && (
                         <>
-                            <p className={styles.receiptLine}>Monto Recibido: ${receipt.amountReceived.toFixed(2)}</p>
-                            <p className={styles.receiptLine}>Cambio: ${(receipt.change ?? 0).toFixed(2)}</p>
+                            <p className={styles.receiptLine}>Monto Recibido: Bs ${receipt.amountReceived.toFixed(2)}</p>
+                            <p className={styles.receiptLine}>Cambio: Bs ${(receipt.change ?? 0).toFixed(2)}</p>
                         </>
                     )}
                     <hr className={styles.receiptDivider} />

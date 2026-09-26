@@ -53,7 +53,6 @@ export class PaymentsService {
       metadata: { orderId, userId },
       automatic_payment_methods: {
         enabled: true,
-        allow_redirects: 'never',
       },
     });
 

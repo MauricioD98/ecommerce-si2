@@ -149,7 +149,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.title}>{product.name}</Text>
 
           <View style={styles.priceStockRow}>
-            <Text style={styles.price}>${unitPrice.toFixed(2)}</Text>
+            <Text style={styles.price}>Bs {unitPrice.toFixed(2)}</Text>
             <View
               style={[
                 styles.stockPill,
@@ -260,7 +260,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.bottomBar}>
         <View style={styles.totalBox}>
           <Text style={styles.totalLabel}>Total Estimado</Text>
-          <Text style={styles.totalValue}>${total}</Text>
+          <Text style={styles.totalValue}>Bs {total}</Text>
         </View>
 
         <Button

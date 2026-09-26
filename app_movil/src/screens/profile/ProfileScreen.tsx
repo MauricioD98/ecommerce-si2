@@ -21,6 +21,8 @@ import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
   resetApiBaseUrl,
+  CLOUD_API_URL,
+  LOCAL_DEV_API_URL,
 } from '../../config/env';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
@@ -217,16 +219,36 @@ export const ProfileScreen: React.FC = () => {
               <Text style={styles.modalTitle}>Configurar Servidor API</Text>
             </View>
             <Text style={styles.modalDesc}>
-              Ajusta la URL base si estás probando desde un dispositivo o red local.
+              Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.
             </Text>
 
             <Input
               label="URL Base de la API"
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
-              placeholder="http://192.168.1.X:3001/api/v1"
+              placeholder={CLOUD_API_URL}
               autoCapitalize="none"
             />
+
+            <TouchableOpacity
+              style={styles.presetIpBtn}
+              onPress={() => setApiUrlInput(CLOUD_API_URL)}
+            >
+              <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
+              <Text style={styles.presetIpText}>
+                Servidor en la Nube (Azure Producción)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.presetIpBtn, { marginTop: 6, marginBottom: 12 }]}
+              onPress={() => setApiUrlInput(LOCAL_DEV_API_URL)}
+            >
+              <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
+              <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
+                Servidor Local (PC): 192.168.100.240:3001
+              </Text>
+            </TouchableOpacity>
 
             <View style={styles.modalButtonsRow}>
               <Button
@@ -396,5 +418,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginTop: 10,
+  },
+  presetIpBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 10,
+  },
+  presetIpText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });

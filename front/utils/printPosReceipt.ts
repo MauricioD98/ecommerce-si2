@@ -13,7 +13,7 @@ const escapeHtml = (value: string) =>
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 
-const money = (value: number) => `$${value.toFixed(2)}`;
+const money = (value: number) => `Bs ${value.toFixed(2)}`;
 
 const buildReceiptHtml = (receipt: PosReceipt): string => {
     const date = new Date(receipt.createdAt).toLocaleString("es-BO");

@@ -84,7 +84,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </View>
 
         <View style={styles.footerRow}>
-          <Text style={styles.price}>${formattedPrice}</Text>
+          <Text style={styles.price}>Bs {formattedPrice}</Text>
 
           {onAddToCart && (
             <TouchableOpacity

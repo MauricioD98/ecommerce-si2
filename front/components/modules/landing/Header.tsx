@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import styles from "./header.module.scss";
 import Link from 'next/link';
-import { LayoutDashboard, ShoppingCart, User as UserIcon } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, User as UserIcon, LogOut } from "lucide-react";
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { useRouter } from 'next/navigation';
@@ -32,44 +32,56 @@ export default function Header(){
 
     return (
         <header className={styles.header}>
-
-            {/*corntainer*/}
             <div className={styles.containers}>
                {/* logo */}
                <Link href="/" className={styles.logo}>
                 STELLA FEMME
                </Link>
-               {/*icons */}
+
+               {/* Branch selector - Solo visible en pantallas grandes */}
+               <div className={styles.desktopBranch}>
+                 <BranchSelector />
+               </div>
+
+               {/* Acciones e iconos */}
                <div className={styles.actions}>
-                <BranchSelector />
-                <Link href="/cart" className={styles.cartButton}>
-                    <ShoppingCart size={20} />
+                <Link href="/cart" className={styles.cartButton} aria-label="Carrito de compras" title="Carrito">
+                    <ShoppingCart size={19} />
                     {totalItems > 0 && <span className={styles.badge}>{totalItems}</span>}
                 </Link>
+
                 {isAuthenticated ? (
                     <>
                      <Link href="/account" className={styles.cartButton} aria-label="Mi cuenta" title="Mi cuenta">
-                        <UserIcon size={20} />
+                        <UserIcon size={19} />
                      </Link>
                      {showDashboard && (
                         <Link href="/admin" className={styles.cartButton} aria-label="Panel administrativo" title="Panel administrativo">
-                            <LayoutDashboard size={20} />
+                            <LayoutDashboard size={19} />
                         </Link>
                      )}
                      <button
                         onClick={handleLogoutClick}
                         className={styles.logoutButton}
                         disabled={isLoading}
+                        title="Cerrar sesión"
+                        aria-label="Cerrar sesión"
                      >
-                      {isLoading? "Cerrando sesión...":"Cerrar sesión"}
+                      <LogOut size={16} className={styles.logoutIcon} />
+                      <span className={styles.logoutText}>{isLoading ? "..." : "Cerrar sesión"}</span>
                      </button>
                     </>
                 ):(
-                   <button className={styles.loginButton} onClick={handleLoginClick}>
+                   <button className={styles.loginButton} onClick={handleLoginClick} title="Iniciar sesión">
                     Iniciar sesión
                    </button>
                 )}
                </div>
+            </div>
+
+            {/* Selector de sucursal en móvil (< 768px): fila dedicada y limpia */}
+            <div className={styles.mobileBranchRow}>
+              <BranchSelector />
             </div>
         </header>
     );

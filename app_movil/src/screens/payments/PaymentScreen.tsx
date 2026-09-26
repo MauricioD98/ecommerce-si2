@@ -122,7 +122,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
           <Text style={styles.successTitle}>¡Pago Exitoso!</Text>
           <Text style={styles.successDesc}>
-            Tu pago por un monto de ${currentAmount.toFixed(2)} USD ha sido procesado
+            Tu pago por un monto de Bs ${currentAmount.toFixed(2)} ha sido procesado
             satisfactoriamente con Stripe. Tu pedido ya está en preparación.
           </Text>
 
@@ -165,7 +165,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Amount Box */}
         <View style={styles.amountCard}>
           <Text style={styles.amountLabel}>Monto a Facturar</Text>
-          <Text style={styles.amountValue}>${currentAmount.toFixed(2)} USD</Text>
+          <Text style={styles.amountValue}>Bs ${currentAmount.toFixed(2)}</Text>
           <View style={styles.stripeBadge}>
             <Ionicons name="lock-closed" size={14} color={Colors.primary} />
             <Text style={styles.stripeBadgeText}>Conexión Segura con Stripe</Text>
@@ -234,7 +234,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
 
           <Button
-            title={`Pagar $${currentAmount.toFixed(2)} USD`}
+            title={`Pagar Bs ${currentAmount.toFixed(2)}`}
             onPress={handleProcessPayment}
             isLoading={isProcessing}
             variant="primary"

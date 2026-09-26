@@ -26,9 +26,11 @@ export function useBranches() {
             .then((data) => {
                 if (!active) return;
                 setBranches(data);
-                // Si la sucursal guardada ya no existe o está inactiva, se descarta
-                if (selectedBranchId && !data.some((branch) => branch.id === selectedBranchId)) {
-                    dispatch(clearSelectedBranch());
+                // Si no hay sucursal seleccionada o la guardada ya no existe, se usa la primera activa
+                if (data.length > 0) {
+                    if (!selectedBranchId || !data.some((branch) => branch.id === selectedBranchId)) {
+                        dispatch(setSelectedBranch(data[0].id));
+                    }
                 }
             })
             .catch((error) => {

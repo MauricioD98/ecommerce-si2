@@ -55,7 +55,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order, onPress }) => {
 
         <View style={styles.totalBox}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalAmount}>${total}</Text>
+          <Text style={styles.totalAmount}>Bs {total}</Text>
         </View>
       </View>
 

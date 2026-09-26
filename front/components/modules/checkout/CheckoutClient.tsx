@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import CheckoutSteps from './CheckoutSteps';
 import CheckoutHeader from './CheckoutHeader';
@@ -81,68 +81,88 @@ export default function CheckoutClient() {
         }
     }, [items.length, orderId, router]);
 
+    // Al llegar al paso 2, preseleccionar automáticamente el método según conectividad
     useEffect(() => {
-        const createOrderAutomatically = async () => {
-            // "offline" tiene su propio flujo manual (handleSaveOfflineOrder): nunca debe intentar
-            // crear la orden por red automáticamente
-            if (currentStep === 2 && selectedPayment === 'stripe' && !orderId && !isCreatingOrder && !clientSecret && !orderFailed) {
-                setIsCreatingOrder(true);
-                setStripeError(null);
+        if (currentStep === 2 && !selectedPayment) {
+            setSelectedPayment(isOnline ? "stripe" : "offline");
+        }
+    }, [currentStep, selectedPayment, isOnline]);
 
-                try {
-                    // El backend calcula los precios: solo se envían productId y quantity
-                    const cartItems: OrderItem[] = items.map((item: CartItem) => ({
-                        productId: item.product?.id || item.productId,
-                        quantity: item.quantity,
-                        selectedSize: item.selectedSize,
-                    }));
+    const preparePayment = useCallback(async (forceRetry = false) => {
+        if (currentStep !== 2 || selectedPayment !== 'stripe' || isCreatingOrder || clientSecret) {
+            return;
+        }
 
-                    const Order = await createOrder({
-                        items: cartItems,
-                        fulfillmentType,
-                        branchId: selectedBranchId ?? undefined,
-                        // La dirección y su ubicación solo aplican al envío a domicilio
-                        ...(!isPickup && deliveryAddress
-                            ? {
-                                shippingAddress: formatShippingAddress(deliveryAddress),
-                                latitude: deliveryAddress.latitude,
-                                longitude: deliveryAddress.longitude,
-                            }
-                            : {}),
-                    });
+        setIsCreatingOrder(true);
+        setStripeError(null);
+        setOrderFailed(false);
 
-                    if (!Order) {
-                        throw new Error("No se pudo crear el pedido");
-                    }
+        try {
+            let activeOrderId = orderId;
 
-                    setOrderId(Order.id);
-                    setOrderTotal(Number(Order.total));
-                    setOrderDiscount(Number(Order.discountApplied ?? 0));
-                    setOrderShippingCost(Number(Order.shippingCost ?? 0));
+            // 1. Crear la orden si no existe aún o si se fuerza reintento
+            if (!activeOrderId || forceRetry) {
+                const cartItems: OrderItem[] = items.map((item: CartItem) => ({
+                    productId: item.product?.id || item.productId,
+                    quantity: item.quantity,
+                    selectedSize: item.selectedSize,
+                }));
 
-                    if (selectedPayment === "stripe") {
-                        // El monto lo calcula el backend desde la orden guardada: no se envía desde el cliente
-                        const paymentCreated = await createPaymentIntent({
-                            orderId: Order.id,
-                            description: "Order payment for ecommerce purchase",
-                            currency: "usd"
-                        });
-
-                        if (!paymentCreated) {
-                            throw new Error("No se pudo iniciar el pago");
+                const createdOrder = await createOrder({
+                    items: cartItems,
+                    fulfillmentType,
+                    branchId: selectedBranchId ?? undefined,
+                    ...(!isPickup && deliveryAddress
+                        ? {
+                            shippingAddress: formatShippingAddress(deliveryAddress),
+                            latitude: deliveryAddress.latitude,
+                            longitude: deliveryAddress.longitude,
                         }
-                    }
-                } catch (error) {
-                    console.error(error);
-                    // Evita reintentar en bucle: el usuario debe volver a elegir el método de pago
-                    setOrderFailed(true);
-                } finally {
-                    setIsCreatingOrder(false);
+                        : {}),
+                });
+
+                if (!createdOrder) {
+                    throw new Error("No se pudo crear la orden en el servidor.");
+                }
+
+                activeOrderId = createdOrder.id;
+                setOrderId(createdOrder.id);
+                setOrderTotal(Number(createdOrder.total));
+                setOrderDiscount(Number(createdOrder.discountApplied ?? 0));
+                setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
+            }
+
+            // 2. Iniciar el PaymentIntent de Stripe para esta orden
+            if (activeOrderId && !clientSecret) {
+                const paymentCreated = await createPaymentIntent({
+                    orderId: activeOrderId,
+                    description: "Pago de orden en Stella Femme",
+                    currency: "usd"
+                });
+
+                if (!paymentCreated) {
+                    throw new Error("No se pudo inicializar la pasarela de pago.");
                 }
             }
-        };
-        createOrderAutomatically();
-    }, [currentStep, selectedPayment, orderId, isCreatingOrder, clientSecret, orderFailed, items, createOrder, createPaymentIntent, fulfillmentType, selectedBranchId, isPickup, deliveryAddress]);
+        } catch (error) {
+            console.error("Error al preparar el pago:", error);
+            setOrderFailed(true);
+        } finally {
+            setIsCreatingOrder(false);
+        }
+    }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, orderId, items, createOrder, fulfillmentType, selectedBranchId, isPickup, deliveryAddress, createPaymentIntent]);
+
+    useEffect(() => {
+        if (currentStep === 2 && selectedPayment === 'stripe' && !clientSecret && !orderFailed && !isCreatingOrder) {
+            preparePayment();
+        }
+    }, [currentStep, selectedPayment, clientSecret, orderFailed, isCreatingOrder, preparePayment]);
+
+    const handleRetry = () => {
+        setOrderFailed(false);
+        setStripeError(null);
+        preparePayment(true);
+    };
 
     // La confirmación real del pago (idempotente) y la limpieza del carrito ocurren en /checkout/success:
     // así también funciona si Stripe redirige la página completa (ej. 3D Secure) en vez de resolver aquí mismo.
@@ -245,20 +265,18 @@ export default function CheckoutClient() {
                                             ? <>Retiro en <strong>{selectedBranch?.name ?? "sucursal"}</strong></>
                                             : <>Envío a <strong>{deliveryAddress ? formatShippingAddress(deliveryAddress) : ""}</strong> (desde {selectedBranch?.name ?? "sucursal"})</>}
                                     </p>
-                                    {!orderId && (
-                                        <button
-                                            type="button"
-                                            className={styles.linkButton}
-                                            onClick={() => {
-                                                setSelectedPayment("");
-                                                setOrderFailed(false);
-                                                setStripeError(null);
-                                                setCurrentStep(1);
-                                            }}
-                                        >
-                                            Cambiar
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        className={styles.linkButton}
+                                        onClick={() => {
+                                            setSelectedPayment("");
+                                            setOrderFailed(false);
+                                            setStripeError(null);
+                                            setCurrentStep(1);
+                                        }}
+                                    >
+                                        Cambiar
+                                    </button>
                                 </div>
 
                                 <div className={styles.paymentMethods}>
@@ -282,7 +300,16 @@ export default function CheckoutClient() {
                                             description="Pago seguro con Stripe"
                                         >
                                             {displayedError && (
-                                                <div className={styles.errorMessage}>{displayedError}</div>
+                                                <div className={styles.errorMessage}>
+                                                    <span>{displayedError}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRetry}
+                                                        className={styles.retryButton}
+                                                    >
+                                                        Reintentar preparar pago
+                                                    </button>
+                                                </div>
                                             )}
 
                                             {clientSecret && orderId ? (
@@ -300,7 +327,11 @@ export default function CheckoutClient() {
                                                     />
                                                 </StripePaymentProvider>
                                             ) : (
-                                                <StripePaymentPlaceholder amount={payableTotal} isLoading={isCreatingOrder} />
+                                                <StripePaymentPlaceholder
+                                                    amount={payableTotal}
+                                                    isLoading={isCreatingOrder}
+                                                    onRetry={orderFailed || displayedError ? handleRetry : undefined}
+                                                />
                                             )}
                                         </PaymentMethodCard>
                                     ) : (
@@ -348,7 +379,7 @@ export default function CheckoutClient() {
                 <h3>Resumen del pedido</h3>
                 <div className={styles.summaryRow}>
                     <span>Artículos ({items.length})</span>
-                    <span>${totals.listSubtotal.toFixed(2)}</span>
+                    <span>Bs {totals.listSubtotal.toFixed(2)}</span>
                 </div>
                 {items.map((item) => (
                     <div className={styles.summaryRow} key={item.id}>
@@ -362,26 +393,26 @@ export default function CheckoutClient() {
                 {totals.productDiscount > 0 && (
                     <div className={`${styles.summaryRow} ${styles.discountRow}`}>
                         <span>Descuento en productos</span>
-                        <span>-${totals.productDiscount.toFixed(2)}</span>
+                        <span>-Bs {totals.productDiscount.toFixed(2)}</span>
                     </div>
                 )}
                 {employeeDiscount > 0 && (
                     <div className={`${styles.summaryRow} ${styles.discountRow}`}>
                         <span>Descuento de empleado ({totals.employeeDiscountPercent}%)</span>
-                        <span>-${employeeDiscount.toFixed(2)}</span>
+                        <span>-Bs {employeeDiscount.toFixed(2)}</span>
                     </div>
                 )}
                 {/* Recojo en sucursal no tiene costo de envío: la fila se oculta en vez de mostrar $0.00 */}
                 {!isPickup && (
                     <div className={styles.summaryRow}>
                         <span>Costo de envío</span>
-                        <span>${shippingCost.toFixed(2)}</span>
+                        <span>Bs {shippingCost.toFixed(2)}</span>
                     </div>
                 )}
                 <hr className={styles.divider} />
                 <div className={styles.summaryTotal}>
                     <span>Total</span>
-                    <span>${payableTotal.toFixed(2)}</span>
+                    <span>Bs {payableTotal.toFixed(2)}</span>
                 </div>
             </aside>
         );

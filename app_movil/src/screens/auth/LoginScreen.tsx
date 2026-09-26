@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   Modal,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -22,6 +23,8 @@ import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
   resetApiBaseUrl,
+  CLOUD_API_URL,
+  LOCAL_DEV_API_URL,
 } from '../../config/env';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
@@ -46,6 +49,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   }, []);
 
   const handleLogin = async () => {
+    Keyboard.dismiss();
     if (!email.trim() || !password.trim()) {
       setError('Por favor ingresa tu correo y contraseña');
       return;
@@ -188,24 +192,34 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.modalTitle}>Configurar Servidor API</Text>
             </View>
             <Text style={styles.modalDesc}>
-              Ajusta la URL base si estás probando desde un emulador Android (10.0.2.2:3001) o celular físico en la red local.
+              Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.
             </Text>
 
             <Input
               label="URL Base de la API"
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
-              placeholder="http://192.168.100.240:3001/api/v1"
+              placeholder={CLOUD_API_URL}
               autoCapitalize="none"
             />
 
             <TouchableOpacity
               style={styles.presetIpBtn}
-              onPress={() => setApiUrlInput('http://192.168.100.240:3001/api/v1')}
+              onPress={() => setApiUrlInput(CLOUD_API_URL)}
             >
-              <Ionicons name="wifi-outline" size={16} color={Colors.primary} />
+              <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
               <Text style={styles.presetIpText}>
-                Fijar IP de mi PC: 192.168.100.240:3001
+                Servidor en la Nube (Azure Producción)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.presetIpBtn, { marginTop: 6 }]}
+              onPress={() => setApiUrlInput(LOCAL_DEV_API_URL)}
+            >
+              <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
+              <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
+                Servidor Local (PC): 192.168.100.240:3001
               </Text>
             </TouchableOpacity>
 
