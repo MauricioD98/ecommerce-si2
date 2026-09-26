@@ -25,12 +25,16 @@ export default function DeliveryStep({
     onContinue,
     stockError,
 }: DeliveryStepProps) {
-    // La sucursal elegida es la misma del selector del Header: así el stock que ve el cliente coincide con el del pedido
-    const { branches, selectedBranchId, selectBranch, isLoading, error } = useBranches();
+    // La sucursal elegida es la misma donde el cliente seleccionó y realizó su pedido
+    const { branches, selectedBranch, selectedBranchId, isLoading, error } = useBranches();
 
     const isPickup = fulfillmentType === 'PICKUP';
     // El envío a domicilio necesita una dirección con su ubicación en el mapa
     const canContinue = !!selectedBranchId && (isPickup || !!deliveryAddress);
+
+    // Solo debe aparecer la sucursal donde realizó el pedido
+    const activeBranch = selectedBranch || branches.find((b) => b.id === selectedBranchId) || (branches.length > 0 ? branches[0] : null);
+    const displayedBranches = activeBranch ? [activeBranch] : [];
 
     const options: { type: FulfillmentType; icon: React.ReactNode; title: string; description: string }[] = [
         {
@@ -74,27 +78,26 @@ export default function DeliveryStep({
                 {isPickup ? 'Sucursal de retiro' : 'Sucursal de despacho'}
             </h3>
 
-            {isLoading && <p className={styles.hint}>Cargando sucursales...</p>}
+            {isLoading && <p className={styles.hint}>Cargando sucursal...</p>}
             {error && <p className={styles.error}>{error}</p>}
 
-            <div className={styles.branches} role="radiogroup" aria-label="Sucursal">
-                {branches.map((branch) => (
-                    <button
-                        key={branch.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={branch.id === selectedBranchId}
-                        className={`${styles.branch} ${branch.id === selectedBranchId ? styles.branchSelected : ''}`}
-                        onClick={() => selectBranch(branch.id)}
-                    >
-                        <span className={styles.branchName}>{branch.name}</span>
-                        {branch.address && <span className={styles.branchAddress}>{branch.address}</span>}
-                        {branch.phone && <span className={styles.branchAddress}>Tel: {branch.phone}</span>}
-                    </button>
-                ))}
-            </div>
-            {!selectedBranchId && !isLoading && (
-                <p className={styles.hint}>Elige una sucursal para continuar.</p>
+            {displayedBranches.length > 0 && (
+                <div className={styles.branches}>
+                    {displayedBranches.map((branch) => (
+                        <div
+                            key={branch.id}
+                            className={`${styles.branch} ${styles.branchSelected}`}
+                            style={{ cursor: 'default' }}
+                        >
+                            <span className={styles.branchName}>{branch.name}</span>
+                            {branch.address && <span className={styles.branchAddress}>{branch.address}</span>}
+                            {branch.phone && <span className={styles.branchAddress}>Tel: {branch.phone}</span>}
+                        </div>
+                    ))}
+                </div>
+            )}
+            {!activeBranch && !isLoading && (
+                <p className={styles.hint}>No se encontró la sucursal del pedido.</p>
             )}
 
             {!isPickup && (
