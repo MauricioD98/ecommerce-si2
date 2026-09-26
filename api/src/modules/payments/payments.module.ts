@@ -1,11 +1,15 @@
 import { Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
 import { PaymentsController } from './payments.controller';
 import { PaymentsWebhookController } from './payments.webhook.controller';
 import { PaymentsService } from './payments.service';
 import { InvoicesModule } from '../invoices/invoices.module';
 
 @Module({
-  imports: [InvoicesModule],
+  imports: [
+    InvoicesModule,
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+  ],
   controllers: [PaymentsController, PaymentsWebhookController],
   providers: [PaymentsService]
 })
