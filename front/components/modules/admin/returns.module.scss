@@ -1,0 +1,459 @@
+/* Punto de devolución: buscador de la venta a la izquierda, armado de la devolución a la derecha.
+   Sigue las mismas convenciones que pos.module.scss (fondo blanco explícito en los controles para no
+   heredar los colores nativos del navegador en modo oscuro del SO). */
+
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.pageHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+
+    h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    p {
+        margin-top: 0.25rem;
+        max-width: 68ch;
+        font-size: 0.9375rem;
+        color: var(--muted-foreground);
+    }
+}
+
+.branchNotice {
+    font-size: 0.8125rem;
+    color: #0369a1;
+
+    strong {
+        color: inherit;
+    }
+}
+
+.branchSelect {
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    color: #000;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+}
+
+.emptyState {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+}
+
+.errorMessage {
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background: color-mix(in srgb, var(--destructive) 10%, transparent);
+    color: var(--destructive);
+    font-size: 0.875rem;
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+
+    @media (min-width: 1024px) {
+        grid-template-columns: minmax(320px, 2fr) minmax(0, 3fr);
+    }
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.25rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+}
+
+.panelTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+/* Buscador */
+.searchForm {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    color: #000;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+
+    &:focus-visible {
+        outline: none;
+        border-color: #000;
+    }
+
+    &[readonly] {
+        background: #f9fafb;
+        color: var(--muted-foreground);
+    }
+}
+
+.inputSmall {
+    max-width: 8rem;
+}
+
+.textarea {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    color: #000;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+
+    &:focus-visible {
+        outline: none;
+        border-color: #000;
+    }
+}
+
+.button {
+    padding: 0.5rem 1rem;
+    background: #000;
+    color: #fff;
+    border: none;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.linkButton {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 0.75rem;
+    font-family: inherit;
+    text-decoration: underline;
+    color: var(--muted-foreground);
+    cursor: pointer;
+}
+
+/* Resultados de la búsqueda */
+.orderList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    list-style: none;
+    max-height: 30rem;
+    overflow-y: auto;
+}
+
+.orderCard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100%;
+    padding: 0.75rem;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    text-align: left;
+    font-family: inherit;
+    color: #000;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+        border-color: #000;
+    }
+}
+
+.orderCardActive {
+    border-color: #000;
+    box-shadow: inset 0 0 0 1px #000;
+}
+
+.orderCardTop {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+}
+
+.orderCardTotal {
+    font-weight: 600;
+}
+
+.orderCardMeta {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+/* Panel de armado */
+.orderRecap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding: 0.75rem;
+    background: #f9fafb;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.itemList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.itemCard {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.itemCardDisabled {
+    opacity: 0.55;
+}
+
+.itemHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    cursor: pointer;
+
+    input[type='checkbox'] {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #000;
+        cursor: pointer;
+    }
+}
+
+.itemInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.itemName {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--foreground);
+}
+
+.itemSize {
+    font-weight: 400;
+    color: var(--muted-foreground);
+}
+
+.itemMeta {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+/* Formulario que aparece al incluir el ítem en la devolución */
+.itemForm {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--border);
+    background: #fdfdfd;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+
+    > span,
+    legend {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted-foreground);
+    }
+}
+
+.conditionGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border: none;
+
+    legend {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted-foreground);
+    }
+}
+
+.radioOption {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+
+    input[type='radio'] {
+        accent-color: #000;
+        cursor: pointer;
+    }
+}
+
+// Explica en una línea lo que va a pasar con el stock según el radio elegido: es la decisión con
+// consecuencias reales de esta pantalla (mermas no se puede deshacer desde acá).
+.conditionHint {
+    flex-basis: 100%;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+/* Totales y acción */
+.totals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+}
+
+.totalRow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    font-size: 1rem;
+
+    strong {
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+}
+
+.totalMeta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+
+    span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+}
+
+.processButton {
+    padding: 0.75rem 1rem;
+    background: #000;
+    color: #fff;
+    border: none;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+}
+
+/* Comprobante posterior */
+.successCard {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 0.5rem;
+}
+
+.successHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #15803d;
+}
+
+.successTotal {
+    font-size: 0.875rem;
+}
+
+.successList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding-left: 1.125rem;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+    list-style: disc;
+}
+
+.successMeta {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+/* Badges */
+.badgeMuted,
+.badgeInfo {
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badgeMuted {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.badgeInfo {
+    background: #e0f2fe;
+    color: #0369a1;
+}

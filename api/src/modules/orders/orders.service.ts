@@ -68,8 +68,27 @@ export class OrdersService {
       throw new BadRequestException('latitude and longitude must be sent together');
     }
 
+    // El carrito activo ya reservó (descontó) stock real al agregar cada ítem (CartService.addItem).
+    // Si un ítem de la orden coincide con esa reserva, no hay que descontarlo otra vez: solo la
+    // diferencia, si el cliente pide más de lo que tenía reservado (o se libera el excedente si
+    // pide menos). Sin esto, el merge del carrito al pagar + esta creación de orden descontarían el
+    // stock dos veces.
+    const activeCart = await this.prisma.cart.findFirst({
+      where: { userId, checkout: false },
+      orderBy: { createdAt: 'desc' },
+      include: { cartItems: true },
+    });
+
     // Precios calculados en el servidor (descuento de la sucursal), nunca los enviados por el cliente
-    const lines: { productId: string; quantity: number; unitPrice: number; size: string }[] = [];
+    const lines: {
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      size: string;
+      toDecrement: number;
+      releaseExtra: number;
+      reservation?: { id: string; branchId: string | null };
+    }[] = [];
 
     for (const item of items) {
       const product = await this.prisma.product.findUnique({
@@ -97,9 +116,19 @@ export class OrdersService {
       const inventoryAggregate = targetBranchId ? await this.inventoryService.getInventory(product.id, targetBranchId) : null;
       const available = targetBranchId && inventoryForSize ? inventoryForSize.stock : product.stock;
 
-      if (available < item.quantity) {
+      const reservation = activeCart?.cartItems.find(
+        (ci) => ci.productId === item.productId && ci.size === item.size,
+      );
+      const reservedQty = reservation?.quantity ?? 0;
+      const consumedFromReservation = Math.min(reservedQty, item.quantity);
+      // Cantidad que todavía no estaba reservada y sí hay que descontar ahora
+      const toDecrement = item.quantity - consumedFromReservation;
+      // Si había reservado más de lo que finalmente compra, ese excedente se libera
+      const releaseExtra = reservedQty - consumedFromReservation;
+
+      if (available < toDecrement) {
         throw new BadRequestException(
-          `Insufficient stock for size ${item.size} of product ${product.name}. Available: ${available}, Requested:${item.quantity}`,
+          `Insufficient stock for size ${item.size} of product ${product.name}. Available: ${available}, Requested:${toDecrement}`,
         );
       }
 
@@ -108,6 +137,9 @@ export class OrdersService {
         quantity: item.quantity,
         unitPrice: getBranchPrice(product, inventoryAggregate),
         size: item.size,
+        toDecrement,
+        releaseExtra,
+        reservation: reservation ? { id: reservation.id, branchId: reservation.branchId } : undefined,
       });
     }
 
@@ -125,16 +157,6 @@ export class OrdersService {
     const shippingCost = fulfillmentType === FulfillmentType.DELIVERY ? DELIVERY_SHIPPING_COST : 0;
     const total = round2(itemsTotal + shippingCost);
 
-    const latestCart = await this.prisma.cart.findFirst({
-  where: {
-    userId,
-    checkout: false,
-  },
-  orderBy: {
-    createdAt: 'desc',
-  },
-  }); 
-
   const order = await this.prisma.$transaction(async (tx) => {
 
   const newOrder = await tx.order.create({
@@ -150,7 +172,7 @@ export class OrdersService {
       shippingAddress,
       // La ubicación solo tiene sentido en envíos a domicilio
       ...(fulfillmentType === FulfillmentType.DELIVERY ? { latitude, longitude } : {}),
-      cartId: latestCart?.id,
+      cartId: activeCart?.id,
       orderItems: {
         create: lines.map((line) => ({
           product: {
@@ -174,16 +196,37 @@ export class OrdersService {
   })
 
   for (const line of lines) {
-        if (targetBranchId) {
-          await this.inventoryService.decrement(tx, line.productId, targetBranchId, line.size, line.quantity);
-        } else {
-          const result = await tx.product.updateMany({
-            where: { id: line.productId, stock: { gte: line.quantity } },
-            data: { stock: { decrement: line.quantity } },
-          });
-          if (result.count === 0) {
-            throw new BadRequestException('Insufficient stock');
+        // Solo se descuenta lo que NO estaba ya reservado por el carrito (toDecrement); lo demás ya
+        // se restó del inventario cuando se agregó al carrito (CartService.addItem).
+        if (line.toDecrement > 0) {
+          if (targetBranchId) {
+            await this.inventoryService.decrement(tx, line.productId, targetBranchId, line.size, line.toDecrement);
+          } else {
+            const result = await tx.product.updateMany({
+              where: { id: line.productId, stock: { gte: line.toDecrement } },
+              data: { stock: { decrement: line.toDecrement } },
+            });
+            if (result.count === 0) {
+              throw new BadRequestException('Insufficient stock');
+            }
           }
+        }
+
+        // Reservó más de lo que finalmente compra: se libera el excedente contra la sucursal donde
+        // realmente estaba reservado (puede no ser targetBranchId si cambió de sucursal a mitad del
+        // checkout). releaseExtra > 0 implica que `reservation` existe (ver cálculo arriba).
+        if (line.releaseExtra > 0 && line.reservation) {
+          if (line.reservation.branchId) {
+            await this.inventoryService.increment(tx, line.productId, line.reservation.branchId, line.size, line.releaseExtra);
+          } else {
+            await tx.product.update({ where: { id: line.productId }, data: { stock: { increment: line.releaseExtra } } });
+          }
+        }
+
+        // La reserva del carrito ya se convirtió en esta orden (o se liberó su excedente arriba):
+        // se borra para que CartCleanupService no la vuelva a tocar más tarde.
+        if (line.reservation) {
+          await tx.cartItem.delete({ where: { id: line.reservation.id } }).catch(() => undefined);
         }
       }
 

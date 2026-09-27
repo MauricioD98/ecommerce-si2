@@ -11,6 +11,7 @@ export const Permission = {
   VIEW_REPORTS: 'VIEW_REPORTS', // reportes de ventas y consultas dinámicas con IA
   ALL_BRANCHES: 'ALL_BRANCHES', // alcance global: sin este permiso solo se opera sobre la sucursal propia
   USE_POS: 'USE_POS', // caja física (punto de venta) de la sucursal propia
+  PROCESS_RETURNS: 'PROCESS_RETURNS', // punto de devolución: reingresar prendas al stock o a mermas
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];

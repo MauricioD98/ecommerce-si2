@@ -9,6 +9,7 @@ import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { InventoryService } from '../branches/inventory.service';
 
 @Injectable()
 export class PaymentsService {
@@ -20,8 +21,26 @@ export class PaymentsService {
         private invoiceService: InvoiceService,
         private mailService: MailService,
         private notificationsService: NotificationsService,
+        private inventoryService: InventoryService,
     ) {
         this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+    }
+
+    // Los ítems del carrito reservan (descuentan) stock real al agregarse (CartService.addItem).
+    // Si se borran sin pasar por acá (ej. al cerrar el carrito tras un pago), ese stock queda
+    // descontado para siempre porque nadie lo devuelve. Esto pasa con cualquier ítem agregado al
+    // carrito después de crear la orden pero antes de que el pago se confirme.
+    private async releaseCartStock(tx: Prisma.TransactionClient, cartId: string): Promise<void> {
+        const items = await tx.cartItem.findMany({ where: { cartId } });
+        for (const item of items) {
+            if (item.quantity <= 0) continue;
+            if (item.branchId) {
+                await this.inventoryService.increment(tx, item.productId, item.branchId, item.size ?? '', item.quantity);
+            } else {
+                await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
+            }
+        }
+        await tx.cartItem.deleteMany({ where: { cartId } });
     }
 
     async createPaymentIntent(
@@ -239,12 +258,9 @@ export class PaymentsService {
     ]);
 
     if (order.cartId) {
-      await this.prisma.cartItem.deleteMany({
-        where: { cartId: order.cartId },
-      });
-      await this.prisma.cart.update({
-        where: { id: order.cartId },
-        data: { checkout: true },
+      await this.prisma.$transaction(async (tx) => {
+        await this.releaseCartStock(tx, order.cartId!);
+        await tx.cart.update({ where: { id: order.cartId! }, data: { checkout: true } });
       });
     }
 
@@ -253,8 +269,10 @@ export class PaymentsService {
       where: { userId: order.userId, checkout: false },
     });
     for (const c of activeCarts) {
-      await this.prisma.cartItem.deleteMany({ where: { cartId: c.id } });
-      await this.prisma.cart.update({ where: { id: c.id }, data: { checkout: true } });
+      await this.prisma.$transaction(async (tx) => {
+        await this.releaseCartStock(tx, c.id);
+        await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
+      });
     }
 
     // Factura por correo y notificación push: sin await, para no demorar la respuesta del pago
@@ -474,12 +492,9 @@ export class PaymentsService {
     ]);
 
     if (updatedOrder.cartId) {
-      await this.prisma.cartItem.deleteMany({
-        where: { cartId: updatedOrder.cartId },
-      });
-      await this.prisma.cart.update({
-        where: { id: updatedOrder.cartId },
-        data: { checkout: true },
+      await this.prisma.$transaction(async (tx) => {
+        await this.releaseCartStock(tx, updatedOrder.cartId!);
+        await tx.cart.update({ where: { id: updatedOrder.cartId! }, data: { checkout: true } });
       });
     }
 
@@ -487,8 +502,10 @@ export class PaymentsService {
       where: { userId: updatedOrder.userId, checkout: false },
     });
     for (const c of activeCarts) {
-      await this.prisma.cartItem.deleteMany({ where: { cartId: c.id } });
-      await this.prisma.cart.update({ where: { id: c.id }, data: { checkout: true } });
+      await this.prisma.$transaction(async (tx) => {
+        await this.releaseCartStock(tx, c.id);
+        await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
+      });
     }
 
     void this.sendInvoiceEmail(orderId);

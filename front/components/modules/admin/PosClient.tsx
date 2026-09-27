@@ -25,22 +25,19 @@ const PAYMENT_METHODS: { value: PosPaymentMethod; label: string; icon: React.Rea
     { value: 'QR', label: 'QR / Transferencia', icon: <QrCode size={18} /> },
 ];
 
-// Caja física (POS): grid/búsqueda de productos a la izquierda, ticket y cobro a la derecha.
-// Comparte el mismo inventario por sucursal que el e-commerce (GET /products?branchId=...).
 export default function PosClient() {
     const { isGlobal, branchId: cashierBranchId } = useAdminRole();
     const { branches } = useAdminBranches();
     const [selectedBranchId, setSelectedBranchId] = useState('');
-    // Un admin de sucursal usa la suya; Super Admin/global debe elegir una para operar la caja
+
     const effectiveBranchId = isGlobal ? selectedBranchId || null : cashierBranchId;
 
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const { products, isLoading: isLoadingProducts, error: catalogError } = usePosCatalog(effectiveBranchId, search);
+    const { products, isLoading: isLoadingProducts, error: catalogError, refetch: refetchCatalog } = usePosCatalog(effectiveBranchId, search);
 
     const [ticket, setTicket] = useState<TicketLine[]>([]);
-    // Producto que está mostrando su selector de talla (null = ninguno abierto)
     const [pendingSizeProductId, setPendingSizeProductId] = useState<string | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('CASH');
     const [amountReceivedInput, setAmountReceivedInput] = useState('');
@@ -56,25 +53,54 @@ export default function PosClient() {
         debounceRef.current = setTimeout(() => setSearch(value.trim()), 300);
     };
 
-    // El stock por talla lo valida el servidor al cobrar (fuente de verdad); acá solo se usa el
-    // stock agregado del producto como tope aproximado para no dejar sumar de más en la UI.
-    const addToTicket = (product: Product, size: string) => {
-        setCheckoutError(null);
-        setPendingSizeProductId(null);
-        setTicket((prev) => {
-            const existing = prev.find((line) => line.product.id === product.id && line.size === size);
-            if (existing) {
-                if (existing.quantity >= product.stock) return prev;
-                return prev.map((line) =>
-                    line.product.id === product.id && line.size === size ? { ...line, quantity: line.quantity + 1 } : line,
-                );
-            }
-            if (product.stock <= 0) return prev;
-            return [...prev, { product, size, quantity: 1 }];
-        });
+    // El catálogo del POS siempre se pide con sucursal, así que `stockBySize` trae una entrada por
+    // cada talla del producto en esa sucursal, con 0 incluido. Una talla sin entrada no tiene
+    // inventario acá: es 0, nunca el stock global (que suma todas las sucursales y todas las tallas,
+    // y hacía que una talla agotada se viera vendible).
+    const getSizeStock = (product: Product, size: string): number => {
+        const source = product as Product & {
+            inventory?: { sizes?: { size: string; stock: number }[] } | { size: string; stock: number }[] | null;
+        };
+
+        let arrayToSearch: { size: string; stock: number }[] | null = null;
+        if (Array.isArray(source.stockBySize)) arrayToSearch = source.stockBySize;
+        else if (Array.isArray(source.inventory)) arrayToSearch = source.inventory;
+        else if (!Array.isArray(source.inventory) && Array.isArray(source.inventory?.sizes)) {
+            arrayToSearch = source.inventory.sizes;
+        }
+
+        // Con desglose por talla, una talla ausente es 0: nunca el stock global (que suma sucursales).
+        if (arrayToSearch) return arrayToSearch.find((row) => row.size === size)?.stock ?? 0;
+        return product.stock ?? 0;
     };
 
-    // Producto con una sola talla: se agrega directo. Con varias: abre el selector en la tarjeta.
+    const addToTicket = (product: Product, size: string) => {
+        const sizeStock = getSizeStock(product, size);
+        if (sizeStock <= 0) {
+            setCheckoutError(`"${product.name}" no tiene stock en la talla ${size} en esta sucursal.`);
+            return;
+        }
+
+        // El techo de cada línea es el stock de ESA talla, no el del producto entero
+        const existing = ticket.find((line) => line.product.id === product.id && line.size === size);
+        if (existing && existing.quantity >= sizeStock) {
+            setCheckoutError(
+                `Solo ${sizeStock} ${sizeStock === 1 ? 'unidad' : 'unidades'} de "${product.name}" en talla ${size} en esta sucursal.`,
+            );
+            return;
+        }
+
+        setCheckoutError(null);
+        setPendingSizeProductId(null);
+        setTicket((prev) =>
+            existing
+                ? prev.map((line) =>
+                      line.product.id === product.id && line.size === size ? { ...line, quantity: line.quantity + 1 } : line,
+                  )
+                : [...prev, { product, size, quantity: 1 }],
+        );
+    };
+
     const handleCardClick = (product: Product) => {
         if (product.stock <= 0) return;
         if (product.sizes.length <= 1) {
@@ -86,11 +112,14 @@ export default function PosClient() {
 
     const changeQuantity = (productId: string, size: string, delta: number) => {
         setTicket((prev) =>
-            prev.map((line) =>
-                line.product.id === productId && line.size === size
-                    ? { ...line, quantity: Math.min(Math.max(line.quantity + delta, 1), line.product.stock) }
-                    : line,
-            ),
+            prev.map((line) => {
+                if (line.product.id !== productId || line.size !== size) return line;
+                // Techo = stock de esa talla en la sucursal; piso = 1 (para bajar de 1 está el botón
+                // de quitar). El Math.max va al final a propósito: si la talla quedó en 0 mientras el
+                // ticket estaba abierto, el orden inverso dejaba la línea en cantidad 0.
+                const maxForSize = getSizeStock(line.product, line.size);
+                return { ...line, quantity: Math.max(Math.min(line.quantity + delta, maxForSize), 1) };
+            }),
         );
     };
 
@@ -104,7 +133,6 @@ export default function PosClient() {
 
     const amountReceived = amountReceivedInput === '' ? null : Number(amountReceivedInput);
     const change = paymentMethod === 'CASH' && amountReceived !== null ? round2(amountReceived - total) : null;
-    // En efectivo, no se puede cobrar sin un monto recibido que alcance el total
     const cashBlocked = paymentMethod === 'CASH' && (amountReceived === null || amountReceived < total);
 
     const resetTicketState = () => {
@@ -121,9 +149,7 @@ export default function PosClient() {
     const handleCharge = async () => {
         if (ticket.length === 0 || !effectiveBranchId || isCharging || cashBlocked) return;
 
-        // Última barrera en el cliente antes de enviar el cobro: el stock pudo cambiar mientras
-        // se armaba el ticket (otra caja vendió el último), así que se revalida acá también.
-        const invalidLine = ticket.find((line) => line.product.stock <= 0 || line.quantity > line.product.stock);
+        const invalidLine = ticket.find((line) => getSizeStock(line.product, line.size) < line.quantity);
         if (invalidLine) {
             setCheckoutError(
                 `"${invalidLine.product.name}" (${invalidLine.size}) ya no tiene stock suficiente. Quítalo o ajusta la cantidad del ticket.`,
@@ -144,6 +170,12 @@ export default function PosClient() {
             });
             setReceipt(response.data);
             resetTicketState();
+
+            // Retrasamos el refresco medio segundo para darle tiempo a PostgreSQL de guardar la venta
+            setTimeout(() => {
+                refetchCatalog();
+            }, 500);
+
         } catch (error) {
             setCheckoutError(getApiErrorMessage(error, 'No se pudo completar la venta.'));
         } finally {
@@ -177,7 +209,6 @@ export default function PosClient() {
                 <div className={styles.emptyState}>Selecciona una sucursal para empezar a cobrar.</div>
             ) : (
                 <div className={styles.layout}>
-                    {/* Izquierda: buscador + grid de productos */}
                     <div className={styles.catalog}>
                         <div className={styles.searchBar}>
                             <Search size={18} />
@@ -217,16 +248,23 @@ export default function PosClient() {
                                             <div className={styles.sizePicker}>
                                                 <span className={styles.sizePickerLabel}>Talla</span>
                                                 <div className={styles.sizePickerOptions}>
-                                                    {product.sizes.map((size) => (
-                                                        <button
-                                                            key={size}
-                                                            type="button"
-                                                            className={styles.sizePickerOption}
-                                                            onClick={() => addToTicket(product, size)}
-                                                        >
-                                                            {size}
-                                                        </button>
-                                                    ))}
+                                                    {product.sizes.map((size) => {
+                                                        const sizeStock = getSizeStock(product, size);
+                                                        const sizeOutOfStock = sizeStock <= 0;
+                                                        return (
+                                                            <button
+                                                                key={size}
+                                                                type="button"
+                                                                className={`${styles.sizePickerOption} ${sizeOutOfStock ? styles.sizePickerOptionDisabled : ''}`}
+                                                                onClick={() => addToTicket(product, size)}
+                                                                disabled={sizeOutOfStock}
+                                                                aria-disabled={sizeOutOfStock}
+                                                                title={sizeOutOfStock ? `Talla ${size} agotada en esta sucursal` : undefined}
+                                                            >
+                                                                {size} <span className={styles.sizePickerOptionStock}>({sizeStock})</span>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <button
                                                     type="button"
@@ -243,7 +281,6 @@ export default function PosClient() {
                         )}
                     </div>
 
-                    {/* Derecha: ticket, método de pago y cobro */}
                     <aside className={styles.ticket}>
                         <h2 className={styles.ticketTitle}>
                             <ShoppingCart size={18} /> Ticket
@@ -277,7 +314,7 @@ export default function PosClient() {
                                                 type="button"
                                                 className={styles.quantityButton}
                                                 onClick={() => changeQuantity(line.product.id, line.size, 1)}
-                                                disabled={line.quantity >= line.product.stock}
+                                                disabled={line.quantity >= getSizeStock(line.product, line.size)}
                                                 aria-label="Agregar uno"
                                             >
                                                 <Plus size={14} />

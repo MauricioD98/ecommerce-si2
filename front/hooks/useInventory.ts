@@ -7,8 +7,10 @@ import { InventoryItem, InventorySizeStock, ProductDiscountPayload, SetInventory
 
 export interface InventoryRow {
     product: Product;
-    // Suma del stock de todas las tallas
+    // Suma del stock vendible de todas las tallas
     stock: number;
+    // Suma de las mermas (devoluciones en mal estado): existen en la tienda pero no se pueden vender
+    damagedStock: number;
     // Stock por talla (una fila por cada talla que tiene el producto, 0 si no tiene registro todavía)
     sizes: InventorySizeStock[];
     // Descuento del producto en la sucursal (vive en su registro de inventario)
@@ -78,13 +80,14 @@ export function useInventory(branchId: string | null) {
         const inventory = branchId ? inventoryMap[product.id] : undefined;
         // El producto puede tener tallas sin fila de inventario todavía (nunca se les cargó stock):
         // se completan en 0 para que siempre haya un input por cada talla del producto.
-        const sizes: InventorySizeStock[] = product.sizes.map((size) => ({
-            size,
-            stock: inventory?.sizes.find((s) => s.size === size)?.stock ?? 0,
-        }));
+        const sizes: InventorySizeStock[] = product.sizes.map((size) => {
+            const row = inventory?.sizes.find((s) => s.size === size);
+            return { size, stock: row?.stock ?? 0, damagedStock: row?.damagedStock ?? 0 };
+        });
         return {
             product,
             stock: inventory?.stock ?? 0,
+            damagedStock: inventory?.damagedStock ?? 0,
             sizes,
             discountPrice: inventory?.discountPrice ?? null,
             discountPercentage: inventory?.discountPercentage ?? null,

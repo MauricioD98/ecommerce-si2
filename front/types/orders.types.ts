@@ -16,8 +16,9 @@ export interface CreateOrderRequest {
     longitude?: number;
     fulfillmentType: FulfillmentType;
     branchId?: string;
-    // Método de pago para la orden: QR o STRIPE
-    paymentMethod?: "QR" | "STRIPE";
+    // El backend solo valida este campo con @IsIn(['QR']) (CreateOrderDto): enviarlo únicamente para
+    // el flujo QR. Para Stripe se omite (STRIPE es el default del esquema); mandar "STRIPE" aquí da 400.
+    paymentMethod?: "QR";
 }
 
 export interface OrderItemDetail {

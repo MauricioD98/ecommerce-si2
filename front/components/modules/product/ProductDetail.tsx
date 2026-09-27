@@ -1,15 +1,20 @@
 'use client'
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
+import { useRouter, usePathname } from 'next/navigation';
 import { ScanFace } from 'lucide-react';
 import { Product } from '@/types/product.types';
 import styles from './product-detail.module.scss'
 import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/hooks/useAuth';
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 
 export default function ProductDetail({ product }: { product: Product }) {
 
     const { addProductToCart, items } = useCart();
+    const { isAuthenticated } = useAuth();
+    const router = useRouter();
+    const pathname = usePathname();
     const hasDiscount = hasProductDiscount(product);
     const [quantity, setQuantity] = useState(1);
     const [selectedSize, setSelectedSize] = useState<string>("");
@@ -100,6 +105,11 @@ export default function ProductDetail({ product }: { product: Product }) {
     };
 
     const handleAddToCart = () => {
+        // Sin sesión no se reserva nada en el carrito: se manda a iniciar sesión y se vuelve aquí.
+        if (!isAuthenticated) {
+            router.push(`/auth/login?redirect=${encodeURIComponent(pathname)}`);
+            return;
+        }
         if (isInStock && quantity > 0) {
             if (hasSizes && !selectedSize) {
                 alert("Por favor, selecciona una talla");

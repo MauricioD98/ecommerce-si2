@@ -219,6 +219,37 @@
     }
 }
 
+// El stock va en su propia línea, debajo de la letra: en una tablet la talla se sigue leyendo de un
+// golpe y el número no la empuja a lo ancho.
+.sizePickerOptionStock {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+}
+
+.sizePickerOptionDisabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: #f3f4f6;
+    text-decoration: line-through;
+
+    // Sin stock: no hay estado "seleccionado" que mostrar, así que se anula el hover/active de arriba.
+    // Los navegadores igual evalúan :hover sobre un botón `disabled`, así que se repite el gris en vez
+    // de dejar que el shorthand lo devuelva a blanco.
+    &:hover,
+    &:focus-visible,
+    &:active {
+        background: #f3f4f6;
+        color: #000;
+        border-color: var(--border);
+    }
+
+    .sizePickerOptionStock {
+        color: var(--destructive);
+    }
+}
+
 .sizePickerCancel {
     background: none;
     border: none;

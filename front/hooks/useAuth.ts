@@ -7,6 +7,7 @@ import { apiClient } from "@/service/api/axios.config";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { LoginCredential, RegisterCredential } from "@/types/auth.types";
 import { clearAuth, setAuth, setUser } from "@/store/slices/authSlices";
+import { clearAllCart } from "@/store/slices/cartSlice";
 
 
 export function useAuth() {
@@ -19,11 +20,17 @@ export function useAuth() {
         setIsLoading(true);
         setError(null);
         try {
+            // authService.logout() ya captura sus propios errores (sin red, token vencido) y no
+            // relanza: este try/catch es una segunda red de seguridad, no el manejo principal.
             await authService.logout();
         } catch (error) {
+            console.warn("Logout: continuando con el cierre de sesión local a pesar del error:", error);
         } finally {
-            // La sesión local se cierra siempre, aunque el backend no responda
+            // La sesión local se cierra siempre, aunque el backend no responda. El carrito es del
+            // usuario que se va: si no se vacía, la próxima persona en este dispositivo vería (o
+            // podría pagar) los productos de otra cuenta.
             dispatch(clearAuth());
+            dispatch(clearAllCart());
             // El service worker cachea respuestas de la API por URL, sin distinguir de quién son
             // (perfil, pedidos). En un dispositivo compartido, la próxima persona que inicie sesión
             // podría ver por un instante (u offline, del todo) los datos de esta cuenta si no se

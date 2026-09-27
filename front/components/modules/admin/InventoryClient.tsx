@@ -5,8 +5,10 @@ import styles from './admin-table.module.scss';
 import { InventoryRow, useInventory } from '@/hooks/useInventory';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useAdminRole } from '@/hooks/useAdminAccess';
+import { useReturnHistory } from '@/hooks/useReturns';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { ProductDiscountPayload, SetInventoryPayload } from '@/types/admin.types';
+import { ITEM_CONDITION_LABELS, RETURN_REASON_LABELS } from '@/types/returns.types';
 
 const toNumberOrNull = (value: string): number | null => (value.trim() === '' ? null : Number(value));
 const toDraft = (value: number | null): string => (value != null ? String(value) : '');
@@ -17,9 +19,11 @@ interface InventoryRowEditorProps {
     branchName?: string;
     onSave: (productId: string, payload: SetInventoryPayload) => Promise<void>;
     onApplyToAll: (productId: string, discount: ProductDiscountPayload) => Promise<void>;
+    // Abre el historial de devoluciones de esta prenda (pestaña de auditoría)
+    onViewReturns: (productId: string) => void;
 }
 
-function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }: InventoryRowEditorProps) {
+function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, onViewReturns }: InventoryRowEditorProps) {
     const { product } = row;
     // Un draft de stock por talla (clave = talla), en vez de un solo input general
     const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>(
@@ -165,6 +169,26 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
                     ))}
                 </div>
             </td>
+            {/* Mermas: unidades devueltas en mal estado. Van aparte del stock vendible (no se pueden
+                vender) y solo se muestran para auditoría o para dar de baja la prenda. */}
+            <td>
+                {row.damagedStock === 0 ? (
+                    <span className={styles.cellSub}>—</span>
+                ) : (
+                    <div className={styles.cellMain}>
+                        <span className={`${styles.badge} ${styles.badgeDanger}`}>{row.damagedStock} en mermas</span>
+                        <span className={styles.cellSub}>
+                            {row.sizes
+                                .filter((size) => (size.damagedStock ?? 0) > 0)
+                                .map((size) => `${size.size}: ${size.damagedStock}`)
+                                .join(' · ')}
+                        </span>
+                    </div>
+                )}
+                <button type="button" className={styles.linkButton} onClick={() => onViewReturns(product.id)}>
+                    Ver devoluciones
+                </button>
+            </td>
             <td>
                 <div className={styles.actions}>
                     {message && !isDirty && <span className={`${styles.badge} ${styles.badgeSuccess}`}>{message}</span>}
@@ -183,11 +207,113 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll }:
     );
 }
 
+// Auditoría: historial de devoluciones de la sucursal, o de una sola prenda. Una fila por prenda
+// devuelta, con el estado en que volvió (que es lo que decidió si sumó al stock o a las mermas).
+function ReturnsAuditPanel({
+    branchId,
+    productId,
+    productName,
+    onClearProduct,
+}: {
+    branchId: string | null;
+    productId?: string;
+    productName?: string;
+    onClearProduct: () => void;
+}) {
+    const { returns, isLoading, error } = useReturnHistory({ productId, branchId, enabled: !!branchId });
+
+    const rows = returns.flatMap((record) =>
+        record.items.map((item) => ({ record, item, key: item.id })),
+    );
+
+    return (
+        <>
+            {productId && (
+                <div className={styles.toolbar}>
+                    <span className={`${styles.badge} ${styles.badgeInfo}`}>
+                        Solo devoluciones de {productName ?? 'la prenda seleccionada'}
+                    </span>
+                    <button type="button" className={styles.linkButton} onClick={onClearProduct}>
+                        Ver todas las devoluciones
+                    </button>
+                </div>
+            )}
+
+            {error && <div className={styles.errorMessage}>{error}</div>}
+
+            <div className={styles.tableCard}>
+                {isLoading ? (
+                    <div className={styles.loadingState}>Cargando devoluciones...</div>
+                ) : rows.length === 0 ? (
+                    <div className={styles.emptyState}>
+                        {productId
+                            ? 'Esta prenda no tiene devoluciones registradas en esta sucursal.'
+                            : 'Todavía no se registraron devoluciones en esta sucursal.'}
+                    </div>
+                ) : (
+                    <div className={styles.tableWrapper}>
+                        <table className={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Prenda</th>
+                                    <th>Talla</th>
+                                    <th className={styles.numeric}>Cant.</th>
+                                    <th>Motivo</th>
+                                    <th>Estado en que volvió</th>
+                                    <th className={styles.numeric}>Reembolso</th>
+                                    <th>Venta / Devolución</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map(({ record, item, key }) => (
+                                    <tr key={key}>
+                                        <td>{formatDate(record.createdAt)}</td>
+                                        <td>
+                                            <div className={styles.cellMain}>
+                                                <span className={styles.cellTitle}>{item.productName}</span>
+                                                <span className={styles.cellSub}>SKU: {item.sku}</span>
+                                            </div>
+                                        </td>
+                                        <td>{item.size ?? '—'}</td>
+                                        <td className={styles.numeric}>{item.quantity}</td>
+                                        <td>{RETURN_REASON_LABELS[item.reason]}</td>
+                                        <td>
+                                            <span
+                                                className={`${styles.badge} ${item.condition === 'SELLABLE' ? styles.badgeSuccess : styles.badgeDanger}`}
+                                            >
+                                                {ITEM_CONDITION_LABELS[item.condition]}
+                                            </span>
+                                        </td>
+                                        <td className={styles.numeric}>Bs {item.subtotal.toFixed(2)}</td>
+                                        <td>
+                                            <div className={styles.cellMain}>
+                                                <span className={styles.cellSub}>Venta #{record.orderNumber}</span>
+                                                <span className={styles.cellSub}>Atendió: {record.cashierName}</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+}
+
+const formatDate = (value: string) =>
+    new Date(value).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' });
+
 export default function InventoryClient() {
     const { isGlobal, branchId: ownBranchId } = useAdminRole();
     const { branches, isLoading: branchesLoading } = useAdminBranches();
     const [chosenBranchId, setChosenBranchId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    const [activeTab, setActiveTab] = useState<'stock' | 'returns'>('stock');
+    // Prenda cuyo historial se está viendo (se fija al pulsar "Ver devoluciones" en su fila)
+    const [returnsProductId, setReturnsProductId] = useState<string | undefined>(undefined);
 
     // SUPERADMIN elige la sucursal; ADMIN_SUCURSAL queda fijo en la suya
     const branchId = isGlobal ? chosenBranchId ?? branches[0]?.id ?? null : ownBranchId;
@@ -199,6 +325,14 @@ export default function InventoryClient() {
     const visibleRows = term
         ? rows.filter(({ product }) => product.name.toLowerCase().includes(term) || product.sku.toLowerCase().includes(term))
         : rows;
+
+    const viewProductReturns = (productId: string) => {
+        setReturnsProductId(productId);
+        setActiveTab('returns');
+    };
+    const returnsProductName = rows.find(({ product }) => product.id === returnsProductId)?.product.name;
+    // Total de mermas de la sucursal, para tener el dato de auditoría a la vista sin abrir el historial
+    const totalDamaged = rows.reduce((sum, row) => sum + row.damagedStock, 0);
 
     return (
         <div className={styles.page}>
@@ -226,18 +360,45 @@ export default function InventoryClient() {
                             ))}
                         </select>
                     )}
-                    <input
-                        className={styles.input}
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar por nombre o SKU"
-                        aria-label="Buscar producto"
-                    />
+                    {activeTab === 'stock' && (
+                        <input
+                            className={styles.input}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar por nombre o SKU"
+                            aria-label="Buscar producto"
+                        />
+                    )}
                 </div>
+            </div>
+
+            <div className={styles.tabs}>
+                <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === 'stock' ? styles.tabActive : ''}`}
+                    onClick={() => setActiveTab('stock')}
+                >
+                    Stock y ofertas
+                </button>
+                <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === 'returns' ? styles.tabActive : ''}`}
+                    onClick={() => setActiveTab('returns')}
+                >
+                    Devoluciones y mermas{totalDamaged > 0 ? ` (${totalDamaged})` : ''}
+                </button>
             </div>
 
             {error && <div className={styles.errorMessage}>{error}</div>}
 
+            {activeTab === 'returns' ? (
+                <ReturnsAuditPanel
+                    branchId={branchId}
+                    productId={returnsProductId}
+                    productName={returnsProductName}
+                    onClearProduct={() => setReturnsProductId(undefined)}
+                />
+            ) : (
             <div className={styles.tableCard}>
                 {!branchId && !branchesLoading ? (
                     <div className={styles.emptyState}>No hay una sucursal para mostrar el inventario.</div>
@@ -255,6 +416,7 @@ export default function InventoryClient() {
                                     <th>Precio oferta</th>
                                     <th>% descuento</th>
                                     <th>Stock por talla</th>
+                                    <th>Mermas</th>
                                     <th className={styles.numeric}>Acciones</th>
                                 </tr>
                             </thead>
@@ -267,6 +429,7 @@ export default function InventoryClient() {
                                         branchName={branchName}
                                         onSave={saveInventory}
                                         onApplyToAll={applyDiscountToAllBranches}
+                                        onViewReturns={viewProductReturns}
                                     />
                                 ))}
                             </tbody>
@@ -274,6 +437,7 @@ export default function InventoryClient() {
                     </div>
                 )}
             </div>
+            )}
         </div>
     );
 }

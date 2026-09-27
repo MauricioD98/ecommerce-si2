@@ -58,6 +58,9 @@ model User {
  preferredBranch Branch? @relation("PreferredBranch", fields: [preferredBranchId], references: [id], onDelete: SetNull)
  orders Order[]
  cashierOrders Order[] @relation("CashierOrders")
+ // Devoluciones donde figura como cliente, y las que atendió como cajero
+ returns Return[] @relation("CustomerReturns")
+ cashierReturns Return[] @relation("CashierReturns")
  carts Cart[]
  payments Payment[]
  addresses UserAddress[]
@@ -112,6 +115,7 @@ model Product {
   orderItems OrderItem[]
   cartItems CartItem[]
   inventories ProductInventory[]
+  returnItems ReturnItem[]
   // Colecciones a las que pertenece (ej. "Otoño-Invierno", "Nueva Temporada"). Un producto puede
   // estar en varias; relación implícita m2m (Prisma crea la tabla puente sola)
   collections Collection[]
@@ -151,6 +155,9 @@ model Branch {
   orders Order[]
   inventories ProductInventory[]
   exclusiveProducts Product[]
+  cartReservations CartItem[]
+  // Devoluciones recibidas en esta sucursal (su inventario es el que recibe la mercadería)
+  returns Return[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -171,6 +178,11 @@ model ProductInventory {
   // servicio se encarga de sincronizarlos entre filas.
   discountPrice Decimal? @db.Decimal(10, 2)
   discountPercentage Int?
+
+  // Mermas: unidades de esta talla que volvieron por una devolución en mal estado. NO son vendibles y
+  // por eso viven aparte de `stock` (y quedan fuera de Product.stock): existen físicamente en la
+  // sucursal, pero solo para auditoría/baja, nunca para el catálogo ni la caja.
+  damagedStock Int @default(0)
 
   productId String
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -237,6 +249,9 @@ model OrderItem {
   orderId String
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  // Devoluciones de esta línea: su suma es el tope que valida ReturnsService (nunca más de `quantity`)
+  returnItems ReturnItem[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -250,6 +265,13 @@ model CartItem {
   quantity  Int @default(1)
   // Talla elegida (una fila distinta por producto+talla)
   size      String?
+  // Sucursal contra cuyo inventario se reservó (descontó) el stock de este ítem al agregarlo
+  // (CartService.addItem). Null: se agregó sin sucursal elegida y la reserva fue contra el stock
+  // global legado (Product.stock). Se usa para saber a quién devolver el stock al quitar el ítem,
+  // vaciar el carrito o liberarlo por abandono (CartCleanupService) — no tiene por qué coincidir
+  // con la sucursal que el usuario tenga seleccionada más tarde.
+  branchId  String?
+  branch    Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
   productId String
   product Product @relation(fields: [productId], references: [id])
 
@@ -259,6 +281,7 @@ model CartItem {
   @@unique([cartId, productId, size])
   @@index([cartId])
   @@index([productId])
+  @@index([branchId])
   @@map("cart_items")
 
 }
@@ -332,6 +355,8 @@ model Order {
 
   orderItems OrderItem[]
   payment Payment?
+  // Devoluciones procesadas contra esta venta (puede haber varias, parciales)
+  returns Return[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -370,6 +395,95 @@ enum PaymentStatus {
   COMPLETADO
   FALLIDO
   REEMBOLSADO
+}
+
+// Por qué el cliente devolvió la prenda. Es el motivo declarado en mostrador y es independiente del
+// estado físico (ItemCondition): alguien puede devolver por talla equivocada una prenda que llega
+// dañada, y lo que decide si vuelve a venderse es la condición, no el motivo.
+enum ReturnReason {
+  WRONG_SIZE
+  DEFECTIVE
+  CHANGED_MIND
+  OTHER
+}
+
+// Estado físico con el que la prenda vuelve a la sucursal, y lo único que decide a qué inventario entra:
+// SELLABLE suma al stock vendible (ProductInventory.stock), DAMAGED suma a las mermas (damagedStock).
+enum ItemCondition {
+  SELLABLE
+  DAMAGED
+}
+
+// Devolución física procesada en mostrador contra una venta previa (web o POS: ambas son Order).
+// La sucursal es la que RECIBE la mercadería (donde está parado el cliente), que no siempre es la
+// misma que vendió: un pedido web se puede devolver en cualquier tienda, y el stock tiene que
+// aparecer donde la prenda quedó físicamente.
+model Return {
+  id           String  @id @default(uuid())
+  returnNumber String  @unique @default(cuid())
+  // Suma de los reembolsos de sus líneas, calculada siempre en el servidor desde el precio histórico
+  // de cada OrderItem (nunca desde lo que manda el cliente)
+  totalRefunded Decimal @db.Decimal(10, 2)
+  notes        String?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  // Cliente dueño de la orden original
+  userId String
+  user   User   @relation("CustomerReturns", fields: [userId], references: [id])
+
+  // Empleado que atendió la devolución en caja
+  cashierId String
+  cashier   User   @relation("CashierReturns", fields: [cashierId], references: [id])
+
+  items ReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([branchId])
+  @@index([userId])
+  @@index([cashierId])
+  @@index([createdAt])
+  @@map("returns")
+}
+
+// Una línea devuelta. Apunta al OrderItem exacto (no solo al producto) porque es lo que permite
+// validar el tope: nunca se puede devolver más de lo que esa línea vendió, sumando devoluciones
+// anteriores. Una misma línea puede generar varias filas: 2 unidades de vuelta con 1 vendible y 1
+// dañada son dos ReturnItem con distinta `condition`.
+model ReturnItem {
+  id        String  @id @default(uuid())
+  quantity  Int
+  // Talla devuelta: se copia del OrderItem (es la que se vendió), no se acepta del cliente
+  size      String?
+  // Precio unitario histórico al que se vendió, copiado del OrderItem para poder auditar el reembolso
+  // aunque después cambie el precio del producto o su oferta
+  unitPrice Decimal @db.Decimal(10, 2)
+  reason    ReturnReason
+  condition ItemCondition
+
+  returnId String
+  return   Return @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([returnId])
+  @@index([productId])
+  @@index([orderItemId])
+  @@index([condition])
+  @@map("return_items")
 }
 
 // Suscripción Web Push de un navegador/dispositivo. Un usuario puede tener varias (uno por dispositivo)

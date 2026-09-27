@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PosService } from "@/service/api/pos.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Product } from "@/types/product.types";
 
-// Catálogo de productos con stock en la sucursal de la caja (el backend ya filtra por stock > 0
-// y resuelve la sucursal del cajero autenticado), para el grid del POS
 export function usePosCatalog(branchId: string | null, search: string) {
     const [products, setProducts] = useState<Product[]>([]);
     const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const [refreshIndex, setRefreshIndex] = useState(0);
     const key = `${branchId ?? ""}:${search}`;
 
     useEffect(() => {
@@ -32,8 +32,14 @@ export function usePosCatalog(branchId: string | null, search: string) {
         return () => {
             active = false;
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [branchId, search]);
 
-    return { products: branchId ? products : [], isLoading: !!branchId && loadedKey !== key, error };
+    }, [branchId, search, refreshIndex]);
+    const refetch = useCallback(() => setRefreshIndex((n) => n + 1), []);
+
+    return {
+        products: branchId ? products : [],
+        isLoading: !!branchId && loadedKey !== key,
+        error,
+        refetch
+    };
 }

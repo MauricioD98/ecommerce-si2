@@ -8,7 +8,9 @@ export const authService = {
         try {
             await apiClient.post("/auth/logout");
         } catch (error) {
-            console.error("Logout failed", error);
+            // Esperado sin conexión (AxiosError: Network Error) o si el refresh token ya venció:
+            // la sesión local se cierra igual (ver useAuth.logout), así que no es un error fatal.
+            console.warn("No se pudo notificar el logout al backend (se cierra la sesión localmente igual):", error);
         }
     },
     refreshToken: async (refreshToken: string): Promise<string | null> => {

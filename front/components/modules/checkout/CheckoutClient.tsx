@@ -105,11 +105,15 @@ export default function CheckoutClient() {
                     selectedSize: item.selectedSize,
                 }));
 
+                // createOrder (useOrder) ahora lanza con el mensaje EXACTO del backend en vez de
+                // devolver null; si esta línea no lanza, createdOrder siempre viene con datos.
                 const createdOrder = await createOrder({
                     items: cartItems,
                     fulfillmentType,
                     branchId: selectedBranchId ?? undefined,
-                    paymentMethod: selectedPayment === 'qr' ? 'QR' : 'STRIPE',
+                    // El backend solo acepta 'QR' explícito (@IsIn(['QR']) en CreateOrderDto); para
+                    // Stripe hay que omitir el campo, no enviar 'STRIPE' (eso da 400 y aborta la orden).
+                    ...(selectedPayment === 'qr' ? { paymentMethod: 'QR' as const } : {}),
                     ...(!isPickup && deliveryAddress
                         ? {
                             shippingAddress: formatShippingAddress(deliveryAddress),
@@ -119,10 +123,6 @@ export default function CheckoutClient() {
                         : {}),
                 });
 
-                if (!createdOrder) {
-                    throw new Error("No se pudo crear la orden en el servidor.");
-                }
-
                 activeOrderId = createdOrder.id;
                 setOrderId(createdOrder.id);
                 setOrderTotal(Number(createdOrder.total));
@@ -130,7 +130,9 @@ export default function CheckoutClient() {
                 setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
                 return activeOrderId ?? null;
             } catch (error) {
-                console.error("Error al preparar la orden:", error);
+                // error.message es ahora el texto EXACTO devuelto por NestJS (ej. "size should not
+                // be empty"), no un texto genérico fijo — ver useOrder.createOrder.
+                console.error("Error al preparar la orden:", error instanceof Error ? error.message : error);
                 setOrderFailed(true);
                 return null;
             } finally {

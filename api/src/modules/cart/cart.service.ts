@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { Product } from '@prisma/client';
+import { Prisma, Product } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
@@ -74,7 +74,10 @@ export class CartService {
     };
   }
 
-  // Agrega o incrementa la cantidad de un producto (una fila distinta por producto+talla)
+  // Agrega o incrementa la cantidad de un producto (una fila distinta por producto+talla). El
+  // carrito ahora ES una reserva real: agregar descuenta el inventario de inmediato (RN: "reserva
+  // de stock en el carrito"), no solo al pagar. Por eso solo se descuenta la CANTIDAD NUEVA
+  // (`quantity`), nunca el acumulado: lo que ya había en el carrito ya se descontó cuando se agregó.
   async addItem(userId: string, dto: AddCartItemDto) {
     const { productId, quantity, branchId, size } = dto;
 
@@ -89,6 +92,15 @@ export class CartService {
     if (size && !product.sizes.includes(size)) {
       throw new BadRequestException(`Talla inválida. Disponibles: ${product.sizes.join(', ')}`);
     }
+    // Todo producto tiene al menos una talla (CreateProductDto la exige); sin ella no hay dónde
+    // reservar el stock por talla.
+    if (!size && product.sizes.length > 0) {
+      throw new BadRequestException('Debe indicar una talla para este producto');
+    }
+
+    if (branchId) {
+      await this.branchesService.findActiveOrFail(branchId);
+    }
 
     const cart = await this.getOrCreateCart(userId);
 
@@ -97,31 +109,35 @@ export class CartService {
       where: { cartId: cart.id, productId, size: size ?? null },
     });
 
-    const currentQtyInCart = existingItem ? existingItem.quantity : 0;
-    const requestedQty = currentQtyInCart + quantity;
+    await this.prisma.$transaction(async (tx) => {
+      await this.reserveStock(tx, product, quantity, branchId, size);
 
-    await this.assertStock(product, requestedQty, branchId, size);
-
-    if (existingItem) {
-      await this.prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: requestedQty },
-      });
-    } else {
-      await this.prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId,
-          quantity,
-          size,
-        },
-      });
-    }
+      if (existingItem) {
+        await tx.cartItem.update({
+          where: { id: existingItem.id },
+          data: {
+            quantity: { increment: quantity },
+            // Si ya había una reserva de otra sucursal (no debería pasar en el flujo normal, el
+            // carrito se sincroniza con la sucursal elegida), se queda con la más reciente.
+            branchId: branchId ?? existingItem.branchId,
+          },
+        });
+      } else {
+        await tx.cartItem.create({
+          data: { cartId: cart.id, productId, quantity, size, branchId },
+        });
+      }
+      // Marca el carrito como "recién activo": lo usa CartCleanupService para saber qué carritos
+      // llevan más de 1 hora sin movimiento (abandonados) y liberar su stock reservado.
+      await tx.cart.update({ where: { id: cart.id }, data: {} });
+    });
 
     return this.getOrCreateCart(userId, branchId);
   }
 
-  // Actualiza la cantidad exacta de un ítem
+  // Actualiza la cantidad exacta de un ítem: descuenta o devuelve solo la diferencia contra la
+  // sucursal donde realmente se reservó el stock original (item.branchId), no la que venga en el
+  // query de esta llamada puntual.
   async updateItemQuantity(userId: string, itemId: string, dto: UpdateCartItemDto) {
     const cart = await this.getOrCreateCart(userId);
 
@@ -134,17 +150,24 @@ export class CartService {
       throw new NotFoundException('Ítem no encontrado en el carrito');
     }
 
-    await this.assertStock(item.product, dto.quantity, dto.branchId, item.size);
+    const reservationBranchId = item.branchId ?? undefined;
+    const delta = dto.quantity - item.quantity;
 
-    await this.prisma.cartItem.update({
-      where: { id: itemId },
-      data: { quantity: dto.quantity },
+    await this.prisma.$transaction(async (tx) => {
+      if (delta > 0) {
+        await this.reserveStock(tx, item.product, delta, reservationBranchId, item.size);
+      } else if (delta < 0) {
+        await this.releaseStock(tx, item.productId, -delta, reservationBranchId, item.size);
+      }
+
+      await tx.cartItem.update({ where: { id: itemId }, data: { quantity: dto.quantity } });
+      await tx.cart.update({ where: { id: cart.id }, data: {} });
     });
 
-    return this.getOrCreateCart(userId, dto.branchId);
+    return this.getOrCreateCart(userId, dto.branchId ?? reservationBranchId);
   }
 
-  // Elimina un ítem específico
+  // Elimina un ítem específico y devuelve el stock que tenía reservado
   async removeItem(userId: string, itemId: string, branchId?: string) {
     const cart = await this.getOrCreateCart(userId);
 
@@ -156,38 +179,71 @@ export class CartService {
       throw new NotFoundException('Ítem no encontrado en el carrito');
     }
 
-    await this.prisma.cartItem.delete({
-      where: { id: itemId },
+    await this.prisma.$transaction(async (tx) => {
+      if (item.quantity > 0) {
+        await this.releaseStock(tx, item.productId, item.quantity, item.branchId ?? undefined, item.size);
+      }
+      await tx.cartItem.delete({ where: { id: itemId } });
     });
 
     return this.getOrCreateCart(userId, branchId);
   }
 
-  // Vacía el carrito
+  // Vacía el carrito y devuelve el stock reservado de todos sus ítems
   async clearCart(userId: string, branchId?: string) {
     const cart = await this.getOrCreateCart(userId);
 
-    await this.prisma.cartItem.deleteMany({
-      where: { cartId: cart.id },
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of cart.cartItems) {
+        if (item.quantity > 0) {
+          await this.releaseStock(tx, item.productId, item.quantity, item.branchId ?? undefined, item.size);
+        }
+      }
+      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     });
 
     return this.getOrCreateCart(userId, branchId);
   }
 
-  // Valida el stock de la sucursal indicada (por talla si se conoce); sin sucursal usa el stock
-  // global (retrocompatible)
-  private async assertStock(product: Product, requestedQty: number, branchId?: string, size?: string | null) {
-    let available = product.stock;
-
+  // Descuenta `quantity` del inventario real (por sucursal+talla, o del stock global legado sin
+  // sucursal) y lanza 400 si no alcanza. Es la reserva propiamente dicha.
+  private async reserveStock(
+    tx: Prisma.TransactionClient,
+    product: Product,
+    quantity: number,
+    branchId?: string | null,
+    size?: string | null,
+  ): Promise<void> {
     if (branchId) {
-      await this.branchesService.findActiveOrFail(branchId);
-      available = size
-        ? await this.inventoryService.getStockForSize(product.id, branchId, size)
-        : ((await this.inventoryService.getInventory(product.id, branchId))?.stock ?? 0);
+      // InventoryService.decrement ya lanza BadRequestException si no alcanza el stock de esa talla
+      await this.inventoryService.decrement(tx, product.id, branchId, size ?? '', quantity);
+      return;
     }
 
-    if (requestedQty > available) {
-      throw new BadRequestException(`Stock insuficiente. Disponible: ${available}`);
+    const result = await tx.product.updateMany({
+      where: { id: product.id, stock: { gte: quantity } },
+      data: { stock: { decrement: quantity } },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException(`Stock insuficiente. Disponible: ${product.stock}`);
     }
+  }
+
+  // Devuelve `quantity` al inventario (contraparte de reserveStock)
+  private async releaseStock(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    quantity: number,
+    branchId?: string | null,
+    size?: string | null,
+  ): Promise<void> {
+    if (branchId) {
+      await this.inventoryService.increment(tx, productId, branchId, size ?? '', quantity);
+      return;
+    }
+    await tx.product.update({
+      where: { id: productId },
+      data: { stock: { increment: quantity } },
+    });
   }
 }

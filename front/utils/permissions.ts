@@ -12,6 +12,7 @@ export const Permission = {
     VIEW_REPORTS: "VIEW_REPORTS",
     ALL_BRANCHES: "ALL_BRANCHES",
     USE_POS: "USE_POS",
+    PROCESS_RETURNS: "PROCESS_RETURNS",
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];
@@ -28,6 +29,7 @@ export const PERMISSION_OPTIONS: { value: PermissionValue; label: string; descri
     { value: "MANAGE_PRODUCTS", label: "Productos", description: "Catálogo de productos y categorías" },
     { value: "ALL_BRANCHES", label: "Todas las sucursales", description: "Actuar sobre cualquier sucursal, no solo la propia" },
     { value: "USE_POS", label: "Punto de venta", description: "Cobrar ventas físicas en la caja de la sucursal" },
+    { value: "PROCESS_RETURNS", label: "Devoluciones", description: "Recibir devoluciones y reingresarlas al stock o a mermas" },
 ];
 
 export const PERMISSION_LABELS: Record<string, string> = Object.fromEntries(
@@ -45,6 +47,7 @@ const PANEL_PERMISSIONS: PermissionValue[] = [
     Permission.SEND_MARKETING,
     Permission.VIEW_REPORTS,
     Permission.USE_POS,
+    Permission.PROCESS_RETURNS,
 ];
 
 export const SUPER_ADMIN_ROLE = "Super Admin";

@@ -35,6 +35,12 @@ export class InventorySizeStockDto {
 
   @ApiProperty({ example: 10 })
   stock: number;
+
+  @ApiProperty({
+    example: 2,
+    description: 'Unidades en mermas (devueltas en mal estado). No son vendibles ni cuentan en `stock`',
+  })
+  damagedStock: number;
 }
 
 export class InventoryResponseDto {
@@ -44,10 +50,16 @@ export class InventoryResponseDto {
   @ApiProperty()
   branchId: string;
 
-  @ApiProperty({ example: 25, description: 'Suma del stock de todas las tallas' })
+  @ApiProperty({ example: 25, description: 'Suma del stock vendible de todas las tallas' })
   stock: number;
 
-  @ApiProperty({ type: [InventorySizeStockDto], description: 'Stock desglosado por talla' })
+  @ApiProperty({
+    example: 3,
+    description: 'Suma de las mermas de todas las tallas (devoluciones en mal estado, no vendibles)',
+  })
+  damagedStock: number;
+
+  @ApiProperty({ type: [InventorySizeStockDto], description: 'Stock vendible y mermas desglosados por talla' })
   sizes: InventorySizeStockDto[];
 
   @ApiProperty({ example: 'Vestido largo rojo de fiesta' })

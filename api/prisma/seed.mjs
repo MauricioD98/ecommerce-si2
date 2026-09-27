@@ -60,6 +60,7 @@ const ALL_PERMISSIONS = [
   'VIEW_REPORTS',
   'ALL_BRANCHES',
   'USE_POS',
+  'PROCESS_RETURNS',
 ];
 
 const ROLES = [
@@ -67,9 +68,9 @@ const ROLES = [
   {
     name: 'Admin Sucursal',
     description: 'Gestiona empleados, inventario y pedidos de su sucursal',
-    permissions: ['MANAGE_USERS', 'MANAGE_INVENTORY', 'MANAGE_PRODUCTS', 'VIEW_ORDERS', 'SEND_MARKETING', 'VIEW_REPORTS', 'USE_POS'],
+    permissions: ['MANAGE_USERS', 'MANAGE_INVENTORY', 'MANAGE_PRODUCTS', 'VIEW_ORDERS', 'SEND_MARKETING', 'VIEW_REPORTS', 'USE_POS', 'PROCESS_RETURNS'],
   },
-  { name: 'Empleado', description: 'Personal de una sucursal (puede cobrar en caja)', permissions: ['USE_POS'] },
+  { name: 'Empleado', description: 'Personal de una sucursal (puede cobrar en caja y recibir devoluciones)', permissions: ['USE_POS', 'PROCESS_RETURNS'] },
   { name: 'Cliente', description: 'Cliente de la tienda', permissions: [] },
 ];
 

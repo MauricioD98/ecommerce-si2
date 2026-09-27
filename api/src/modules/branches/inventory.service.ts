@@ -22,14 +22,17 @@ export class InventoryService {
   // Stock + descuento de UN producto en una sucursal, sumado entre todas sus tallas. Es lo que
   // usan el catálogo/checkout cuando todavía no importa la talla elegida (ej. mostrar la card).
   async getInventory(productId: string, branchId: string): Promise<InventoryAggregate | null> {
-    const rows = await this.prisma.productInventory.findMany({ where: { productId, branchId } });
-    if (rows.length === 0) return null;
+    const [product, rows] = await Promise.all([
+      this.prisma.product.findUnique({ where: { id: productId }, select: { sizes: true } }),
+      this.prisma.productInventory.findMany({ where: { productId, branchId } }),
+    ]);
+    if (!product) return null;
     return {
       stock: rows.reduce((sum, row) => sum + row.stock, 0),
       // Los descuentos se mantienen sincronizados entre tallas: cualquier fila sirve
-      discountPrice: rows[0].discountPrice,
-      discountPercentage: rows[0].discountPercentage,
-      sizes: rows.map((row) => ({ size: row.size, stock: row.stock })),
+      discountPrice: rows[0]?.discountPrice ?? null,
+      discountPercentage: rows[0]?.discountPercentage ?? null,
+      sizes: this.buildSizeBreakdown(product.sizes, rows),
     };
   }
 
@@ -50,17 +53,53 @@ export class InventoryService {
     productIds: string[],
     branchId: string,
   ): Promise<Record<string, InventoryAggregate>> {
-    const rows = await this.prisma.productInventory.findMany({
-      where: { branchId, productId: { in: productIds } },
-    });
-    const map: Record<string, InventoryAggregate> = {};
+    const [products, rows] = await Promise.all([
+      this.prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true, sizes: true } }),
+      this.prisma.productInventory.findMany({ where: { branchId, productId: { in: productIds } } }),
+    ]);
+
+    const rowsByProduct = new Map<string, ProductInventory[]>();
     for (const row of rows) {
-      const current = map[row.productId] ?? { stock: 0, discountPrice: row.discountPrice, discountPercentage: row.discountPercentage, sizes: [] };
-      current.stock += row.stock;
-      current.sizes.push({ size: row.size, stock: row.stock });
-      map[row.productId] = current;
+      const current = rowsByProduct.get(row.productId) ?? [];
+      current.push(row);
+      rowsByProduct.set(row.productId, current);
+    }
+
+    const map: Record<string, InventoryAggregate> = {};
+    for (const product of products) {
+      const productRows = rowsByProduct.get(product.id) ?? [];
+      map[product.id] = {
+        stock: productRows.reduce((sum, row) => sum + row.stock, 0),
+        // Los descuentos se mantienen sincronizados entre tallas: cualquier fila sirve
+        discountPrice: productRows[0]?.discountPrice ?? null,
+        discountPercentage: productRows[0]?.discountPercentage ?? null,
+        sizes: this.buildSizeBreakdown(product.sizes, productRows),
+      };
     }
     return map;
+  }
+
+  // Desglose por talla que consumen el POS y el catálogo: SIEMPRE trae una entrada por cada talla que
+  // el producto declara, en ese mismo orden, y con stock 0 cuando la sucursal no tiene fila de
+  // inventario para ella. Antes esas tallas simplemente no venían en el arreglo, así que el cliente no
+  // podía distinguir "agotada acá" de "no me mandaron el desglose": terminaba cayendo al stock global
+  // y mostraba como disponible una talla que no se puede vender.
+  private buildSizeBreakdown(
+    declaredSizes: string[],
+    rows: { size: string; stock: number }[],
+  ): { size: string; stock: number }[] {
+    const stockBySize = new Map(rows.map((row) => [row.size, row.stock]));
+    const breakdown = declaredSizes.map((size) => ({ size, stock: stockBySize.get(size) ?? 0 }));
+
+    // Tallas con inventario que ya no figuran entre las del producto (se le quitaron después de
+    // cargarles stock): van al final, para no esconder unidades que siguen físicamente en la tienda.
+    for (const row of rows) {
+      if (!declaredSizes.includes(row.size)) {
+        breakdown.push({ size: row.size, stock: row.stock });
+      }
+    }
+
+    return breakdown;
   }
 
   // Inventario de una sucursal para el panel admin: una fila por producto, con el stock desglosado por talla
@@ -202,6 +241,23 @@ export class InventoryService {
     await this.syncGlobalStock(tx, productId);
   }
 
+  // Devolución en mal estado: la prenda entra a mermas, NO al stock vendible. A propósito no llama a
+  // syncGlobalStock: Product.stock suma solo `stock`, así que estas unidades quedan fuera del catálogo,
+  // de la caja y del carrito, y solo se ven en el reporte de inventario para auditoría o baja.
+  async incrementDamaged(
+    tx: Prisma.TransactionClient,
+    productId: string,
+    branchId: string,
+    size: string,
+    quantity: number,
+  ): Promise<void> {
+    await tx.productInventory.upsert({
+      where: { productId_branchId_size: { productId, branchId, size } },
+      update: { damagedStock: { increment: quantity } },
+      create: { productId, branchId, size, stock: 0, damagedStock: quantity },
+    });
+  }
+
   // Mantiene Product.stock (global, legado) como la suma del stock de todas las sucursales y tallas
   private async syncGlobalStock(tx: Prisma.TransactionClient, productId: string): Promise<void> {
     const { _sum } = await tx.productInventory.aggregate({
@@ -242,10 +298,13 @@ export class InventoryService {
       productId: product.id,
       branchId: rows[0]?.branchId ?? '',
       stock: rows.reduce((sum, row) => sum + row.stock, 0),
+      // Mermas del producto en la sucursal (devoluciones en mal estado). Va aparte de `stock` porque
+      // no es vendible: el panel lo muestra solo para auditoría.
+      damagedStock: rows.reduce((sum, row) => sum + row.damagedStock, 0),
       sizes: rows
         .slice()
         .sort((a, b) => a.size.localeCompare(b.size))
-        .map((row) => ({ size: row.size, stock: row.stock })),
+        .map((row) => ({ size: row.size, stock: row.stock, damagedStock: row.damagedStock })),
       productName: product.name,
       sku: product.sku,
       price: Number(product.price),

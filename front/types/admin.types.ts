@@ -57,14 +57,19 @@ export interface RolePayload {
 export interface InventorySizeStock {
     size: string;
     stock: number;
+    // Unidades en mermas de esa talla (devoluciones en mal estado). No son vendibles.
+    // Opcional porque el payload de escritura (SetInventoryPayload) solo manda el stock vendible.
+    damagedStock?: number;
 }
 
 export interface InventoryItem {
     productId: string;
     branchId: string;
-    // Suma del stock de todas las tallas
+    // Suma del stock vendible de todas las tallas
     stock: number;
-    // Stock desglosado por talla
+    // Suma de las mermas de todas las tallas (no vendibles, solo para auditoría)
+    damagedStock: number;
+    // Stock vendible y mermas desglosados por talla
     sizes: InventorySizeStock[];
     productName: string;
     sku: string;
