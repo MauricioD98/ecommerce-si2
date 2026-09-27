@@ -190,13 +190,18 @@ export class InventoryService {
   }
 
   // Descuenta stock de la talla en la sucursal de forma atómica (falla si no alcanza)
+  // `syncGlobal: false` deja Product.stock sin recalcular: lo usa quien descuenta varias líneas en
+  // una misma transacción y prefiere un solo syncGlobalStockMany() al final, en vez de dos queries
+  // por línea (era lo que hacía que una venta de POS de 5 líneas agotara el timeout de la transacción).
   async decrement(
     tx: Prisma.TransactionClient,
     productId: string,
     branchId: string,
     size: string,
     quantity: number,
+    options: { syncGlobal?: boolean } = {},
   ): Promise<void> {
+    const { syncGlobal = true } = options;
     const result = await tx.productInventory.updateMany({
       where: { productId, branchId, size, stock: { gte: quantity } },
       data: { stock: { decrement: quantity } },
@@ -218,12 +223,12 @@ export class InventoryService {
             data: { stock: { decrement: quantity } },
           });
         }
-        await this.syncGlobalStock(tx, productId);
+        if (syncGlobal) await this.syncGlobalStock(tx, productId);
         return;
       }
       throw new BadRequestException(`Insufficient stock for size ${size} in the selected branch`);
     }
-    await this.syncGlobalStock(tx, productId);
+    if (syncGlobal) await this.syncGlobalStock(tx, productId);
   }
 
   async increment(
@@ -256,6 +261,22 @@ export class InventoryService {
       update: { damagedStock: { increment: quantity } },
       create: { productId, branchId, size, stock: 0, damagedStock: quantity },
     });
+  }
+
+  // Igual que syncGlobalStock pero para varios productos en UNA sola ida a la base, en vez de dos
+  // queries (aggregate + update) por producto. El subselect con COALESCE cubre el caso de un producto
+  // sin ninguna fila de inventario: queda en 0, igual que la versión de a uno.
+  async syncGlobalStockMany(tx: Prisma.TransactionClient, productIds: string[]): Promise<void> {
+    if (productIds.length === 0) return;
+
+    await tx.$executeRaw`
+      UPDATE "products" p
+      SET "stock" = COALESCE(
+        (SELECT SUM(pi."stock") FROM "product_inventories" pi WHERE pi."productId" = p."id"),
+        0
+      )
+      WHERE p."id" IN (${Prisma.join(productIds)})
+    `;
   }
 
   // Mantiene Product.stock (global, legado) como la suma del stock de todas las sucursales y tallas

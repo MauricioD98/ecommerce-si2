@@ -9,22 +9,38 @@ import { CollectionOption } from "@/types/collection.types";
 
 const PAGE_SIZE = 10;
 
-// Catálogo global paginado (incluye productos inactivos) con búsqueda por nombre.
+// Catálogo global paginado con búsqueda por nombre.
 // Con branchId, cada producto trae además su stock específico en esa sucursal (product.stock pasa
 // a ser el de esa sucursal en vez del global legado; ver normalizeProduct en product.service.ts).
-export function useAdminProducts(page: number, search: string, branchId?: string | null) {
+// `includeArchived` controla si la tabla muestra los productos archivados (isActive: false). Por
+// defecto no: eliminar es un soft delete, así que sin este filtro la fila archivada seguiría en la
+// lista y no se vería que "se eliminó".
+export function useAdminProducts(
+    page: number,
+    search: string,
+    branchId?: string | null,
+    includeArchived = false,
+) {
     const [products, setProducts] = useState<Product[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
     const [refreshKey, setRefreshKey] = useState(0);
     const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const key = `${page}|${search}|${branchId ?? ''}|${refreshKey}`;
+    const key = `${page}|${search}|${branchId ?? ''}|${includeArchived}|${refreshKey}`;
 
     useEffect(() => {
         let active = true;
 
-        ProductService.getProducts({ page, limit: PAGE_SIZE, search: search || undefined, branchId: branchId || undefined })
+        ProductService.getProducts({
+            page,
+            limit: PAGE_SIZE,
+            search: search || undefined,
+            branchId: branchId || undefined,
+            // Explícito en los dos casos: la tabla muestra SOLO activos, o SOLO archivados. Nunca
+            // mezclados, así "eliminar" saca la fila de la vista de verdad.
+            isActive: !includeArchived,
+        })
             .then((response) => {
                 if (!active) return;
                 setProducts(response.data);
@@ -41,7 +57,7 @@ export function useAdminProducts(page: number, search: string, branchId?: string
         return () => {
             active = false;
         };
-    }, [page, search, branchId, key]);
+    }, [page, search, branchId, includeArchived, key]);
 
     const refresh = useCallback(() => setRefreshKey((value) => value + 1), []);
 
@@ -56,8 +72,16 @@ export function useAdminProducts(page: number, search: string, branchId?: string
         refresh();
     };
 
+    // Archivar (soft delete). La fila sale del estado local en el acto, sin esperar el refetch: la
+    // tabla muestra o solo activos o solo archivados, así que un producto recién archivado ya no
+    // pertenece a la lista que se está viendo en ninguno de los dos casos. Después se revalida contra
+    // el servidor para que el total y la paginación queden exactos.
     const deleteProduct = async (id: string) => {
         await ProductService.deleteProduct(id);
+
+        setProducts((previous) => previous.filter((product) => product.id !== id));
+        setMeta((previous) => ({ ...previous, total: Math.max(0, previous.total - 1) }));
+
         refresh();
     };
 

@@ -1,0 +1,42 @@
+// Scrollbar delgada y redondeada para los paneles con scroll interno del panel admin.
+// Vive en un partial porque la usan varios módulos (shell del panel y POS) y duplicar las reglas
+// de ::-webkit-scrollbar en cada .module.scss se desincroniza a la primera.
+@mixin thin-scrollbar($thumb: rgba(0, 0, 0, 0.18), $thumb-hover: rgba(0, 0, 0, 0.32)) {
+    // Firefox
+    scrollbar-width: thin;
+    scrollbar-color: $thumb transparent;
+
+    // WebKit / Chromium
+    &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $thumb;
+        border-radius: 999px;
+        // El borde transparente + background-clip deja aire a los lados: el thumb se ve más delgado
+        // de lo que es, pero conserva el área real para agarrarlo con el mouse.
+        border: 2px solid transparent;
+        background-clip: content-box;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: $thumb-hover;
+        background-clip: content-box;
+    }
+}
+
+// Scroll sin barra visible (para carruseles o navs horizontales donde la barra ensucia)
+@mixin hidden-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}

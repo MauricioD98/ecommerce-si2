@@ -444,6 +444,41 @@
     margin-top: 0.5rem;
 }
 
+/* Filtro de la barra de herramientas (ej. "Ver archivados") */
+.inlineCheckbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+
+    input {
+        width: 1rem;
+        height: 1rem;
+        accent-color: #000;
+        cursor: pointer;
+    }
+}
+
+/* Cuerpo del diálogo de confirmación de archivado */
+.confirmBody {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    font-size: 0.9375rem;
+    color: var(--foreground);
+    line-height: 1.5;
+}
+
+.confirmNote {
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+}
+
 /* Paginación */
 .pagination {
     display: flex;

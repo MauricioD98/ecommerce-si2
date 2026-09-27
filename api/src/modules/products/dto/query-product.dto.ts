@@ -21,9 +21,13 @@ export class QueryProductDto {
     description: 'Filter by active status',
     example: true,
   })
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
+  // Se lee `obj[key]` (el valor crudo de la query) y no `value`: el ValidationPipe global corre con
+  // enableImplicitConversion, que ya convirtió el string a boolean con Boolean(), y Boolean('false')
+  // es true. Con `value`, ?isActive=false devolvía los productos ACTIVOS.
+  @Transform(({ obj, key }) => {
+    const raw = (obj as Record<string, unknown>)[key];
+    if (raw === 'true' || raw === true) return true;
+    if (raw === 'false' || raw === false) return false;
     return undefined;
   })
   @IsBoolean()

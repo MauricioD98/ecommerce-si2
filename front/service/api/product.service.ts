@@ -37,6 +37,11 @@ export class ProductService {
         throw new Error('Method not implemented.');
     }
 
+    // Por defecto trae SOLO productos activos. El backend, sin el filtro, devuelve activos y
+    // archivados: es lo que hacía que un producto eliminado (soft delete, isActive: false) siguiera
+    // apareciendo en el catálogo de la tienda y en "productos similares". El default vive acá y no en
+    // cada pantalla para que una vista nueva no tenga que acordarse de pedirlo.
+    // Para ver archivados hay que pedir isActive: false explícitamente (solo el panel admin lo hace).
     static async getProducts(
         params?: ProductQueryParams
     ): Promise<ProductsResponse> {
@@ -46,7 +51,7 @@ export class ProductService {
             meta?: PaginationMeta;
             pagination?: PaginationMeta;
         }>(this.ENDPOINT, {
-            params,
+            params: { ...params, isActive: params?.isActive ?? true },
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
@@ -59,7 +64,8 @@ export class ProductService {
         };
     }
 
-    // Panel admin: recorre todas las páginas del catálogo (incluye productos inactivos).
+    // Panel admin (Inventario): recorre todas las páginas del catálogo. Hereda el default de
+    // getProducts, así que trae SOLO activos: a un producto archivado no se le asigna stock ni oferta.
     // Con branchId, el backend ya filtra por exclusividad de sucursal (globales + los exclusivos de
     // esa sucursal) y trae el stock/descuento de esa sucursal en cada producto.
     static async getAllProducts(branchId?: string | null): Promise<Product[]> {
@@ -89,8 +95,11 @@ export class ProductService {
         return normalizeProduct(response.data);
     }
 
-    static async deleteProduct(id: string): Promise<void> {
-        await apiClient.delete(`${this.ENDPOINT}/${id}`);
+    // Soft delete: el backend no borra la fila, pone isActive en false y devuelve el producto archivado
+    // (sirve para actualizar la tabla sin volver a pedir la página entera)
+    static async deleteProduct(id: string): Promise<Product | null> {
+        const response = await apiClient.delete<{ message?: string; data?: RawProduct }>(`${this.ENDPOINT}/${id}`);
+        return response.data?.data ? normalizeProduct(response.data.data) : null;
     }
 
     // Solo SUPERADMIN: aplica el descuento a este producto en todas las sucursales

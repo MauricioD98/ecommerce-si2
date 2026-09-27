@@ -1,7 +1,20 @@
+@use '../../../styles/scrollbars' as scroll;
+
+// El POS llena el alto que le da .content del shell y no lo desborda: el scroll queda adentro del
+// catálogo y del ticket. Por eso .content nunca scrollea cuando estás en esta pantalla.
 .page {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    height: 100%;
+    min-height: 0;
+
+    // Abajo de 960px el layout es de una sola columna: forzar alturas fijas dejaría el catálogo y el
+    // ticket en dos ventanitas de 200px. Ahí conviene que scrollee la pantalla completa.
+    @media (max-width: 959px) {
+        height: auto;
+        min-height: 0;
+    }
 }
 
 .pageHeader {
@@ -10,6 +23,7 @@
     justify-content: space-between;
     gap: 1rem;
     flex-wrap: wrap;
+    flex-shrink: 0;
 
     h1 {
         font-size: 1.75rem;
@@ -52,21 +66,29 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;
-    align-items: start;
 
     @media (min-width: 960px) {
-        grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+        // flex:1 + min-height:0 = las dos columnas miden exactamente el alto que sobra debajo del
+        // encabezado. `align-items: start` (lo que había) las dejaba del alto de su contenido, que es
+        // justo lo que hacía crecer la página y arrastrar el menú lateral.
+        flex: 1;
+        min-height: 0;
+        grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+        align-items: stretch;
     }
 }
 
-/* Columna izquierda: buscador + grid de productos */
+/* Columna central: buscador fijo arriba + grid de productos con su propio scroll */
 .catalog {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    min-height: 0;
 }
 
+// El buscador nunca se va con el scroll: el cajero teclea sin tener que volver arriba
 .searchBar {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 0.625rem;
@@ -99,10 +121,27 @@
     }
 }
 
+// Única parte de la columna central que scrollea. El padding-right deja que la scrollbar no se monte
+// encima de las tarjetas de la última columna.
+.catalogScroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    @include scroll.thin-scrollbar;
+
+    @media (max-width: 959px) {
+        overflow-y: visible;
+        padding-right: 0;
+    }
+}
+
 .productGrid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 0.75rem;
+    // El selector de talla se abre encima de la tarjeta: sin esto, la primera fila lo recorta
+    align-content: start;
 }
 
 .productCard {
@@ -261,9 +300,9 @@
 }
 
 /* Columna derecha: ticket */
+// Panel derecho: alto completo y estático. Ya no usa `position: sticky` — con el shell de alto fijo
+// no hay nada que "seguir", el panel simplemente mide lo mismo que su columna.
 .ticket {
-    position: sticky;
-    top: 1rem;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -271,9 +310,17 @@
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
+
+    @media (min-width: 960px) {
+        height: 100%;
+        min-height: 0;
+        // Recorta a los hijos para que el footer del ticket quede siempre pegado abajo del panel
+        overflow: hidden;
+    }
 }
 
 .ticketTitle {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -282,12 +329,37 @@
     color: var(--foreground);
 }
 
+// Zona con scroll del ticket: líneas, datos de factura y método de pago. Todo lo que puede crecer.
+// Se incluye acá y no solo las líneas porque en una laptop de 768px de alto, dejar los 3 botones de
+// pago + los 2 campos de factura fijos no deja aire para ver ni un ítem del ticket.
+.ticketScroll {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding-right: 0.25rem;
+
+    @media (min-width: 960px) {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        @include scroll.thin-scrollbar;
+    }
+}
+
+// Totales y botón de cobrar: nunca se mueven, el cajero siempre los ve
+.ticketFooter {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
 .ticketLines {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    max-height: 320px;
-    overflow-y: auto;
 }
 
 .ticketLine {

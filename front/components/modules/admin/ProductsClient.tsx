@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import styles from './admin-table.module.scss';
+import AdminModal from './AdminModal';
 import ProductFormModal from './ProductFormModal';
 import { useAdminProducts, useCategoryOptions, useCollectionOptions } from '@/hooks/useAdminProducts';
 import { useAdminRole } from '@/hooks/useAdminAccess';
@@ -23,10 +24,15 @@ export default function ProductsClient() {
     const { branches } = useAdminBranches();
     const activeBranchName = branches.find((branch) => branch.id === ownBranchId)?.name;
 
+    // Los archivados no se muestran por defecto: eliminar los saca de la vista, pero siguen
+    // recuperables activando este filtro y editándolos
+    const [showArchived, setShowArchived] = useState(false);
+
     const { products, meta, error, isLoading, createProduct, updateProduct, deleteProduct } = useAdminProducts(
         page,
         search,
         isGlobal ? null : ownBranchId,
+        showArchived,
     );
     const { categories } = useCategoryOptions();
     const { collections } = useCollectionOptions();
@@ -34,6 +40,8 @@ export default function ProductsClient() {
     const [editing, setEditing] = useState<Product | null | undefined>(undefined);
     const [actionError, setActionError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
+    // Producto esperando confirmación de archivado (null = no hay diálogo abierto)
+    const [confirmingDelete, setConfirmingDelete] = useState<Product | null>(null);
 
     const handleSearchChange = (value: string) => {
         setSearchInput(value);
@@ -52,23 +60,21 @@ export default function ProductsClient() {
         }
     };
 
-    const handleDelete = async (product: Product) => {
-        if (product.orderCount > 0) {
-            window.alert(
-                `"${product.name}" tiene ${product.orderCount} pedido${product.orderCount === 1 ? '' : 's'} asociado${product.orderCount === 1 ? '' : 's'}. Desactívalo en vez de eliminarlo.`,
-            );
-            return;
-        }
-        if (!window.confirm(`¿Eliminar "${product.name}"?`)) return;
+    // Eliminar es un soft delete (archivar), así que ya no hay nada que bloquear: un producto con
+    // ventas se archiva igual y su histórico queda intacto.
+    const handleConfirmDelete = async () => {
+        const product = confirmingDelete;
+        if (!product) return;
 
         setBusyId(product.id);
         setActionError(null);
         try {
             await deleteProduct(product.id);
+            setConfirmingDelete(null);
             // Si era el único de la última página, se vuelve a la anterior
             if (products.length === 1 && page > 1) setPage(page - 1);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar el producto.'));
+            setActionError(getApiErrorMessage(error, 'No se pudo archivar el producto.'));
         } finally {
             setBusyId(null);
         }
@@ -98,6 +104,17 @@ export default function ProductsClient() {
                         placeholder="Buscar por nombre"
                         aria-label="Buscar producto"
                     />
+                    <label className={styles.inlineCheckbox}>
+                        <input
+                            type="checkbox"
+                            checked={showArchived}
+                            onChange={(e) => {
+                                setShowArchived(e.target.checked);
+                                setPage(1);
+                            }}
+                        />
+                        Ver archivados
+                    </label>
                     <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                         <Plus size={16} />
                         Nuevo producto
@@ -112,7 +129,11 @@ export default function ProductsClient() {
                     <div className={styles.loadingState}>Cargando productos...</div>
                 ) : products.length === 0 ? (
                     <div className={styles.emptyState}>
-                        {search ? `No se encontraron productos para "${search}".` : 'Aún no hay productos en el catálogo.'}
+                        {search
+                            ? `No se encontraron productos para "${search}".`
+                            : showArchived
+                              ? 'No hay productos archivados.'
+                              : 'Aún no hay productos en el catálogo.'}
                     </div>
                 ) : (
                     <>
@@ -174,13 +195,13 @@ export default function ProductsClient() {
                                                     <button
                                                         type="button"
                                                         className={styles.buttonDanger}
-                                                        disabled={busyId === product.id || product.orderCount > 0}
+                                                        disabled={busyId === product.id || product.isActive === false}
                                                         title={
-                                                            product.orderCount > 0
-                                                                ? `Tiene ${product.orderCount} pedido${product.orderCount === 1 ? '' : 's'} asociado${product.orderCount === 1 ? '' : 's'}: desactívalo en vez de eliminarlo`
-                                                                : undefined
+                                                            product.isActive === false
+                                                                ? 'Ya está archivado: reactivalo desde Editar'
+                                                                : 'Archivar: deja de verse en la tienda y en la caja'
                                                         }
-                                                        onClick={() => handleDelete(product)}
+                                                        onClick={() => setConfirmingDelete(product)}
                                                     >
                                                         <Trash2 size={14} />
                                                         Eliminar
@@ -220,6 +241,42 @@ export default function ProductsClient() {
                     onClose={() => setEditing(undefined)}
                     onSubmit={handleSubmit}
                 />
+            )}
+
+            {confirmingDelete && (
+                <AdminModal title="Archivar producto" onClose={() => setConfirmingDelete(null)}>
+                    <div className={styles.confirmBody}>
+                        <p>
+                            ¿Seguro que querés eliminar <strong>{confirmingDelete.name}</strong>?
+                        </p>
+                        <p className={styles.confirmNote}>
+                            Se archiva, no se borra: deja de aparecer en la tienda y en la caja, pero sus
+                            {confirmingDelete.orderCount > 0
+                                ? ` ${confirmingDelete.orderCount} venta${confirmingDelete.orderCount === 1 ? '' : 's'} y devoluciones`
+                                : ' ventas y devoluciones'}{' '}
+                            siguen en el histórico. Podés recuperarlo con <em>Ver archivados</em>.
+                        </p>
+                    </div>
+                    <div className={styles.modalFooter}>
+                        <button
+                            type="button"
+                            className={styles.buttonSecondary}
+                            onClick={() => setConfirmingDelete(null)}
+                            disabled={busyId === confirmingDelete.id}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            className={styles.buttonDanger}
+                            onClick={handleConfirmDelete}
+                            disabled={busyId === confirmingDelete.id}
+                        >
+                            <Trash2 size={14} />
+                            {busyId === confirmingDelete.id ? 'Archivando...' : 'Sí, archivar'}
+                        </button>
+                    </div>
+                </AdminModal>
             )}
         </div>
     );

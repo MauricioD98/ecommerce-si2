@@ -12,6 +12,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
         super({
            adapter,
+           // El default de Prisma es timeout 5s / maxWait 2s, y la base es remota (Neon): cada ida y
+           // vuelta cuesta cientos de ms, así que una venta de POS de 5 líneas se pasaba de 5000 ms
+           // dentro de la transacción y Prisma la abortaba con P2028 → el cliente veía un 500 pelado.
+           // Subirlo es la red de seguridad; el arreglo de verdad es hacer menos queries adentro
+           // (ver PosService.checkout e InventoryService.syncGlobalStockMany).
+           transactionOptions: {
+             maxWait: 10000,
+             timeout: 20000,
+           },
            log:
             process.env.NODE_ENV === 'development'
                 ? ['query', 'error', 'warn']

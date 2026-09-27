@@ -43,6 +43,8 @@ export interface ProductQueryParams {
     search?: string;
     category?: string;
     branchId?: string;
+    // Panel admin: true = solo activos, false = solo archivados. Omitido = ambos
+    isActive?: boolean;
     // Filtros avanzados del catálogo
     collectionSlug?: string;
     sizes?: string[];

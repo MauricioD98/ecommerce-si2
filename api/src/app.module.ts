@@ -22,6 +22,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PosModule } from './modules/pos/pos.module';
 import { ReturnsModule } from './modules/returns/returns.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
 
 
 @Module({
@@ -38,7 +39,7 @@ import { ReturnsModule } from './modules/returns/returns.module';
    ]),
     // Habilita @Cron(...) en toda la app (usado por CartCleanupService para liberar carritos abandonados)
     ScheduleModule.forRoot(),
-    PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule],
+    PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule, ChatbotModule],
   controllers: [AppController],
   providers: [AppService],
 })

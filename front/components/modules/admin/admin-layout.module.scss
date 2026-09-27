@@ -1,6 +1,15 @@
+@use '../../../styles/scrollbars' as scroll;
+
+// El panel se comporta como una app, no como un documento: el alto lo fija el viewport y el scroll
+// vive adentro de cada columna. `overflow: hidden` acá es lo que mata el scroll de la ventana, y es
+// la razón por la que el menú lateral ya no se va para arriba al bajar.
+// 100dvh y no 100vh: en móvil, 100vh mide el viewport SIN la barra del navegador, así que la app
+// quedaba unos 60-80px más alta que la pantalla y aparecía un scroll global igual.
 .shell {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     background: #fafafa;
 
     @media (max-width: 900px) {
@@ -9,24 +18,26 @@
 }
 
 .sidebar {
-    position: sticky;
-    top: 0;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
     width: 260px;
-    height: 100vh;
+    height: 100%;
     padding: 1.5rem 1rem;
     background: #fff;
     border-right: 1px solid var(--border);
+    // Si el rol tiene muchos enlaces y no entran en la pantalla, scrollea el menú, no la página
+    overflow-y: auto;
+    @include scroll.thin-scrollbar;
 
     @media (max-width: 900px) {
-        position: static;
         width: 100%;
         height: auto;
+        flex-shrink: 0;
         padding: 1rem;
         border-right: none;
         border-bottom: 1px solid var(--border);
+        overflow-y: visible;
     }
 }
 
@@ -64,6 +75,8 @@
     @media (max-width: 900px) {
         flex-direction: row;
         overflow-x: auto;
+        // En móvil el menú se desliza en horizontal: la barra ahí solo ensucia, el gesto ya es obvio
+        @include scroll.hidden-scrollbar;
     }
 }
 
@@ -144,10 +157,20 @@
     }
 }
 
+// Única región con scroll del panel. `min-height: 0` es obligatorio: sin eso un hijo flex no puede
+// ser más bajo que su contenido y el overflow se escapa al shell en lugar de scrollear acá.
 .content {
     flex: 1;
     min-width: 0;
+    min-height: 0;
+    height: 100%;
     padding: 2rem;
+    overflow-y: auto;
+    @include scroll.thin-scrollbar;
+
+    @media (max-width: 900px) {
+        height: auto;
+    }
 
     @media (max-width: 640px) {
         padding: 1rem;
@@ -160,7 +183,10 @@
     align-items: center;
     justify-content: center;
     gap: 1rem;
+    // Se renderiza en lugar del shell (early return de AdminShell), así que lleva su propio alto.
+    // dvh por lo mismo que el shell: con 100vh el móvil se pasa de la pantalla y aparece scroll.
     min-height: 100vh;
+    min-height: 100dvh;
     padding: 1rem;
     text-align: center;
     color: var(--muted-foreground);

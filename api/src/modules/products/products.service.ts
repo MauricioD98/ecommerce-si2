@@ -363,31 +363,49 @@ async updateStock(id: string, quantity: number): Promise<ProductResponseDto> {
 }
 
 
-async remove(id: string): Promise<{ message: string }> {
-  const product = await this.prisma.product.findUnique({
+// Soft delete: archivar, nunca borrar la fila.
+//
+// Dos razones. La primera es técnica: un producto queda referenciado por ventas (order_items),
+// carritos (cart_items) y devoluciones (return_items), y ninguna de esas relaciones declara
+// `onDelete`, así que Prisma las protege con Restrict. Un delete físico de un producto ya vendido
+// falla con error de llave foránea. La segunda es de negocio y pesa más: esas filas son el histórico
+// contable. Si se borra el producto, los reportes de ventas pierden la referencia y una devolución
+// sobre una venta vieja se queda sin a qué producto apuntar.
+//
+// `isActive: false` es exactamente el filtro que ya usan el catálogo web, la caja y el carrito, así
+// que archivar saca el producto de circulación sin tocar nada del pasado.
+async remove(id: string): Promise<{ message: string; data: ProductResponseDto }> {
+  const existing = await this.prisma.product.findUnique({
     where: { id },
+    select: { id: true, isActive: true },
+  });
+
+  if (!existing) {
+    throw new NotFoundException('Product not found');
+  }
+
+  // Idempotente: archivar algo ya archivado no es un error, el resultado buscado ya se cumple
+  if (!existing.isActive) {
+    return {
+      message: 'El producto ya estaba archivado',
+      data: await this.findOne(id),
+    };
+  }
+
+  const archived = await this.prisma.product.update({
+    where: { id },
+    data: { isActive: false },
     include: {
-      orderItems: true,
-      cartItems: true,
+      category: true,
+      collections: true,
+      _count: { select: { orderItems: true } },
     },
   });
 
-  if (!product) {
-  throw new NotFoundException('Product not found');
- }
-
-if (product.orderItems.length > 0) {
-  throw new BadRequestException(
-    'No se puede eliminar un producto que tiene pedidos o ventas asociadas. Por favor, desactívalo.',
-  );
- }
-
-await this.prisma.product.delete({
-  where: { id },
-});
-
-return { message: 'Product deleted successfully' };
-
+  return {
+    message: 'Producto archivado: ya no aparece en la tienda ni en la caja',
+    data: this.formatProduct(archived),
+  };
 }
 
 

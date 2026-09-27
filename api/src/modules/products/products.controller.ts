@@ -217,21 +217,22 @@ export class ProductsController {
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: "Delete product (MANAGE_PRODUCTS)"
+    summary: "Archive product / soft delete (MANAGE_PRODUCTS)",
+    description:
+      'No borra la fila: pone isActive en false. El producto queda referenciado por ventas, carritos y ' +
+      'devoluciones (histórico contable), así que un borrado físico rompería el reporte de ventas y las ' +
+      'devoluciones sobre pedidos viejos. Para reactivarlo, PATCH /products/:id con isActive: true.',
   })
   @ApiResponse({
     status: 200,
-    description: "Product deleted successfully"
+    description: "Product archived successfully; returns the archived product",
+    type: ProductResponseDto,
   })
   @ApiResponse({
     status: 404,
     description: "Product not found"
   })
-  @ApiResponse({
-    status: 400,
-    description: "Cannot delete product in active orders"
-  })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
+  async remove(@Param('id') id: string): Promise<{ message: string; data: ProductResponseDto }> {
   return await this.productsService.remove(id);
 }
 }

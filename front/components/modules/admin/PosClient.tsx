@@ -222,6 +222,8 @@ export default function PosClient() {
 
                         {catalogError && <div className={styles.errorMessage}>{catalogError}</div>}
 
+                        {/* Lo único que scrollea de la columna central: el buscador de arriba queda fijo */}
+                        <div className={styles.catalogScroll}>
                         {isLoadingProducts ? (
                             <div className={styles.emptyState}>Cargando productos...</div>
                         ) : products.length === 0 ? (
@@ -279,6 +281,7 @@ export default function PosClient() {
                                 ))}
                             </div>
                         )}
+                        </div>
                     </div>
 
                     <aside className={styles.ticket}>
@@ -286,6 +289,8 @@ export default function PosClient() {
                             <ShoppingCart size={18} /> Ticket
                         </h2>
 
+                        {/* Zona con scroll: líneas del ticket, datos de factura y método de pago */}
+                        <div className={styles.ticketScroll}>
                         {ticket.length === 0 ? (
                             <div className={styles.emptyState}>Agrega productos desde el catálogo.</div>
                         ) : (
@@ -393,20 +398,24 @@ export default function PosClient() {
                         )}
 
                         {checkoutError && <div className={styles.errorMessage}>{checkoutError}</div>}
-
-                        <div className={styles.ticketTotal}>
-                            <span>Total</span>
-                            <span>Bs ${total.toFixed(2)}</span>
                         </div>
 
-                        <button
-                            type="button"
-                            className={styles.chargeButton}
-                            disabled={ticket.length === 0 || isCharging || cashBlocked}
-                            onClick={handleCharge}
-                        >
-                            {isCharging ? 'Cobrando...' : `Cobrar Bs ${total.toFixed(2)}`}
-                        </button>
+                        {/* Anclado abajo: el cajero ve el total y el botón de cobrar sin scrollear */}
+                        <div className={styles.ticketFooter}>
+                            <div className={styles.ticketTotal}>
+                                <span>Total</span>
+                                <span>Bs ${total.toFixed(2)}</span>
+                            </div>
+
+                            <button
+                                type="button"
+                                className={styles.chargeButton}
+                                disabled={ticket.length === 0 || isCharging || cashBlocked}
+                                onClick={handleCharge}
+                            >
+                                {isCharging ? 'Cobrando...' : `Cobrar Bs ${total.toFixed(2)}`}
+                            </button>
+                        </div>
                     </aside>
                 </div>
             )}

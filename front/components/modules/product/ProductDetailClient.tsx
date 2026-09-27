@@ -48,7 +48,10 @@ export default function ProductDetailClient({
         );
     }
 
-    if (error || !product) {
+    // Un producto archivado (soft delete, isActive: false) no se muestra aunque se llegue por enlace
+    // directo: GET /products/:id lo devuelve igual porque el panel admin necesita poder editarlo para
+    // reactivarlo, así que el corte para el público va acá.
+    if (error || !product || product.isActive === false) {
         return (
             <div className={styles.error}>
                 <div className={styles.container}>

@@ -1,7 +1,14 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { FulfillmentType, OrderSource, OrderStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { FulfillmentType, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BranchesService } from '../branches/branches.service';
 import { InventoryService } from '../branches/inventory.service';
@@ -18,6 +25,8 @@ const WALK_IN_CUSTOMER_EMAIL = 'consumidor-final@pos.stellafemme.internal';
 
 @Injectable()
 export class PosService {
+  private readonly logger = new Logger(PosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly branchesService: BranchesService,
@@ -61,11 +70,49 @@ export class PosService {
       ? await this.getRegisteredCustomer(dto.customerId)
       : await this.getOrCreateWalkInCustomer();
 
-    // Precios y stock siempre desde la BD, con el descuento vigente de esta sucursal (nunca del cliente)
+    // Precios y stock siempre desde la BD, con el descuento vigente de esta sucursal (nunca del cliente).
+    // Se lee TODO de una vez (2 queries) en lugar de 4 por línea: con la base remota, esas 4 idas y
+    // vueltas por ítem hacían que una venta de 5 líneas tardara ~10s en total.
+    const productIds = [...new Set(dto.items.map((item) => item.productId))];
+    const [products, inventoryRows] = await Promise.all([
+      this.prisma.product.findMany({ where: { id: { in: productIds } } }),
+      this.prisma.productInventory.findMany({ where: { branchId, productId: { in: productIds } } }),
+    ]);
+
+    const productById = new Map(products.map((product) => [product.id, product]));
+    const stockByProductSize = new Map<string, number>();
+    const discountByProduct = new Map<string, { discountPrice: Prisma.Decimal | null; discountPercentage: number | null }>();
+
+    for (const row of inventoryRows) {
+      stockByProductSize.set(`${row.productId}|${row.size}`, row.stock);
+      // El descuento se mantiene sincronizado entre las tallas de un mismo producto+sucursal, así que
+      // la primera fila que aparezca ya lo representa (mismo criterio que InventoryService.getInventory)
+      if (!discountByProduct.has(row.productId)) {
+        discountByProduct.set(row.productId, {
+          discountPrice: row.discountPrice,
+          discountPercentage: row.discountPercentage,
+        });
+      }
+    }
+
+    // Cantidad total pedida de cada producto+talla. Se agrupa ANTES de validar porque si el ticket
+    // manda dos líneas de la misma talla, validarlas por separado deja pasar una venta que después no
+    // tiene stock (cada línea cabía sola, las dos juntas no).
+    const requested = new Map<string, { productId: string; size: string; quantity: number }>();
+    for (const item of dto.items) {
+      const key = `${item.productId}|${item.size}`;
+      const accumulated = requested.get(key);
+      requested.set(key, {
+        productId: item.productId,
+        size: item.size,
+        quantity: (accumulated?.quantity ?? 0) + item.quantity,
+      });
+    }
+
     const lines: { productId: string; productName: string; quantity: number; unitPrice: number; size: string }[] = [];
 
     for (const item of dto.items) {
-      const product = await this.prisma.product.findUnique({ where: { id: item.productId } });
+      const product = productById.get(item.productId);
       if (!product || !product.isActive) {
         throw new NotFoundException(`Product with ID ${item.productId} not found`);
       }
@@ -74,23 +121,23 @@ export class PosService {
         throw new BadRequestException(`Invalid size for product ${product.name}. Available: ${product.sizes.join(', ')}`);
       }
 
-      const inventoryForSize = await this.inventoryService.getInventoryForSize(product.id, branchId, item.size);
-      if ((inventoryForSize?.stock ?? 0) < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for size ${item.size} of product ${product.name}. Available: ${inventoryForSize?.stock ?? 0}, Requested: ${item.quantity}`,
-        );
-      }
-
-      // El descuento sigue siendo agregado (igual en todas las tallas)
-      const inventoryAggregate = await this.inventoryService.getInventory(product.id, branchId);
-
       lines.push({
         productId: product.id,
         productName: product.name,
         quantity: item.quantity,
-        unitPrice: getBranchPrice(product, inventoryAggregate),
+        unitPrice: getBranchPrice(product, discountByProduct.get(product.id) ?? null),
         size: item.size,
       });
+    }
+
+    for (const line of requested.values()) {
+      const available = stockByProductSize.get(`${line.productId}|${line.size}`) ?? 0;
+      if (available < line.quantity) {
+        const product = productById.get(line.productId);
+        throw new BadRequestException(
+          `Insufficient stock for size ${line.size} of product ${product?.name ?? line.productId}. Available: ${available}, Requested: ${line.quantity}`,
+        );
+      }
     }
 
     const { subtotal, discountApplied, total } = calculateTotals(
@@ -112,7 +159,9 @@ export class PosService {
       change = round2(dto.amountReceived - total);
     }
 
-    const order = await this.prisma.$transaction(async (tx) => {
+    let order: { id: string; orderNumber: string; createdAt: Date };
+    try {
+      order = await this.prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
           userId: customer.id,
@@ -140,12 +189,33 @@ export class PosService {
         },
       });
 
-      for (const line of lines) {
-        await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity);
+      // Un updateMany condicional por talla (la garantía atómica contra sobreventa) y UN solo
+      // recálculo del stock global al final, en vez de dos queries extra por línea.
+      for (const line of requested.values()) {
+        await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity, {
+          syncGlobal: false,
+        });
       }
+      await this.inventoryService.syncGlobalStockMany(tx, productIds);
 
       return newOrder;
-    });
+      });
+    } catch (error) {
+      // Las excepciones HTTP ya son mensajes pensados para el cajero (stock insuficiente, monto que no
+      // alcanza): se dejan pasar tal cual. Cualquier otra cosa es un fallo real que el cliente veía
+      // como "Internal server error" sin ningún detalle, así que acá queda registrado con contexto.
+      if (error instanceof HttpException) throw error;
+
+      const prismaCode = (error as { code?: string })?.code;
+      this.logger.error(
+        `Falló el cobro en caja: sucursal ${branchId}, ${dto.items.length} línea(s), método ${dto.paymentMethod}` +
+          (prismaCode ? ` — código Prisma ${prismaCode}` : ''),
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new InternalServerErrorException(
+        'No se pudo registrar la venta. No se descontó stock ni se cobró: volvé a intentar.',
+      );
+    }
 
     return {
       success: true,

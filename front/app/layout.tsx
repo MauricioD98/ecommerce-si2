@@ -1,6 +1,7 @@
 import { poppins } from "./fonts"; // Ajusta esta ruta de importación
 import "./globals.css";
 import Providers from "@/providers";
+import BotpressChat from "@/components/modules/chatbot/BotpressChat";
 import type { Metadata, Viewport } from "next";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${poppins.variable}`}>
         <Providers>{children}</Providers>
+        <BotpressChat />
       </body>
     </html>
   );
