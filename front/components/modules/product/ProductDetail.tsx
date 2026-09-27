@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { ScanFace } from 'lucide-react';
 import { Product } from '@/types/product.types';
 import styles from './product-detail.module.scss'
+import VirtualTryOnModal from './VirtualTryOnModal';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
@@ -18,6 +19,7 @@ export default function ProductDetail({ product }: { product: Product }) {
     const hasDiscount = hasProductDiscount(product);
     const [quantity, setQuantity] = useState(1);
     const [selectedSize, setSelectedSize] = useState<string>("");
+    const [isTryOnOpen, setIsTryOnOpen] = useState(false);
     const hasSizes = !!product.sizes && product.sizes.length > 0;
 
     // Stock base por talla en la sucursal elegida
@@ -100,8 +102,14 @@ export default function ProductDetail({ product }: { product: Product }) {
     };
 
     // Placeholder: el probador virtual aún no existe. No toca el carrito ni la talla elegida
+    // El probador cuesta por segundo generado, así que la sesión se abre solo con el modal montado:
+    // desmontarlo corta el WebRTC y apaga la cámara (ver el cleanup de VirtualTryOnModal).
     const handleTryOn = () => {
-        alert('Próximamente: Probador Virtual');
+        if (!isAuthenticated) {
+            router.push(`/auth/login?redirect=${encodeURIComponent(pathname)}`);
+            return;
+        }
+        setIsTryOnOpen(true);
     };
 
     const handleAddToCart = () => {
@@ -208,13 +216,15 @@ export default function ProductDetail({ product }: { product: Product }) {
                         </button>
                         <button type="button" className={styles.tryOnButton} onClick={handleTryOn}>
                             <ScanFace size={20} />
-                            Probador Virtual 3D
-                            <span className={styles.tryOnBadge}>Próximamente</span>
+                            Probarme virtualmente
+                            <span className={styles.tryOnBadge}>15s</span>
                         </button>
                         <p className={styles.sku}>SKU: {product.sku}</p>
                     </div>
                 </div>
             </div>
+
+            {isTryOnOpen && <VirtualTryOnModal product={product} onClose={() => setIsTryOnOpen(false)} />}
         </section>
 
     );

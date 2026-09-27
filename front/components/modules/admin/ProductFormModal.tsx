@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Box } from 'lucide-react';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -234,16 +233,6 @@ export default function ProductFormModal({ product, categories, collections, isG
                         />
                     )}
                     {previewFailed && <small>No se pudo cargar la imagen. Revisa la URL.</small>}
-
-                    {/* Placeholder: la carga de modelos 3D aún no existe */}
-                    <button
-                        type="button"
-                        className={styles.beta3dButton}
-                        onClick={() => window.alert('La carga de modelos 3D estará disponible próximamente')}
-                    >
-                        <Box size={18} />
-                        Cargar modelo 3D (BETA)
-                    </button>
                 </div>
 
                 <label className={styles.checkbox}>
