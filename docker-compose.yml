@@ -34,6 +34,7 @@ services:
       PORT: 3000
       NEXT_PUBLIC_API_URL: http://localhost:3001/api/v1
       NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_51UIJqOEZbg8keB70wHRqFCaUjPnbgCeHD7oOsy3JrE9G9GSCYvSCv4QmwsvjqoqwBDdkEaSdUX2cz7lZb6DqX9vT00zW3pyuBf
+      DECART_API_KEY: dct_probador_JVDugbzZMLTVeTjwCVWniRymaFiymafwHghKUKRzdNrhRRxIeHGkRqRVIssPvjFB
     depends_on:
       - api
     networks:
