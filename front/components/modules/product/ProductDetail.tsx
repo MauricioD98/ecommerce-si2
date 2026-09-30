@@ -113,11 +113,6 @@ export default function ProductDetail({ product }: { product: Product }) {
     };
 
     const handleAddToCart = () => {
-        // Sin sesión no se reserva nada en el carrito: se manda a iniciar sesión y se vuelve aquí.
-        if (!isAuthenticated) {
-            router.push(`/auth/login?redirect=${encodeURIComponent(pathname)}`);
-            return;
-        }
         if (isInStock && quantity > 0) {
             if (hasSizes && !selectedSize) {
                 alert("Por favor, selecciona una talla");

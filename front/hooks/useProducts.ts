@@ -1,9 +1,14 @@
 import { useState, useCallback } from "react";
 import { Product, ProductQueryParams, ProductsResponse } from "../types/product.types";
-import { ProductService } from "../service/api/product.service"
+import { ProductService } from "../service/api/product.service";
+import {
+    saveCatalogProducts,
+    saveCachedProduct,
+    getCachedProductById,
+    getAllCachedProducts,
+} from "../utils/productStorage";
 
 export function useProducts() {
-
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [products, setProducts] = useState<Product[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -11,11 +16,10 @@ export function useProducts() {
         total: 0,
         page: 1,
         limit: 10,
-        totalPages: 1
+        totalPages: 1,
     });
 
-    const [product, setProduct] = useState<Product | null>(null)
-
+    const [product, setProduct] = useState<Product | null>(null);
 
     const getProducts = useCallback(
         async (params?: ProductQueryParams): Promise<ProductsResponse | null> => {
@@ -26,12 +30,33 @@ export function useProducts() {
                 const response = await ProductService.getProducts(params);
                 setProducts(response.data);
                 setMeta(response.pagination);
+                saveCatalogProducts(response.data);
                 return response;
-
             } catch (error) {
+                // Fallback offline: si falla la red, intentar cargar productos guardados previamente
+                const cached = getAllCachedProducts();
+                if (cached.length > 0) {
+                    setProducts(cached);
+                    setMeta({
+                        total: cached.length,
+                        page: 1,
+                        limit: cached.length,
+                        totalPages: 1,
+                    });
+                    setError(null);
+                    return {
+                        data: cached,
+                        pagination: {
+                            total: cached.length,
+                            page: 1,
+                            limit: cached.length,
+                            totalPages: 1,
+                        },
+                    };
+                }
+
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 const message = "Failed to load products: " + errorMessage;
-
                 setError(message);
                 return null;
             } finally {
@@ -50,17 +75,26 @@ export function useProducts() {
                 const response = await ProductService.getProductById(id, branchId);
                 if (response) {
                     setProduct(response);
+                    saveCachedProduct(response);
                     return response;
                 }
                 throw new Error("Product not found");
             } catch (error) {
+                // Fallback offline: buscar el producto en el almacenamiento local
+                const local = getCachedProductById(id);
+                if (local) {
+                    setProduct(local);
+                    setError(null);
+                    return local;
+                }
                 const message = "Failed to load product: " + error;
                 setError(message);
                 return null;
             } finally {
                 setIsLoading(false);
             }
-        }, []
+        },
+        []
     );
 
 

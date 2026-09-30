@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { CloudOff, RefreshCw } from 'lucide-react';
 import styles from './admin-table.module.scss';
 import { InventoryRow, useInventory } from '@/hooks/useInventory';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { useReturnHistory } from '@/hooks/useReturns';
+import { useOfflineInventorySync } from '@/hooks/useOfflineInventorySync';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { ProductDiscountPayload, SetInventoryPayload } from '@/types/admin.types';
 import { ITEM_CONDITION_LABELS, RETURN_REASON_LABELS } from '@/types/returns.types';
@@ -17,13 +19,14 @@ interface InventoryRowEditorProps {
     row: InventoryRow;
     isGlobal: boolean;
     branchName?: string;
-    onSave: (productId: string, payload: SetInventoryPayload) => Promise<void>;
+    onSave: (productId: string, payload: SetInventoryPayload, productName?: string) => Promise<{ isOffline: boolean } | void>;
     onApplyToAll: (productId: string, discount: ProductDiscountPayload) => Promise<void>;
     // Abre el historial de devoluciones de esta prenda (pestaña de auditoría)
     onViewReturns: (productId: string) => void;
+    isPendingSync?: boolean;
 }
 
-function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, onViewReturns }: InventoryRowEditorProps) {
+function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, onViewReturns, isPendingSync }: InventoryRowEditorProps) {
     const { product } = row;
     // Un draft de stock por talla (clave = talla), en vez de un solo input general
     const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>(
@@ -93,7 +96,10 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
         }
 
         run(async () => {
-            await onSave(product.id, { sizes, ...result.discount });
+            const res = await onSave(product.id, { sizes, ...result.discount }, product.name);
+            if (res && res.isOffline) {
+                return 'Guardado localmente (sin internet). Se sincronizará con Neon al reconectar.';
+            }
             return 'Guardado';
         });
     };
@@ -123,6 +129,11 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                 <div className={styles.cellMain}>
                     <span className={styles.cellTitle}>{product.name}</span>
                     <span className={styles.cellSub}>SKU: {product.sku}</span>
+                    {isPendingSync && (
+                        <span className={`${styles.badge} ${styles.badgeWarning}`}>
+                            Pendiente de sincronizar con Neon
+                        </span>
+                    )}
                 </div>
             </td>
             <td className={styles.numeric}>Bs {Number(product.price).toFixed(2)}</td>
@@ -320,6 +331,13 @@ export default function InventoryClient() {
     const branchName = branches.find((branch) => branch.id === branchId)?.name;
 
     const { rows, isLoading, error, saveInventory, applyDiscountToAllBranches } = useInventory(branchId);
+    const { pendingCount, pendingUpdates, isSyncing, lastSyncError, lastSyncSuccess, syncNow } = useOfflineInventorySync();
+
+    const pendingProductIds = new Set(
+        pendingUpdates
+            .filter((u) => !branchId || u.branchId === branchId)
+            .map((u) => u.productId)
+    );
 
     const term = search.trim().toLowerCase();
     const visibleRows = term
@@ -371,6 +389,41 @@ export default function InventoryClient() {
                     )}
                 </div>
             </div>
+
+            {pendingCount > 0 && (
+                <div className={styles.syncBanner} style={{ marginBottom: '1rem' }}>
+                    <div className={styles.syncInfo}>
+                        <CloudOff size={18} />
+                        <span>
+                            Tienes <strong>{pendingCount}</strong> cambio(s) de stock guardados localmente sin conexión a internet.
+                        </span>
+                    </div>
+                    <button
+                        type="button"
+                        className={styles.syncButton}
+                        onClick={() => syncNow()}
+                        disabled={isSyncing}
+                    >
+                        <RefreshCw size={14} className={isSyncing ? styles.spinner : ''} />
+                        {isSyncing ? 'Sincronizando con Neon...' : 'Sincronizar ahora'}
+                    </button>
+                </div>
+            )}
+
+            {lastSyncSuccess && (
+                <div
+                    className={`${styles.badge} ${styles.badgeSuccess}`}
+                    style={{ padding: '0.625rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', width: 'fit-content' }}
+                >
+                    {lastSyncSuccess}
+                </div>
+            )}
+
+            {lastSyncError && (
+                <div className={styles.errorMessage} style={{ marginBottom: '1rem' }}>
+                    {lastSyncError}
+                </div>
+            )}
 
             <div className={styles.tabs}>
                 <button
@@ -430,6 +483,7 @@ export default function InventoryClient() {
                                         onSave={saveInventory}
                                         onApplyToAll={applyDiscountToAllBranches}
                                         onViewReturns={viewProductReturns}
+                                        isPendingSync={pendingProductIds.has(row.product.id)}
                                     />
                                 ))}
                             </tbody>

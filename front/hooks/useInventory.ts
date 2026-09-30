@@ -1,9 +1,16 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { InventoryService } from "@/service/api/inventory.service";
 import { ProductService } from "@/service/api/product.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Product } from "@/types/product.types";
 import { InventoryItem, InventorySizeStock, ProductDiscountPayload, SetInventoryPayload } from "@/types/admin.types";
+import {
+    addOfflineInventoryUpdate,
+    cacheBranchInventory,
+    cacheBranchProducts,
+    getCachedBranchInventory,
+    getCachedBranchProducts,
+} from "@/utils/offlineInventoryQueue";
 
 export interface InventoryRow {
     product: Product;
@@ -18,13 +25,7 @@ export interface InventoryRow {
     discountPercentage: number | null;
 }
 
-// Catálogo + stock y descuentos de una sucursal. Los productos sin registro en la sucursal aparecen
-// con stock 0 y sin descuento, porque el endpoint de inventario solo devuelve los que ya tienen fila.
-//
-// El catálogo en sí (qué productos aparecen) se pide con branchId: el backend ya filtra por
-// exclusividad de sucursal (globales + los exclusivos de esta), así que acá no hace falta filtrar
-// nada aparte — antes se pedía con getAllProducts() sin branchId, así que siempre traía TODO el
-// catálogo del sistema sin importar la sucursal elegida.
+// Catálogo + stock y descuentos de una sucursal con soporte offline y caché local
 export function useInventory(branchId: string | null) {
     const [products, setProducts] = useState<Product[]>([]);
     const [productsLoadedFor, setProductsLoadedFor] = useState<string | null>(null);
@@ -32,54 +33,73 @@ export function useInventory(branchId: string | null) {
     const [loadedBranchId, setLoadedBranchId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (!branchId) return;
-        let active = true;
+    const loadProducts = useCallback(async (bId: string, active: () => boolean) => {
+        try {
+            const data = await ProductService.getAllProducts(bId);
+            if (!active()) return;
+            setProducts(data);
+            cacheBranchProducts(bId, data);
+        } catch (err) {
+            const cached = getCachedBranchProducts(bId);
+            if (cached && cached.length > 0 && active()) {
+                setProducts(cached);
+            } else if (active()) {
+                setError(getApiErrorMessage(err, "No se pudieron cargar los productos."));
+            }
+        } finally {
+            if (active()) setProductsLoadedFor(bId);
+        }
+    }, []);
 
-        ProductService.getAllProducts(branchId)
-            .then((data) => {
-                if (active) setProducts(data);
-            })
-            .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar los productos."));
-            })
-            .finally(() => {
-                if (active) setProductsLoadedFor(branchId);
-            });
-
-        return () => {
-            active = false;
-        };
-    }, [branchId]);
-
-    useEffect(() => {
-        if (!branchId) return;
-        let active = true;
-
-        InventoryService.getBranchInventory(branchId)
-            .then((items) => {
-                if (!active) return;
-                setInventoryMap(Object.fromEntries(items.map((item) => [item.productId, item])));
+    const loadInventory = useCallback(async (bId: string, active: () => boolean) => {
+        try {
+            const items = await InventoryService.getBranchInventory(bId);
+            if (!active()) return;
+            setInventoryMap(Object.fromEntries(items.map((item) => [item.productId, item])));
+            cacheBranchInventory(bId, items);
+            setError(null);
+        } catch (err) {
+            const cached = getCachedBranchInventory(bId);
+            if (cached && active()) {
+                setInventoryMap(Object.fromEntries(cached.map((item) => [item.productId, item])));
                 setError(null);
-            })
-            .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudo cargar el inventario de la sucursal."));
-            })
-            .finally(() => {
-                if (active) setLoadedBranchId(branchId);
-            });
+            } else if (active()) {
+                setError(getApiErrorMessage(err, "No se pudo cargar el inventario de la sucursal."));
+            }
+        } finally {
+            if (active()) setLoadedBranchId(bId);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!branchId) return;
+        let isActive = true;
+        loadProducts(branchId, () => isActive);
+        return () => {
+            isActive = false;
+        };
+    }, [branchId, loadProducts]);
+
+    useEffect(() => {
+        if (!branchId) return;
+        let isActive = true;
+        loadInventory(branchId, () => isActive);
+
+        const handleSynced = () => {
+            if (branchId) loadInventory(branchId, () => isActive);
+        };
+        window.addEventListener("inventory-synced", handleSynced);
 
         return () => {
-            active = false;
+            isActive = false;
+            window.removeEventListener("inventory-synced", handleSynced);
         };
-    }, [branchId]);
+    }, [branchId, loadInventory]);
 
     const isLoading = !!branchId && (productsLoadedFor !== branchId || loadedBranchId !== branchId);
 
     const rows: InventoryRow[] = products.map((product) => {
         const inventory = branchId ? inventoryMap[product.id] : undefined;
-        // El producto puede tener tallas sin fila de inventario todavía (nunca se les cargó stock):
-        // se completan en 0 para que siempre haya un input por cada talla del producto.
         const sizes: InventorySizeStock[] = product.sizes.map((size) => {
             const row = inventory?.sizes.find((s) => s.size === size);
             return { size, stock: row?.stock ?? 0, damagedStock: row?.damagedStock ?? 0 };
@@ -94,11 +114,71 @@ export function useInventory(branchId: string | null) {
         };
     });
 
-    // Las acciones lanzan el error para que la fila lo muestre
-    const saveInventory = async (productId: string, payload: SetInventoryPayload) => {
-        if (!branchId) return;
-        const updated = await InventoryService.saveInventory(branchId, productId, payload);
-        setInventoryMap((prev) => ({ ...prev, [productId]: updated }));
+    // Guarda el inventario con soporte offline y persistencia inmediata en la UI
+    const saveInventory = async (productId: string, payload: SetInventoryPayload, productName?: string) => {
+        if (!branchId) return { isOffline: false };
+
+        const isOnline = typeof navigator !== "undefined" && navigator.onLine;
+
+        const applyOptimistic = () => {
+            const existing = inventoryMap[productId];
+            const prod = products.find((p) => p.id === productId);
+            const basePrice = prod ? Number(prod.price) : (existing?.price ?? 0);
+            const discountPrice = payload.discountPrice ?? null;
+            const discountPercentage = payload.discountPercentage ?? null;
+
+            let effectivePrice = basePrice;
+            if (discountPrice !== null && discountPrice < effectivePrice) {
+                effectivePrice = discountPrice;
+            } else if (discountPercentage !== null && discountPercentage > 0) {
+                effectivePrice = Math.round(basePrice * (1 - discountPercentage / 100) * 100) / 100;
+            }
+
+            const optimisticItem: InventoryItem = {
+                productId,
+                branchId,
+                productName: prod?.name ?? existing?.productName ?? productName ?? '',
+                sku: prod?.sku ?? existing?.sku ?? '',
+                price: basePrice,
+                effectivePrice,
+                stock: payload.sizes.reduce((sum, s) => sum + s.stock, 0),
+                damagedStock: existing?.damagedStock ?? 0,
+                sizes: payload.sizes.map((s) => ({
+                    size: s.size,
+                    stock: s.stock,
+                    damagedStock: existing?.sizes?.find((x) => x.size === s.size)?.damagedStock ?? 0,
+                })),
+                discountPrice,
+                discountPercentage,
+            };
+
+            setInventoryMap((prev) => {
+                const next = { ...prev, [productId]: optimisticItem };
+                cacheBranchInventory(branchId, Object.values(next));
+                return next;
+            });
+        };
+
+        if (!isOnline) {
+            await addOfflineInventoryUpdate(branchId, productId, payload, productName);
+            applyOptimistic();
+            return { isOffline: true };
+        }
+
+        try {
+            const updated = await InventoryService.saveInventory(branchId, productId, payload);
+            setInventoryMap((prev) => {
+                const next = { ...prev, [productId]: updated };
+                cacheBranchInventory(branchId, Object.values(next));
+                return next;
+            });
+            return { isOffline: false };
+        } catch {
+            // Si la llamada de red falló (sin conexión real), guardar en cola local y actualizar UI
+            await addOfflineInventoryUpdate(branchId, productId, payload, productName);
+            applyOptimistic();
+            return { isOffline: true };
+        }
     };
 
     // Solo SUPERADMIN: el descuento se copia a todas las sucursales; se recarga la sucursal visible

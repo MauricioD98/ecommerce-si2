@@ -9,7 +9,7 @@ export interface OfflineOrder {
 }
 
 const DB_NAME = "stella-femme-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "orders";
 
 const isSupported = () => typeof window !== "undefined" && "indexedDB" in window;
@@ -21,6 +21,9 @@ function openDb(): Promise<IDBDatabase> {
             const db = request.result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 db.createObjectStore(STORE_NAME, { keyPath: "id" });
+            }
+            if (!db.objectStoreNames.contains("inventory_queue")) {
+                db.createObjectStore("inventory_queue", { keyPath: "id" });
             }
         };
         request.onsuccess = () => resolve(request.result);
