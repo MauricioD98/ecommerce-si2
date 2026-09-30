@@ -44,7 +44,10 @@ export async function addOfflineOrder(payload: CreateOrderRequest): Promise<Offl
     if (!isSupported()) throw new Error("IndexedDB no disponible en este navegador");
 
     const order: OfflineOrder = {
-        id: crypto.randomUUID(),
+        id:
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+                ? crypto.randomUUID()
+                : `offline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         payload,
         createdAt: new Date().toISOString(),
         status: "pending",

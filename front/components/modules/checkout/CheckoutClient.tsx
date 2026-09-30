@@ -236,6 +236,9 @@ export default function CheckoutClient() {
             };
 
             await addOfflineOrder(payload);
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('offline-order-added'));
+            }
             clearAllCart();
             router.push('/checkout/offline-success');
         } catch (error) {

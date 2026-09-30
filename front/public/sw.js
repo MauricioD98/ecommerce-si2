@@ -9,7 +9,7 @@
 // nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
 // (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
 
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const API_CACHE = `sf-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;
@@ -22,13 +22,14 @@ const OFFLINE_URL = '/offline';
 // Ruta estática a la que redirige el checkout cuando se guarda un pedido offline (nunca un id
 // dinámico de orden: esa página no existiría en caché la primera vez que se visita sin red).
 const OFFLINE_ORDER_SUCCESS_URL = '/checkout/offline-success';
+const PRECACHE_URLS = ['/', OFFLINE_URL, OFFLINE_ORDER_SUCCESS_URL, '/cart'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(PAGE_CACHE)
-      .then((cache) => cache.addAll([OFFLINE_URL, OFFLINE_ORDER_SUCCESS_URL]))
-      .catch(() => undefined) // best-effort: si falla (ej. build todavía no las sirve), no bloquea la instalación
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .catch(() => undefined) // best-effort: si falla alguna ruta, no bloquea la instalación
       .then(() => self.skipWaiting()),
   );
 });
@@ -49,11 +50,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// El cliente (useAuth().logout()) manda esto al cerrar sesión. api-cache puede tener respuestas de
-// endpoints con datos de UNA persona (perfil, pedidos) — el Cache API las guarda solo por URL, sin
-// distinguir de quién son. Sin este borrado, en un dispositivo compartido la siguiente persona que
-// inicia sesión podría ver, por una fracción de segundo (StaleWhileRevalidate sirve lo cacheado
-// antes de que la red responda) u offline del todo, los datos de la cuenta anterior.
+// El cliente (useAuth().logout() o sincronizador) manda esto para limpiar caché de API
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'CLEAR_USER_CACHE' || event.data?.type === 'CLEAR_API_CACHE') {
     event.waitUntil(caches.delete(API_CACHE));
@@ -61,10 +58,6 @@ self.addEventListener('message', (event) => {
 });
 
 // Respuesta real (no Response.error()) para peticiones internas del router de Next/Turbopack.
-// Diferencia clave: fetch() SE RESUELVE con esto (aunque sea un error), nunca rechaza. Un
-// Response.error() en cambio hace que fetch() rechace con un TypeError "Failed to fetch" sin
-// atrapar — eso es lo que dispara el overlay/crash. El código de Next que pidió estos datos puede
-// inspeccionar response.ok/response.status y decidir con calma en vez de recibir una excepción.
 function controlledFailureResponse() {
   return new Response(JSON.stringify({ error: 'offline' }), {
     status: 503,
@@ -79,63 +72,48 @@ async function networkFirst(request, cacheName, onMiss) {
   const cache = await caches.open(cacheName);
   try {
     const response = await fetch(request, { cache: 'no-cache' });
-    if (response && response.ok) {
+    if (response && (response.ok || response.type === 'opaque')) {
       cache.put(request, response.clone());
     }
     return response;
   } catch {
-    const cached = await cache.match(request);
+    const cached = await cache.match(request, { ignoreVary: true });
     if (cached) return cached;
     return onMiss ? onMiss() : Response.error();
   }
 }
 
 // StaleWhileRevalidate: responde de caché al instante (si existe) y actualiza en segundo plano.
-// `onMiss` es qué devolver si no hay caché Y falla la red (por defecto, Response.error() — falla de
-// red real, correcta para peticiones de datos porque axios/fetch la traduce en un error atrapable
-// por los .catch() de los hooks; para las peticiones RSC del router se le pasa
-// controlledFailureResponse en su lugar, ver más abajo).
 async function staleWhileRevalidate(request, cacheName, onMiss) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, { ignoreVary: true });
   const networkFetch = fetch(request)
     .then((response) => {
-      if (response && response.ok) cache.put(request, response.clone());
+      if (response && (response.ok || response.type === 'opaque')) cache.put(request, response.clone());
       return response;
     })
     .catch(() => undefined);
   return cached || (await networkFetch) || (onMiss ? onMiss() : Response.error());
 }
 
-// CacheFirst: para contenido inmutable (imágenes, fuentes, chunks hasheados de Next). Nunca vuelve
-// a pedirse por red una vez cacheado.
-//
-// Importante: si no está en caché y falla la red (offline), NUNCA se debe devolver el HTML de
-// /offline acá — un <script src> esperando JS que recibe HTML revienta con un SyntaxError en vez
-// de fallar limpio. Response.error() es una respuesta "de red fallida" sin cuerpo: el navegador la
-// trata igual que cualquier carga de recurso caída (el <script>/<img>/<link> dispara su onerror
-// normal), que es exactamente lo que React/Next ya saben manejar.
+// CacheFirst: para contenido inmutable (imágenes, fuentes, chunks hasheados de Next).
+// Soporta respuestas opacas (type === 'opaque') necesarias para imágenes externas (Unsplash, CDN).
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, { ignoreVary: true });
   if (cached) return cached;
 
   try {
     const response = await fetch(request);
-    if (response && response.ok) cache.put(request, response.clone());
+    if (response && (response.ok || response.type === 'opaque')) cache.put(request, response.clone());
     return response;
   } catch {
-    // Los scripts (chunks de Turbopack) pasan por el runtime de carga de módulos de Next, que sabe
-    // reaccionar a una respuesta con status de error; una respuesta real evita el "Failed to fetch"
-    // sin atrapar que sí produce Response.error(). Para imágenes/fuentes no importa (el navegador
-    // ya maneja su onerror igual con cualquiera de las dos), así que se deja Response.error() ahí.
     return request.destination === 'script' ? controlledFailureResponse() : Response.error();
   }
 }
 
 // NetworkFirst para navegación: intenta red primero (contenido fresco); si falla, cae a la última
-// versión vista de esa misma URL; si tampoco existe en caché (nunca se visitó online), sirve
-// OFFLINE_URL en vez de dejar que el navegador muestre su error nativo (ERR_FAILED).
+// versión vista de esa misma URL; si tampoco existe en caché, sirve OFFLINE_URL.
 async function navigateWithOfflineFallback(request, cacheName) {
   const cache = await caches.open(cacheName);
   try {
@@ -143,9 +121,9 @@ async function navigateWithOfflineFallback(request, cacheName) {
     if (response && response.ok) cache.put(request, response.clone());
     return response;
   } catch {
-    const cached = await cache.match(request);
+    const cached = await cache.match(request, { ignoreVary: true });
     if (cached) return cached;
-    const offlinePage = await cache.match(OFFLINE_URL);
+    const offlinePage = await cache.match(OFFLINE_URL, { ignoreVary: true });
     return offlinePage || Response.error();
   }
 }
@@ -161,31 +139,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Toda la API (catálogo, perfil, pedidos, sucursales...): puede ser cross-origin (la API vive en
-  // otro host/puerto que el frontend en dev), por eso se filtra por pathname y no por origin.
-  // NetworkFirst: si hay internet, SIEMPRE pide datos frescos a la red (el stock y precios siempre
-  // están al día); si no hay conexión (offline), sirve la última copia guardada en caché.
+  // Toda la API (catálogo, perfil, pedidos, sucursales...): puede ser cross-origin
   if (url.pathname.startsWith('/api/v1/')) {
     event.respondWith(networkFirst(request, API_CACHE));
     return;
   }
 
-  // manifest.webmanifest: a diferencia de los chunks de _next/static, esta URL NO tiene contenido
-  // hasheado/inmutable (es un nombre fijo), así que sí le sirve revalidar en segundo plano en vez
-  // de quedar pegada a la primera copia para siempre
+  // manifest.webmanifest / manifest.json
   if (url.pathname.endsWith('manifest.webmanifest') || url.pathname.endsWith('manifest.json')) {
     event.respondWith(staleWhileRevalidate(request, ASSET_CACHE));
     return;
   }
 
-  // Imágenes (incluye las de dominios externos: Unsplash, Bing, etc. — el catálogo las trae así),
-  // fuentes y JS/CSS de Next (_next/static, y cualquier script/style por su `destination` aunque no
-  // matchee ese prefijo): contenido con hash en el nombre de archivo, o sea inmutable.
-  // CacheFirst (no StaleWhileRevalidate) a propósito: si el hash no cambió, el contenido tampoco, y
-  // revalidarlo en cada visita sería una petición de red desperdiciada para un archivo que nunca
-  // puede haber cambiado.
+  // Imágenes (incluyendo hosts externos como Unsplash), fuentes, estilos y scripts
+  const isImageFile = url.pathname.match(/\.(png|jpe?g|webp|svg|gif|ico|avif)(\?.*)?$/i);
   if (
     request.destination === 'image' ||
+    Boolean(isImageFile) ||
     request.destination === 'font' ||
     request.destination === 'script' ||
     request.destination === 'style' ||
@@ -195,13 +165,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Peticiones internas del router de Next para navegación del lado del cliente (RSC flight data
-  // del App Router, identificadas por el header `RSC`, o /_next/data/ del Pages Router).
-  // StaleWhileRevalidate igual que el resto: si la ruta ya se visitó online, su RSC queda cacheado y
-  // la transición de cliente funciona offline. Si nunca se visitó, no hay nada que servir — ahí es
-  // importante NO usar Response.error() (rechaza el fetch del router sin atrapar, provoca el
-  // crash/overlay) sino controlledFailureResponse(): el fetch se resuelve con un 503 que el propio
-  // manejo de errores de Next/nuestro Error Boundary sí puede procesar con calma.
+  // Peticiones internas del router de Next para navegación del lado del cliente (RSC flight data)
   if (request.headers.has('rsc') || url.pathname.includes('/_next/data/')) {
     event.respondWith(staleWhileRevalidate(request, PAGE_CACHE, controlledFailureResponse));
     return;

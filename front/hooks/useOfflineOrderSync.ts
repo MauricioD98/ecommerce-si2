@@ -28,16 +28,27 @@ export function useOfflineOrderSync() {
 
         try {
             const orders = await getOfflineOrders();
+            let anySuccess = false;
             // Uno por uno: si un pedido falla (ej. sin stock), no debe bloquear el envío de los demás
             for (const offlineOrder of orders) {
                 try {
                     await OrderService.createOrder(offlineOrder.payload);
                     await removeOfflineOrder(offlineOrder.id);
+                    anySuccess = true;
                 } catch (error) {
                     const message = getApiErrorMessage(error, "No se pudo enviar un pedido guardado en este dispositivo.");
                     await updateOfflineOrder(offlineOrder.id, { status: "failed", lastError: message });
                     failureMessage = message;
                 }
+            }
+
+            // Si se envió al menos un pedido con éxito, se invalida el caché de API y se notifica
+            // a la UI para recargar el stock actualizado del servidor
+            if (anySuccess && typeof window !== "undefined") {
+                if (navigator.serviceWorker?.controller) {
+                    navigator.serviceWorker.controller.postMessage({ type: "CLEAR_API_CACHE" });
+                }
+                window.dispatchEvent(new CustomEvent("inventory-changed"));
             }
         } finally {
             setLastSyncError(failureMessage);
@@ -55,7 +66,11 @@ export function useOfflineOrderSync() {
         refreshCount();
         syncNow();
         window.addEventListener("online", syncNow);
-        return () => window.removeEventListener("online", syncNow);
+        window.addEventListener("offline-order-added", refreshCount);
+        return () => {
+            window.removeEventListener("online", syncNow);
+            window.removeEventListener("offline-order-added", refreshCount);
+        };
     }, [refreshCount, syncNow]);
 
     return { pendingCount, isSyncing, lastSyncError, syncNow };
