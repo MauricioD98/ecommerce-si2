@@ -117,14 +117,21 @@ export class OrdersService {
       const available = targetBranchId && inventoryForSize ? inventoryForSize.stock : product.stock;
 
       const reservation = activeCart?.cartItems.find(
-        (ci) => ci.productId === item.productId && ci.size === item.size,
+        (ci) => ci.productId === item.productId && (ci.size === item.size || !ci.size),
       );
       const reservedQty = reservation?.quantity ?? 0;
-      const consumedFromReservation = Math.min(reservedQty, item.quantity);
-      // Cantidad que todavía no estaba reservada y sí hay que descontar ahora
+
+      // Una reserva previa solo descuenta de esta sucursal si se hizo EXPLÍCITAMENTE en esta sucursal (reservation.branchId === targetBranchId).
+      // Si la reserva fue sin sucursal (branchId: null) o de otra sucursal, no se puede consumir para targetBranchId; hay que descontar
+      // la cantidad requerida de targetBranchId en Neon y liberar la reserva previa para que el stock de la sucursal no quede intacto.
+      const isMatchingBranch = !!(reservation && targetBranchId && reservation.branchId === targetBranchId);
+      const consumedFromReservation = isMatchingBranch ? Math.min(reservedQty, item.quantity) : 0;
+      // Cantidad que todavía no estaba reservada en esta sucursal y sí hay que descontar ahora de Neon
       const toDecrement = item.quantity - consumedFromReservation;
-      // Si había reservado más de lo que finalmente compra, ese excedente se libera
-      const releaseExtra = reservedQty - consumedFromReservation;
+      // Si la reserva no coincidía en sucursal se libera completa; si coincidía, solo el excedente si compró menos
+      const releaseExtra = isMatchingBranch
+        ? reservedQty - consumedFromReservation
+        : (reservation ? reservedQty : 0);
 
       if (available < toDecrement) {
         throw new BadRequestException(

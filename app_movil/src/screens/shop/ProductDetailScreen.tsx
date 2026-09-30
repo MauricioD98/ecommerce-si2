@@ -76,7 +76,7 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       setIsAdding(true);
       const chosenSize = selectedSize || (product as any)?.sizes?.[0] || 'M';
-      await addToCart(product.id, quantity, chosenSize);
+      await addToCart(product.id, quantity, chosenSize, selectedBranchId || undefined);
       Alert.alert(
         '¡Producto añadido!',
         `Se agregaron ${quantity} unidad(es) de ${product.name} (Talla: ${chosenSize}) al carrito.`,

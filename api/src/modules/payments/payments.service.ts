@@ -259,7 +259,9 @@ export class PaymentsService {
 
     if (order.cartId) {
       await this.prisma.$transaction(async (tx) => {
-        await this.releaseCartStock(tx, order.cartId!);
+        // Los ítems comprados son una venta finalizada: se eliminan del carrito y se marca checkout=true.
+        // NUNCA devolver el stock a la tienda (releaseCartStock) porque el cliente ya pagó por ellos.
+        await tx.cartItem.deleteMany({ where: { cartId: order.cartId! } });
         await tx.cart.update({ where: { id: order.cartId! }, data: { checkout: true } });
       });
     }
@@ -269,8 +271,9 @@ export class PaymentsService {
       where: { userId: order.userId, checkout: false },
     });
     for (const c of activeCarts) {
+      if (c.id === order.cartId) continue;
       await this.prisma.$transaction(async (tx) => {
-        await this.releaseCartStock(tx, c.id);
+        await tx.cartItem.deleteMany({ where: { cartId: c.id } });
         await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
       });
     }
@@ -493,7 +496,9 @@ export class PaymentsService {
 
     if (updatedOrder.cartId) {
       await this.prisma.$transaction(async (tx) => {
-        await this.releaseCartStock(tx, updatedOrder.cartId!);
+        // Los ítems comprados son una venta finalizada: se eliminan del carrito y se marca checkout=true.
+        // NUNCA devolver el stock a la tienda (releaseCartStock) porque el cliente ya pagó por ellos.
+        await tx.cartItem.deleteMany({ where: { cartId: updatedOrder.cartId! } });
         await tx.cart.update({ where: { id: updatedOrder.cartId! }, data: { checkout: true } });
       });
     }
@@ -502,8 +507,9 @@ export class PaymentsService {
       where: { userId: updatedOrder.userId, checkout: false },
     });
     for (const c of activeCarts) {
+      if (c.id === updatedOrder.cartId) continue;
       await this.prisma.$transaction(async (tx) => {
-        await this.releaseCartStock(tx, c.id);
+        await tx.cartItem.deleteMany({ where: { cartId: c.id } });
         await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
       });
     }

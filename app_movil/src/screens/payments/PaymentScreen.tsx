@@ -27,7 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
-  const { fetchCart, clearCart } = useCart();
+  const { fetchCart, clearCartLocal } = useCart();
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
     const val = Number(amount);
@@ -151,9 +151,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           setTransactionRef(`QR-${orderId}`);
           setIsSuccess(true);
           try {
-            await clearCart();
-          } catch {
+            clearCartLocal();
             await fetchCart();
+          } catch {
+            // Ignorar
           }
         }
       } catch {
@@ -162,7 +163,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [selectedMethod, orderId, isSuccess, clearCart, fetchCart]);
+  }, [selectedMethod, orderId, isSuccess, clearCartLocal, fetchCart]);
 
   const handleSimulateQrPayment = async () => {
     try {
@@ -171,9 +172,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       setTransactionRef(`QR-${orderId}`);
       setIsSuccess(true);
       try {
-        await clearCart();
-      } catch {
+        clearCartLocal();
         await fetchCart();
+      } catch {
+        // Ignorar
       }
     } catch (err) {
       Alert.alert('Error al simular pago', getErrorMessage(err));
@@ -198,9 +200,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       setTransactionRef(res.data?.transactionId || paymentIntentId);
       setIsSuccess(true);
       try {
-        await clearCart();
-      } catch {
+        clearCartLocal();
         await fetchCart();
+      } catch {
+        // Ignorar
       }
     } catch (err) {
       Alert.alert('Error de Pago', getErrorMessage(err));

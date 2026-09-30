@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Cart } from '../types';
 import { cartApi } from '../api/cart.api';
 import { useAuth } from './AuthContext';
+import { useBranch } from './BranchContext';
 
 interface CartContextType {
   cart: Cart | null;
@@ -9,16 +10,18 @@ interface CartContextType {
   itemCount: number;
   totalAmount: number;
   fetchCart: () => Promise<void>;
-  addToCart: (productId: string, quantity?: number, size?: string) => Promise<void>;
+  addToCart: (productId: string, quantity?: number, size?: string, branchId?: string) => Promise<void>;
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeFromCart: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
+  clearCartLocal: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
+  const { selectedBranchId } = useBranch();
   const [cart, setCart] = useState<Cart | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
@@ -46,10 +49,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [isAuthenticated, fetchCart]);
 
-  const addToCart = async (productId: string, quantity: number = 1, size?: string) => {
+  const addToCart = async (productId: string, quantity: number = 1, size?: string, branchId?: string) => {
     setIsLoading(true);
     try {
-      const updated = await cartApi.addItem({ productId, quantity, size });
+      const finalBranchId = branchId || selectedBranchId || undefined;
+      const updated = await cartApi.addItem({ productId, quantity, size, branchId: finalBranchId });
       setCart(updated);
     } finally {
       setIsLoading(false);
@@ -91,6 +95,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const clearCartLocal = useCallback(() => {
+    setCart(null);
+  }, []);
+
   const itemCount = useMemo(() => {
     if (!cart?.cartItems) return 0;
     return cart.cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -120,6 +128,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateQuantity,
         removeFromCart,
         clearCart,
+        clearCartLocal,
       }}
     >
       {children}

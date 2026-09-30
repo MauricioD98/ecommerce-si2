@@ -49,8 +49,8 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    const pickupBranchId = activeBranch?.id || selectedBranchId;
-    if (fulfillmentType === 'PICKUP' && !pickupBranchId) {
+    const activeBranchId = activeBranch?.id || selectedBranchId || branches[0]?.id;
+    if (fulfillmentType === 'PICKUP' && !activeBranchId) {
       Alert.alert('Sucursal requerida', 'Por favor selecciona la sucursal donde retirarás tu pedido.');
       return;
     }
@@ -74,7 +74,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
         items: itemsPayload,
         shippingAddress: fulfillmentType === 'DELIVERY' ? shippingAddress.trim() : undefined,
         fulfillmentType,
-        branchId: fulfillmentType === 'PICKUP' ? (pickupBranchId || undefined) : undefined,
+        branchId: activeBranchId || undefined,
       });
 
       // Calculate amount safely (supports total from DTO and totalAmount from Prisma)

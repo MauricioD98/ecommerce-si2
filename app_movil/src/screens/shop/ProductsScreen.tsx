@@ -82,8 +82,9 @@ export const ProductsScreen: React.FC = () => {
   const handleAddToCart = async (product: Product) => {
     try {
       setAddingProductId(product.id);
-      await addToCart(product.id, 1);
-      Alert.alert('¡Agregado!', `"${product.name}" se agregó al carrito.`);
+      const chosenSize = (product.sizes && product.sizes.length > 0 ? product.sizes[0] : (product as any)?.sizes?.[0]) || 'M';
+      await addToCart(product.id, 1, chosenSize, selectedBranchId || undefined);
+      Alert.alert('¡Agregado!', `"${product.name}" (Talla: ${chosenSize}) se agregó al carrito.`);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
     } finally {
