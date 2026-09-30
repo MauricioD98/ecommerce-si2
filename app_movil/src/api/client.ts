@@ -44,6 +44,12 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+let onAuthFailureCallback: (() => void) | null = null;
+
+export const setOnAuthFailureCallback = (callback: (() => void) | null) => {
+  onAuthFailureCallback = callback;
+};
+
 // Response interceptor for auto-refresh
 apiClient.interceptors.response.use(
   (response) => response,
@@ -79,7 +85,7 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = await appStorage.getItem(REFRESH_TOKEN_KEY);
         if (!refreshToken) {
-          throw new Error('No refresh token');
+          throw new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
         }
 
         const currentBase = await getApiBaseUrl();
@@ -110,13 +116,21 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch (refreshErr) {
-        processQueue(refreshErr, null);
+        const friendlyErr = new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+        processQueue(friendlyErr, null);
         await Promise.all([
           appStorage.removeItem(ACCESS_TOKEN_KEY),
           appStorage.removeItem(REFRESH_TOKEN_KEY),
           appStorage.removeItem(USER_DATA_KEY),
         ]);
-        return Promise.reject(refreshErr);
+        if (onAuthFailureCallback) {
+          try {
+            onAuthFailureCallback();
+          } catch {
+            // ignore
+          }
+        }
+        return Promise.reject(friendlyErr);
       } finally {
         isRefreshing = false;
       }
@@ -143,7 +157,14 @@ export const getErrorMessage = (error: unknown): string => {
       if (Array.isArray(data.message)) {
         return data.message.join(', ');
       }
+      const msgLower = String(data.message).toLowerCase();
+      if (msgLower.includes('refresh') || msgLower.includes('jwt') || msgLower === 'unauthorized') {
+        return 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
+      }
       return data.message;
+    }
+    if (error.response?.status === 401) {
+      return 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
     }
     if (error.code === 'ECONNABORTED') {
       return 'Tiempo de espera agotado. Verifica tu conexión.';
@@ -151,9 +172,15 @@ export const getErrorMessage = (error: unknown): string => {
     if (error.message === 'Network Error') {
       return 'No se pudo conectar con el servidor. Verifica que la API esté corriendo y la URL sea correcta.';
     }
+    if (error.message?.toLowerCase().includes('refresh token') || error.message === 'No refresh token') {
+      return 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
+    }
     return error.message;
   }
   if (error instanceof Error) {
+    if (error.message?.toLowerCase().includes('refresh token') || error.message === 'No refresh token') {
+      return 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
+    }
     return error.message;
   }
   return 'Ha ocurrido un error inesperado';

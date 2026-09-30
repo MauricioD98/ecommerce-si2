@@ -3,7 +3,7 @@ import { appStorage } from '../utils/storage';
 import { User, LoginPayload, RegisterPayload, UpdateUserPayload } from '../types';
 import { authApi } from '../api/auth.api';
 import { usersApi } from '../api/users.api';
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_DATA_KEY } from '../api/client';
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, USER_DATA_KEY, setOnAuthFailureCallback } from '../api/client';
 
 interface AuthContextType {
   user: User | null;
@@ -24,14 +24,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Escuchar fallos de autenticación (401 sin refresh posible) desde apiClient para resetear la sesión
+  useEffect(() => {
+    setOnAuthFailureCallback(() => {
+      setToken(null);
+      setUser(null);
+    });
+    return () => {
+      setOnAuthFailureCallback(null);
+    };
+  }, []);
+
   // Restore session from AsyncStorage
   const loadStoredSession = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [storedToken, storedUser] = await Promise.all([
+      const [storedToken, storedRefreshToken, storedUser] = await Promise.all([
         appStorage.getItem(ACCESS_TOKEN_KEY),
+        appStorage.getItem(REFRESH_TOKEN_KEY),
         appStorage.getItem(USER_DATA_KEY),
       ]);
+
+      // Si falta el token de acceso o el de refresco, la sesión no es válida: limpiar y pedir login
+      if (!storedToken || !storedRefreshToken) {
+        await Promise.all([
+          appStorage.removeItem(ACCESS_TOKEN_KEY),
+          appStorage.removeItem(REFRESH_TOKEN_KEY),
+          appStorage.removeItem(USER_DATA_KEY),
+        ]);
+        setToken(null);
+        setUser(null);
+        return;
+      }
 
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -41,8 +65,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const profile = await usersApi.getProfile();
           setUser(profile);
           await appStorage.setItem(USER_DATA_KEY, JSON.stringify(profile));
-        } catch {
-          // Token might still be refreshed by interceptor on next call
+        } catch (profileErr: any) {
+          if (profileErr?.response?.status === 401) {
+            await Promise.all([
+              appStorage.removeItem(ACCESS_TOKEN_KEY),
+              appStorage.removeItem(REFRESH_TOKEN_KEY),
+              appStorage.removeItem(USER_DATA_KEY),
+            ]);
+            setToken(null);
+            setUser(null);
+          }
         }
       }
     } catch {
