@@ -14,6 +14,7 @@ export const Permission = {
     USE_POS: "USE_POS",
     PROCESS_RETURNS: "PROCESS_RETURNS",
     MANAGE_PAYMENTS: "MANAGE_PAYMENTS",
+    MANAGE_APPEARANCE: "MANAGE_APPEARANCE",
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];
@@ -33,6 +34,7 @@ export const PERMISSION_OPTIONS: PermissionValue[] = [
     "USE_POS",
     "PROCESS_RETURNS",
     "MANAGE_PAYMENTS",
+    "MANAGE_APPEARANCE",
 ];
 
 export const isPermission = (value: string): value is PermissionValue =>
@@ -59,6 +61,7 @@ const PANEL_PERMISSIONS: PermissionValue[] = [
     Permission.VIEW_REPORTS,
     Permission.USE_POS,
     Permission.PROCESS_RETURNS,
+    Permission.MANAGE_APPEARANCE,
 ];
 
 export const SUPER_ADMIN_ROLE = "Super Admin";

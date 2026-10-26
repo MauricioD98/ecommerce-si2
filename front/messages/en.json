@@ -162,7 +162,8 @@
     "notifications": "Notifications",
     "roles": "Roles",
     "subscription": "Subscription",
-    "payments": "Payment settings"
+    "payments": "Payment settings",
+    "appearance": "Customize"
   },
   "AdminShell": {
     "checkingAccess": "Checking access...",
@@ -734,7 +735,8 @@
       "unsupported": "Your browser doesn’t support voice dictation. Use Chrome, Edge or Safari.",
       "generic": "Couldn’t use the microphone.",
       "startFailed": "Couldn’t start the microphone. Please try again."
-    }
+    },
+    "openDashboard": "Interactive dashboard"
   },
   "AdminErrors": {
     "branches": "Couldn’t load the branches.",
@@ -1039,6 +1041,10 @@
       "MANAGE_PAYMENTS": {
         "label": "Payment settings",
         "description": "Set up the store’s Stripe account, bank QR and USDT wallet"
+      },
+      "MANAGE_APPEARANCE": {
+        "label": "Customize store",
+        "description": "Change the public store’s logo, colors, description and social links"
       }
     },
     "baseRoles": {
@@ -1581,6 +1587,171 @@
       "invalidAddress": "The address isn’t valid for the {network} network.",
       "warning": "Double-check the network and address: funds sent to the wrong network or address can’t be recovered.",
       "enable": "Offer USDT payment at checkout"
+    }
+  },
+  "AdminAppearance": {
+    "title": "Customize store",
+    "subtitle": "Logo, colors and copy for your public store. The preview updates live; nothing is published until you save.",
+    "loading": "Loading appearance…",
+    "loadFailed": "Couldn’t load the store appearance.",
+    "saveFailed": "Couldn’t save your changes.",
+    "saved": "Changes published to your store.",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "discard": "Discard",
+    "unsaved": "Unsaved changes",
+    "upToDate": "Published",
+    "images": {
+      "title": "Logo and favicon",
+      "logo": "Logo",
+      "favicon": "Favicon (tab icon)",
+      "logoHint": "PNG, JPG or WebP, max. {max} KB. Best: transparent background, landscape format.",
+      "faviconHint": "Square image, max. {max} KB (e.g. 64×64 px).",
+      "upload": "Upload {name}",
+      "replace": "Change {name}",
+      "uploadShort": "Upload",
+      "replaceShort": "Change",
+      "remove": "Remove",
+      "pending": "Uploads when you save",
+      "invalidType": "The image must be PNG, JPG or WebP.",
+      "tooLarge": "The image exceeds {max} KB."
+    },
+    "colors": {
+      "title": "Colors",
+      "primary": "Primary color",
+      "primaryHint": "Background of the buy button, cart counter and accents.",
+      "secondary": "Secondary color",
+      "secondaryHint": "Text on top of the primary color (e.g. “Add to cart”).",
+      "lowContrast": "The button text has low contrast with its background: customers will struggle to read it.",
+      "presets": "Suggested combinations",
+      "presetNames": {
+        "classic": "Classic",
+        "rose": "Rose",
+        "terracotta": "Terracotta",
+        "olive": "Olive",
+        "ocean": "Ocean",
+        "cream": "Cream"
+      }
+    },
+    "description": {
+      "title": "Description",
+      "label": "About your store",
+      "placeholder": "Women’s clothing with original designs, made in Santa Cruz…",
+      "hint": "Shown on Google and in the “About us” section"
+    },
+    "social": {
+      "title": "Social media",
+      "description": "Shown as icons in the store footer.",
+      "empty": "You haven’t added any social links yet.",
+      "add": "Add social link",
+      "remove": "Remove",
+      "platform": "Network",
+      "url": "Link",
+      "invalidUrl": "Check the links: they must start with https://",
+      "platforms": {
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "whatsapp": "WhatsApp",
+        "x": "X (Twitter)",
+        "youtube": "YouTube",
+        "website": "Website"
+      }
+    },
+    "preview": {
+      "title": "Preview",
+      "label": "Public store preview",
+      "url": "yourstore.com",
+      "descriptionPlaceholder": "Your store description will appear here.",
+      "category": "Dresses",
+      "productName": "Linen midi dress",
+      "addToCart": "Add to cart",
+      "search": "Search products…",
+      "adminLabel": "Admin menu preview",
+      "adminOrders": "Orders",
+      "adminCustomize": "Customize",
+      "adminStore": "View store"
+    },
+    "font": {
+      "title": "Typography",
+      "label": "Store font",
+      "hint": "Applied to all text in the store and the admin panel.",
+      "sample": "New season collection · Nationwide shipping"
+    },
+    "navbar": {
+      "title": "Header and search",
+      "background": "Header background",
+      "backgroundHint": "Top bar with the logo, cart and account.",
+      "text": "Header text",
+      "textHint": "Store name, icons and selectors.",
+      "search": "Search bar",
+      "searchHint": "The text color adjusts automatically to stay readable.",
+      "lowContrast": "The header text has low contrast with its background: customers will struggle to read it."
+    },
+    "background": {
+      "title": "Store background",
+      "color": "Background color",
+      "colorHint": "Shown behind the catalog and the store pages.",
+      "image": "Background image",
+      "imageHint": "Optional. PNG, JPG or WebP, max. {max} KB. Covers the whole background, on top of the color."
+    },
+    "admin": {
+      "title": "Admin panel",
+      "menu": "Sidebar color",
+      "menuHint": "Only you and your team see it. The text color adjusts automatically."
+    }
+  },
+  "AnalyticsDashboard": {
+    "title": "Interactive dashboard",
+    "subtitle": "Drag panels by their title and resize them from the corner. Save the layout to find it the same way next time.",
+    "back": "Back to Reports",
+    "save": "Save layout",
+    "saving": "Saving…",
+    "saved": "Layout saved.",
+    "saveFailed": "Couldn’t save the layout.",
+    "discard": "Discard changes",
+    "loading": "Loading…",
+    "updating": "Updating…",
+    "layoutFailed": "Couldn’t load your layout.",
+    "metricsFailed": "Couldn’t load the metrics.",
+    "empty": "The canvas is empty: add a panel to get started.",
+    "noSales": "No sales in this period.",
+    "branchLabel": "Branch",
+    "allBranches": "All branches",
+    "rangeLabel": "Period",
+    "lastDays": "Last {days} days",
+    "from": "From",
+    "to": "To",
+    "invalidRange": "The “from” date must be on or before “to”.",
+    "dateLabel": "Date: {date}",
+    "defaultHint": "This is the default layout. Arrange it your way and save it.",
+    "editHint": "Drag by the title · resize from the bottom-right corner",
+    "addLabel": "Panel to add",
+    "add": "Add panel",
+    "remove": "Remove panel",
+    "chartType": "Chart type",
+    "metrics": {
+      "dailyRevenue": "Daily revenue",
+      "dailyOrders": "Paid orders per day",
+      "topProducts": "Top 5 best-selling products",
+      "totalRevenue": "Total revenue",
+      "totalOrders": "Total orders",
+      "averageTicket": "Average ticket"
+    },
+    "types": {
+      "LINE_CHART": "Line",
+      "BAR_CHART": "Bars",
+      "DONUT_CHART": "Donut",
+      "KPI": "Indicator"
+    },
+    "series": {
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "units": "Units"
+    },
+    "kpi": {
+      "paidOrders": "{count, plural, one {# paid order} other {# paid orders}}",
+      "perPaidOrder": "Per paid order"
     }
   }
 }

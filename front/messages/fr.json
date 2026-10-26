@@ -162,7 +162,8 @@
     "notifications": "Notifications",
     "roles": "Rôles",
     "subscription": "Abonnement",
-    "payments": "Gestion des paiements"
+    "payments": "Gestion des paiements",
+    "appearance": "Personnaliser"
   },
   "AdminShell": {
     "checkingAccess": "Vérification de l’accès...",
@@ -734,7 +735,8 @@
       "unsupported": "Votre navigateur ne permet pas la dictée vocale. Utilisez Chrome, Edge ou Safari.",
       "generic": "Impossible d’utiliser le micro.",
       "startFailed": "Impossible de démarrer le micro. Réessayez."
-    }
+    },
+    "openDashboard": "Tableau de bord interactif"
   },
   "AdminErrors": {
     "branches": "Impossible de charger les succursales.",
@@ -1039,6 +1041,10 @@
       "MANAGE_PAYMENTS": {
         "label": "Gestion des paiements",
         "description": "Configurer le compte Stripe, le QR bancaire et le portefeuille USDT de la boutique"
+      },
+      "MANAGE_APPEARANCE": {
+        "label": "Personnaliser la boutique",
+        "description": "Modifier le logo, les couleurs, la description et les réseaux sociaux de la boutique publique"
       }
     },
     "baseRoles": {
@@ -1581,6 +1587,171 @@
       "invalidAddress": "L’adresse n’est pas valide pour le réseau {network}.",
       "warning": "Vérifiez bien le réseau et l’adresse : des fonds envoyés sur le mauvais réseau ou à la mauvaise adresse sont irrécupérables.",
       "enable": "Proposer le paiement en USDT"
+    }
+  },
+  "AdminAppearance": {
+    "title": "Personnaliser la boutique",
+    "subtitle": "Logo, couleurs et textes de votre boutique publique. L’aperçu change en direct ; rien n’est publié avant l’enregistrement.",
+    "loading": "Chargement de l’apparence…",
+    "loadFailed": "Impossible de charger l’apparence de la boutique.",
+    "saveFailed": "Impossible d’enregistrer les modifications.",
+    "saved": "Modifications publiées sur votre boutique.",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "discard": "Annuler",
+    "unsaved": "Modifications non enregistrées",
+    "upToDate": "Publié",
+    "images": {
+      "title": "Logo et favicon",
+      "logo": "Logo",
+      "favicon": "Favicon (icône de l’onglet)",
+      "logoHint": "PNG, JPG ou WebP, max. {max} Ko. Idéal : fond transparent, format horizontal.",
+      "faviconHint": "Image carrée, max. {max} Ko (ex. 64×64 px).",
+      "upload": "Téléverser {name}",
+      "replace": "Changer {name}",
+      "uploadShort": "Téléverser",
+      "replaceShort": "Changer",
+      "remove": "Retirer",
+      "pending": "Téléversé à l’enregistrement",
+      "invalidType": "L’image doit être au format PNG, JPG ou WebP.",
+      "tooLarge": "L’image dépasse {max} Ko."
+    },
+    "colors": {
+      "title": "Couleurs",
+      "primary": "Couleur principale",
+      "primaryHint": "Fond du bouton d’achat, du compteur du panier et des accents.",
+      "secondary": "Couleur secondaire",
+      "secondaryHint": "Texte sur la couleur principale (ex. « Ajouter au panier »).",
+      "lowContrast": "Le texte du bouton manque de contraste avec son fond : vos clients auront du mal à le lire.",
+      "presets": "Combinaisons suggérées",
+      "presetNames": {
+        "classic": "Classique",
+        "rose": "Rose",
+        "terracotta": "Terracotta",
+        "olive": "Olive",
+        "ocean": "Océan",
+        "cream": "Crème"
+      }
+    },
+    "description": {
+      "title": "Description",
+      "label": "À propos de votre boutique",
+      "placeholder": "Vêtements pour femmes aux créations originales, fabriqués à Santa Cruz…",
+      "hint": "Affichée sur Google et dans la section « Qui sommes-nous »"
+    },
+    "social": {
+      "title": "Réseaux sociaux",
+      "description": "Affichés sous forme d’icônes dans le pied de page de la boutique.",
+      "empty": "Vous n’avez encore ajouté aucun réseau social.",
+      "add": "Ajouter un réseau",
+      "remove": "Retirer",
+      "platform": "Réseau social",
+      "url": "Lien",
+      "invalidUrl": "Vérifiez les liens : ils doivent commencer par https://",
+      "platforms": {
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "whatsapp": "WhatsApp",
+        "x": "X (Twitter)",
+        "youtube": "YouTube",
+        "website": "Site web"
+      }
+    },
+    "preview": {
+      "title": "Aperçu",
+      "label": "Aperçu de la boutique publique",
+      "url": "votreboutique.com",
+      "descriptionPlaceholder": "La description de votre boutique apparaîtra ici.",
+      "category": "Robes",
+      "productName": "Robe midi en lin",
+      "addToCart": "Ajouter au panier",
+      "search": "Rechercher des produits…",
+      "adminLabel": "Aperçu du menu du panneau",
+      "adminOrders": "Commandes",
+      "adminCustomize": "Personnaliser",
+      "adminStore": "Voir la boutique"
+    },
+    "font": {
+      "title": "Typographie",
+      "label": "Police de la boutique",
+      "hint": "Appliquée à tous les textes de la boutique et du panneau.",
+      "sample": "Nouvelle collection de saison · Livraison dans tout le pays"
+    },
+    "navbar": {
+      "title": "En-tête et recherche",
+      "background": "Fond de l’en-tête",
+      "backgroundHint": "Barre supérieure avec le logo, le panier et le compte.",
+      "text": "Texte de l’en-tête",
+      "textHint": "Nom de la boutique, icônes et sélecteurs.",
+      "search": "Barre de recherche",
+      "searchHint": "La couleur du texte s’ajuste automatiquement pour rester lisible.",
+      "lowContrast": "Le texte de l’en-tête manque de contraste avec son fond : vos clients auront du mal à le lire."
+    },
+    "background": {
+      "title": "Fond de la boutique",
+      "color": "Couleur de fond",
+      "colorHint": "Visible derrière le catalogue et les pages de la boutique.",
+      "image": "Image de fond",
+      "imageHint": "Facultatif. PNG, JPG ou WebP, max. {max} Ko. Couvre tout le fond, par-dessus la couleur."
+    },
+    "admin": {
+      "title": "Panneau d’administration",
+      "menu": "Couleur du menu latéral",
+      "menuHint": "Visible uniquement par vous et votre équipe. Le texte s’ajuste automatiquement."
+    }
+  },
+  "AnalyticsDashboard": {
+    "title": "Tableau de bord interactif",
+    "subtitle": "Faites glisser les panneaux par leur titre et redimensionnez-les depuis le coin. Enregistrez la disposition pour la retrouver telle quelle.",
+    "back": "Retour aux rapports",
+    "save": "Enregistrer la disposition",
+    "saving": "Enregistrement…",
+    "saved": "Disposition enregistrée.",
+    "saveFailed": "Impossible d’enregistrer la disposition.",
+    "discard": "Annuler les modifications",
+    "loading": "Chargement…",
+    "updating": "Mise à jour…",
+    "layoutFailed": "Impossible de charger votre disposition.",
+    "metricsFailed": "Impossible de charger les indicateurs.",
+    "empty": "Le canevas est vide : ajoutez un panneau pour commencer.",
+    "noSales": "Aucune vente sur cette période.",
+    "branchLabel": "Succursale",
+    "allBranches": "Toutes les succursales",
+    "rangeLabel": "Période",
+    "lastDays": "{days} derniers jours",
+    "from": "Du",
+    "to": "Au",
+    "invalidRange": "La date de début doit être antérieure ou égale à la date de fin.",
+    "dateLabel": "Date : {date}",
+    "defaultHint": "Voici la disposition par défaut. Organisez-la à votre goût et enregistrez-la.",
+    "editHint": "Glissez par le titre · redimensionnez depuis le coin inférieur droit",
+    "addLabel": "Panneau à ajouter",
+    "add": "Ajouter un panneau",
+    "remove": "Retirer le panneau",
+    "chartType": "Type de graphique",
+    "metrics": {
+      "dailyRevenue": "Chiffre d’affaires quotidien",
+      "dailyOrders": "Commandes payées par jour",
+      "topProducts": "Top 5 des produits les plus vendus",
+      "totalRevenue": "Chiffre d’affaires total",
+      "totalOrders": "Total des commandes",
+      "averageTicket": "Panier moyen"
+    },
+    "types": {
+      "LINE_CHART": "Ligne",
+      "BAR_CHART": "Barres",
+      "DONUT_CHART": "Anneau",
+      "KPI": "Indicateur"
+    },
+    "series": {
+      "revenue": "Chiffre d’affaires",
+      "orders": "Commandes",
+      "units": "Unités"
+    },
+    "kpi": {
+      "paidOrders": "{count, plural, one {# commande payée} other {# commandes payées}}",
+      "perPaidOrder": "Par commande payée"
     }
   }
 }

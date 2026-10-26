@@ -13,6 +13,7 @@ export const Permission = {
   USE_POS: 'USE_POS', // caja física (punto de venta) de la sucursal propia
   PROCESS_RETURNS: 'PROCESS_RETURNS', // punto de devolución: reingresar prendas al stock o a mermas
   MANAGE_PAYMENTS: 'MANAGE_PAYMENTS', // medios de cobro de la tienda: Stripe, QR bancario y USDT
+  MANAGE_APPEARANCE: 'MANAGE_APPEARANCE', // logo, colores, descripción y redes sociales de la tienda pública
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];

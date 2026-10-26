@@ -156,11 +156,12 @@
     user-select: none;
 }
 
+// Colores de la tienda (variables que inyecta app/layout.tsx); sin personalizar queda como siempre
 .addToCartButton {
     width: 100%;
     padding: 1rem 2rem;
-    background: #111827;
-    color: #fff;
+    background: var(--color-primary, #111827);
+    color: var(--color-secondary, #fff);
     border: none;
     border-radius: 0.5rem;
     font-size: 1rem;
@@ -169,7 +170,7 @@
     transition: all 0.2s;
 
     &:hover:not(:disabled) {
-        background-color: #1f2937;
+        filter: brightness(1.15);
         transform: translateY(-1px);
     }
 

@@ -1,4 +1,4 @@
-import { Bell, Boxes, Building2, ChartColumn, ClipboardList, CreditCard, Landmark, Layers, LucideIcon, RotateCcw, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
+import { Bell, Boxes, Building2, ChartColumn, ClipboardList, CreditCard, Landmark, Layers, LucideIcon, Palette, RotateCcw, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
 import type { Messages } from "next-intl";
 import { Permission, PermissionValue } from "@/utils/permissions";
 
@@ -9,6 +9,7 @@ export interface AdminNavLink {
     href: string;
     label: AdminNavLabel;
     icon: LucideIcon;
+    highlight?: boolean;
 }
 
 interface NavItem {
@@ -18,6 +19,8 @@ interface NavItem {
     permission: PermissionValue;
     // Además del permiso, solo para el rol "Super Admin" (dueño de la tienda)
     superAdminOnly?: boolean;
+    // Ítem destacado en el menú (acento de color aunque no esté activo)
+    highlight?: boolean;
     // Etiqueta con alcance global (permiso ALL_BRANCHES) y con alcance de sucursal
     label: AdminNavLabel;
     branchLabel?: AdminNavLabel;
@@ -38,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
     { href: "/admin/roles", icon: ShieldCheck, permission: Permission.MANAGE_ROLES, label: "roles" },
     { href: "/admin/suscripcion", icon: CreditCard, permission: Permission.MANAGE_ROLES, label: "subscription", superAdminOnly: true },
     { href: "/admin/settings/payments", icon: Landmark, permission: Permission.MANAGE_PAYMENTS, label: "payments" },
+    { href: "/admin/settings/appearance", icon: Palette, permission: Permission.MANAGE_APPEARANCE, label: "appearance", highlight: true },
 ];
 
 // Ítems del menú lateral según los permisos del usuario. Las rutas son las mismas para todos,
@@ -46,5 +50,6 @@ export const getAdminLinks = (can: (permission: string) => boolean, isGlobal: bo
     NAV_ITEMS.filter((item) => can(item.permission) && (!item.superAdminOnly || isSuperAdmin)).map((item) => ({
         href: item.href,
         icon: item.icon,
+        highlight: item.highlight,
         label: isGlobal ? item.label : item.branchLabel ?? item.label,
     }));

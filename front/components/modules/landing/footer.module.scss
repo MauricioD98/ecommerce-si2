@@ -32,6 +32,31 @@
                     font-size: 0.875rem;
                     line-height: 1.6;
                 }
+
+                // Redes sociales de la tienda (apariencia)
+                .social {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                    margin-top: 1rem;
+
+                    a {
+                        display: grid;
+                        place-items: center;
+                        width: 2.25rem;
+                        height: 2.25rem;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 999px;
+                        color: #374151;
+                        transition: all 0.2s ease;
+
+                        &:hover {
+                            background: var(--color-primary, #000);
+                            border-color: var(--color-primary, #000);
+                            color: var(--color-secondary, #fff);
+                        }
+                    }
+                }
             }
 
             .section {

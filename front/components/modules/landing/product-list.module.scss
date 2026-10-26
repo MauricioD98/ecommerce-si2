@@ -1,7 +1,8 @@
+// Sin fondo propio: se ve el de la tienda (--store-bg-color / --store-bg-image en <body>)
 .section {
     width: 100%;
     padding: 2rem 1rem;
-    background: #fff;
+    background: transparent;
 
     .container {
         max-width: 1280px;
@@ -28,17 +29,26 @@
     .searchBar {
         margin-bottom: 2rem;
 
+        // Colores de la apariencia: el texto (--search-text) se calcula legible sobre el fondo elegido
         input {
             width: 100%;
             padding: 0.75rem 1rem;
-            border: 1px solid #e5e7eb;
+            border: 1px solid color-mix(in srgb, var(--search-text, #000) 15%, transparent);
             border-radius: 0.375rem;
+            background: var(--search-bg, #fff);
+            color: var(--search-text, #000);
             font-size: 1rem;
+            font-family: inherit;
             outline: none;
             transition: border-color 0.2s ease-in-out;
 
+            &::placeholder {
+                color: color-mix(in srgb, var(--search-text, #000) 55%, transparent);
+            }
+
             &:focus {
-                border-color: #000;
+                border-color: var(--color-primary, #000);
+                box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary, #000) 25%, transparent);
             }
         }
     }

@@ -61,13 +61,13 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
                 </span>
 
                 <nav className={styles.nav} aria-label={tNav('menuLabel')}>
-                    {getAdminLinks(can, isGlobal, isSuperAdmin).map(({ href, label, icon: Icon }) => (
+                    {getAdminLinks(can, isGlobal, isSuperAdmin).map(({ href, label, icon: Icon, highlight }) => (
                         <Link
                             key={href}
                             href={href}
-                            className={`${styles.navLink} ${pathname.startsWith(href) ? styles.navLinkActive : ''}`}
+                            className={`${styles.navLink} ${highlight ? styles.navLinkHighlight : ''} ${pathname.startsWith(href) ? styles.navLinkActive : ''}`}
                         >
-                            <Icon size={18} />
+                            <Icon size={18} className={highlight ? styles.navIconHighlight : undefined} />
                             {tNav(label)}
                         </Link>
                     ))}

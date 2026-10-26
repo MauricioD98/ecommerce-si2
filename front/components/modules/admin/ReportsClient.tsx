@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
+import { LayoutDashboard } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import GeneralMetrics from './GeneralMetrics';
@@ -19,6 +21,10 @@ export default function ReportsClient() {
                     <h1>{t('title')}</h1>
                     <p>{t('subtitle')}</p>
                 </div>
+                <Link href="/admin/reports/dashboard" className={styles.button}>
+                    <LayoutDashboard size={16} />
+                    {t('openDashboard')}
+                </Link>
             </div>
 
             <div className={styles.tabs} role="tablist" aria-label={t('tabsLabel')}>

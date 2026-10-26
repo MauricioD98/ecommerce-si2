@@ -162,7 +162,8 @@
     "notifications": "Notificaciones",
     "roles": "Roles",
     "subscription": "Suscripción",
-    "payments": "Gestión de pagos"
+    "payments": "Gestión de pagos",
+    "appearance": "Personalizar"
   },
   "AdminShell": {
     "checkingAccess": "Verificando acceso...",
@@ -734,7 +735,8 @@
       "unsupported": "Tu navegador no permite el dictado por voz. Usa Chrome, Edge o Safari.",
       "generic": "No se pudo usar el micrófono.",
       "startFailed": "No se pudo iniciar el micrófono. Inténtalo de nuevo."
-    }
+    },
+    "openDashboard": "Dashboard interactivo"
   },
   "AdminErrors": {
     "branches": "No se pudieron cargar las sucursales.",
@@ -1039,6 +1041,10 @@
       "MANAGE_PAYMENTS": {
         "label": "Gestión de pagos",
         "description": "Configurar Stripe, el QR bancario y la wallet USDT de la tienda"
+      },
+      "MANAGE_APPEARANCE": {
+        "label": "Personalizar tienda",
+        "description": "Cambiar el logo, los colores, la descripción y las redes sociales de la tienda pública"
       }
     },
     "baseRoles": {
@@ -1581,6 +1587,171 @@
       "invalidAddress": "La dirección no es válida para la red {network}.",
       "warning": "Revisa bien la red y la dirección: un envío a una red o dirección equivocada no se puede recuperar.",
       "enable": "Ofrecer pago con USDT en el checkout"
+    }
+  },
+  "AdminAppearance": {
+    "title": "Personalizar tienda",
+    "subtitle": "Logo, colores y textos de tu tienda pública. La vista previa cambia en vivo; nada se publica hasta que guardes.",
+    "loading": "Cargando apariencia…",
+    "loadFailed": "No se pudo cargar la apariencia de la tienda.",
+    "saveFailed": "No se pudieron guardar los cambios.",
+    "saved": "Cambios publicados en tu tienda.",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "discard": "Descartar",
+    "unsaved": "Cambios sin guardar",
+    "upToDate": "Publicado",
+    "images": {
+      "title": "Logo y favicon",
+      "logo": "Logo",
+      "favicon": "Favicon (ícono de la pestaña)",
+      "logoHint": "PNG, JPG o WebP, máx. {max} KB. Ideal: fondo transparente y formato horizontal.",
+      "faviconHint": "Imagen cuadrada, máx. {max} KB (p. ej. 64×64 px).",
+      "upload": "Subir {name}",
+      "replace": "Cambiar {name}",
+      "uploadShort": "Subir",
+      "replaceShort": "Cambiar",
+      "remove": "Quitar",
+      "pending": "Se sube al guardar",
+      "invalidType": "La imagen debe ser PNG, JPG o WebP.",
+      "tooLarge": "La imagen supera los {max} KB."
+    },
+    "colors": {
+      "title": "Colores",
+      "primary": "Color principal",
+      "primaryHint": "Fondo del botón de compra, del contador del carrito y de los acentos.",
+      "secondary": "Color secundario",
+      "secondaryHint": "Texto sobre el color principal (p. ej. \"Agregar al carrito\").",
+      "lowContrast": "El texto del botón tiene poco contraste con su fondo: a tus clientes les costará leerlo.",
+      "presets": "Combinaciones sugeridas",
+      "presetNames": {
+        "classic": "Clásico",
+        "rose": "Rosa",
+        "terracotta": "Terracota",
+        "olive": "Oliva",
+        "ocean": "Océano",
+        "cream": "Crema"
+      }
+    },
+    "description": {
+      "title": "Descripción",
+      "label": "Sobre tu tienda",
+      "placeholder": "Ropa femenina con diseño propio, hecha en Santa Cruz…",
+      "hint": "Aparece en Google y en la sección \"Quiénes somos\""
+    },
+    "social": {
+      "title": "Redes sociales",
+      "description": "Se muestran como íconos en el pie de página de la tienda.",
+      "empty": "Todavía no agregaste redes sociales.",
+      "add": "Agregar red social",
+      "remove": "Quitar",
+      "platform": "Red social",
+      "url": "Enlace",
+      "invalidUrl": "Revisa los enlaces: deben empezar con https://",
+      "platforms": {
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "whatsapp": "WhatsApp",
+        "x": "X (Twitter)",
+        "youtube": "YouTube",
+        "website": "Sitio web"
+      }
+    },
+    "preview": {
+      "title": "Vista previa",
+      "label": "Vista previa de la tienda pública",
+      "url": "tutienda.com",
+      "descriptionPlaceholder": "Aquí aparecerá la descripción de tu tienda.",
+      "category": "Vestidos",
+      "productName": "Vestido midi de lino",
+      "addToCart": "Agregar al carrito",
+      "search": "Buscar productos…",
+      "adminLabel": "Vista previa del menú del panel",
+      "adminOrders": "Pedidos",
+      "adminCustomize": "Personalizar",
+      "adminStore": "Ver tienda"
+    },
+    "font": {
+      "title": "Tipografía",
+      "label": "Fuente de la tienda",
+      "hint": "Se aplica a todos los textos de la tienda y del panel.",
+      "sample": "Nueva colección de temporada · Envíos a todo el país"
+    },
+    "navbar": {
+      "title": "Cabecera y búsqueda",
+      "background": "Fondo de la cabecera",
+      "backgroundHint": "Barra superior con el logo, el carrito y la cuenta.",
+      "text": "Texto de la cabecera",
+      "textHint": "Nombre de la tienda, íconos y selectores.",
+      "search": "Barra de búsqueda",
+      "searchHint": "El color del texto se ajusta solo para que se lea.",
+      "lowContrast": "El texto de la cabecera tiene poco contraste con su fondo: a tus clientes les costará leerlo."
+    },
+    "background": {
+      "title": "Fondo de la tienda",
+      "color": "Color de fondo",
+      "colorHint": "Se ve detrás del catálogo y de las páginas de la tienda.",
+      "image": "Imagen de fondo",
+      "imageHint": "Opcional. PNG, JPG o WebP, máx. {max} KB. Cubre todo el fondo, encima del color."
+    },
+    "admin": {
+      "title": "Panel de administración",
+      "menu": "Color del menú lateral",
+      "menuHint": "Solo lo ven tú y tu equipo. El texto se ajusta solo para que se lea."
+    }
+  },
+  "AnalyticsDashboard": {
+    "title": "Dashboard interactivo",
+    "subtitle": "Arrastra los paneles desde su título y cambia su tamaño desde la esquina. Guarda el diseño para encontrarlo igual la próxima vez.",
+    "back": "Volver a Reportes",
+    "save": "Guardar diseño",
+    "saving": "Guardando…",
+    "saved": "Diseño guardado.",
+    "saveFailed": "No se pudo guardar el diseño.",
+    "discard": "Descartar cambios",
+    "loading": "Cargando…",
+    "updating": "Actualizando…",
+    "layoutFailed": "No se pudo cargar tu diseño.",
+    "metricsFailed": "No se pudieron cargar las métricas.",
+    "empty": "El lienzo está vacío: agrega un panel para empezar.",
+    "noSales": "Sin ventas en este período.",
+    "branchLabel": "Sucursal",
+    "allBranches": "Todas las sucursales",
+    "rangeLabel": "Período",
+    "lastDays": "Últimos {days} días",
+    "from": "Desde",
+    "to": "Hasta",
+    "invalidRange": "La fecha \"desde\" debe ser anterior o igual a \"hasta\".",
+    "dateLabel": "Fecha: {date}",
+    "defaultHint": "Este es el diseño predeterminado. Muévelo a tu gusto y guárdalo.",
+    "editHint": "Arrastra desde el título · redimensiona desde la esquina inferior derecha",
+    "addLabel": "Panel a agregar",
+    "add": "Agregar panel",
+    "remove": "Quitar panel",
+    "chartType": "Tipo de gráfico",
+    "metrics": {
+      "dailyRevenue": "Ingresos diarios",
+      "dailyOrders": "Pedidos pagados por día",
+      "topProducts": "Top 5 productos más vendidos",
+      "totalRevenue": "Ingresos totales",
+      "totalOrders": "Total de pedidos",
+      "averageTicket": "Ticket promedio"
+    },
+    "types": {
+      "LINE_CHART": "Línea",
+      "BAR_CHART": "Barras",
+      "DONUT_CHART": "Dona",
+      "KPI": "Indicador"
+    },
+    "series": {
+      "revenue": "Ingresos",
+      "orders": "Pedidos",
+      "units": "Unidades"
+    },
+    "kpi": {
+      "paidOrders": "{count, plural, one {# pedido pagado} other {# pedidos pagados}}",
+      "perPaidOrder": "Por pedido pagado"
     }
   }
 }

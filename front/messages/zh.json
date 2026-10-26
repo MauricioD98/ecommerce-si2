@@ -162,7 +162,8 @@
     "notifications": "通知",
     "roles": "角色",
     "subscription": "订阅",
-    "payments": "支付管理"
+    "payments": "支付管理",
+    "appearance": "个性化"
   },
   "AdminShell": {
     "checkingAccess": "正在验证权限...",
@@ -734,7 +735,8 @@
       "unsupported": "你的浏览器不支持语音听写。请使用 Chrome、Edge 或 Safari。",
       "generic": "无法使用麦克风。",
       "startFailed": "无法启动麦克风，请重试。"
-    }
+    },
+    "openDashboard": "交互式仪表板"
   },
   "AdminErrors": {
     "branches": "无法加载分店。",
@@ -1039,6 +1041,10 @@
       "MANAGE_PAYMENTS": {
         "label": "支付管理",
         "description": "配置店铺的 Stripe 账户、银行二维码和 USDT 钱包"
+      },
+      "MANAGE_APPEARANCE": {
+        "label": "店铺个性化",
+        "description": "修改公开店铺的标志、颜色、简介和社交媒体链接"
       }
     },
     "baseRoles": {
@@ -1581,6 +1587,171 @@
       "invalidAddress": "该地址对 {network} 网络无效。",
       "warning": "请仔细核对网络和地址：转到错误网络或地址的资金无法找回。",
       "enable": "在结账页面提供 USDT 支付"
+    }
+  },
+  "AdminAppearance": {
+    "title": "店铺个性化",
+    "subtitle": "公开店铺的标志、颜色和文字。预览实时更新；保存之前不会发布任何内容。",
+    "loading": "正在加载外观…",
+    "loadFailed": "无法加载店铺外观。",
+    "saveFailed": "无法保存更改。",
+    "saved": "更改已发布到你的店铺。",
+    "save": "保存更改",
+    "saving": "正在保存…",
+    "discard": "放弃",
+    "unsaved": "有未保存的更改",
+    "upToDate": "已发布",
+    "images": {
+      "title": "标志和网站图标",
+      "logo": "标志",
+      "favicon": "网站图标（标签页图标）",
+      "logoHint": "PNG、JPG 或 WebP，最大 {max} KB。建议使用透明背景的横版图片。",
+      "faviconHint": "正方形图片，最大 {max} KB（例如 64×64 像素）。",
+      "upload": "上传{name}",
+      "replace": "更换{name}",
+      "uploadShort": "上传",
+      "replaceShort": "更换",
+      "remove": "移除",
+      "pending": "保存时上传",
+      "invalidType": "图片必须是 PNG、JPG 或 WebP 格式。",
+      "tooLarge": "图片超过 {max} KB。"
+    },
+    "colors": {
+      "title": "颜色",
+      "primary": "主色",
+      "primaryHint": "购买按钮、购物车计数和强调元素的背景色。",
+      "secondary": "辅色",
+      "secondaryHint": "主色上的文字颜色（例如“加入购物车”）。",
+      "lowContrast": "按钮文字与背景的对比度较低：顾客可能难以阅读。",
+      "presets": "推荐配色",
+      "presetNames": {
+        "classic": "经典",
+        "rose": "玫瑰",
+        "terracotta": "陶土",
+        "olive": "橄榄",
+        "ocean": "海洋",
+        "cream": "奶油"
+      }
+    },
+    "description": {
+      "title": "简介",
+      "label": "关于你的店铺",
+      "placeholder": "原创设计的女装，产自圣克鲁斯…",
+      "hint": "显示在 Google 搜索结果和“关于我们”中"
+    },
+    "social": {
+      "title": "社交媒体",
+      "description": "以图标形式显示在店铺页脚。",
+      "empty": "你还没有添加社交媒体。",
+      "add": "添加社交媒体",
+      "remove": "移除",
+      "platform": "社交平台",
+      "url": "链接",
+      "invalidUrl": "请检查链接：必须以 https:// 开头",
+      "platforms": {
+        "instagram": "Instagram",
+        "facebook": "Facebook",
+        "tiktok": "TikTok",
+        "whatsapp": "WhatsApp",
+        "x": "X (Twitter)",
+        "youtube": "YouTube",
+        "website": "网站"
+      }
+    },
+    "preview": {
+      "title": "预览",
+      "label": "公开店铺预览",
+      "url": "yourstore.com",
+      "descriptionPlaceholder": "你的店铺简介将显示在这里。",
+      "category": "连衣裙",
+      "productName": "亚麻中长连衣裙",
+      "addToCart": "加入购物车",
+      "search": "搜索商品…",
+      "adminLabel": "后台菜单预览",
+      "adminOrders": "订单",
+      "adminCustomize": "个性化",
+      "adminStore": "查看店铺"
+    },
+    "font": {
+      "title": "字体",
+      "label": "店铺字体",
+      "hint": "应用于店铺和后台的所有文字。",
+      "sample": "当季新品 · 全国配送"
+    },
+    "navbar": {
+      "title": "页头和搜索",
+      "background": "页头背景",
+      "backgroundHint": "包含标志、购物车和账户的顶部栏。",
+      "text": "页头文字",
+      "textHint": "店铺名称、图标和选择器。",
+      "search": "搜索栏",
+      "searchHint": "文字颜色会自动调整以保持清晰可读。",
+      "lowContrast": "页头文字与背景的对比度较低：顾客可能难以阅读。"
+    },
+    "background": {
+      "title": "店铺背景",
+      "color": "背景颜色",
+      "colorHint": "显示在商品目录和店铺页面的后面。",
+      "image": "背景图片",
+      "imageHint": "可选。PNG、JPG 或 WebP，最大 {max} KB。覆盖整个背景，位于颜色之上。"
+    },
+    "admin": {
+      "title": "管理后台",
+      "menu": "侧边菜单颜色",
+      "menuHint": "只有你和你的团队能看到。文字颜色会自动调整。"
+    }
+  },
+  "AnalyticsDashboard": {
+    "title": "交互式仪表板",
+    "subtitle": "拖动面板标题可移动位置，拖动角落可调整大小。保存布局后，下次打开时保持不变。",
+    "back": "返回报表",
+    "save": "保存布局",
+    "saving": "正在保存…",
+    "saved": "布局已保存。",
+    "saveFailed": "无法保存布局。",
+    "discard": "放弃更改",
+    "loading": "加载中…",
+    "updating": "正在更新…",
+    "layoutFailed": "无法加载你的布局。",
+    "metricsFailed": "无法加载指标。",
+    "empty": "画布为空：添加一个面板开始吧。",
+    "noSales": "此期间没有销售。",
+    "branchLabel": "门店",
+    "allBranches": "所有门店",
+    "rangeLabel": "期间",
+    "lastDays": "最近 {days} 天",
+    "from": "从",
+    "to": "至",
+    "invalidRange": "开始日期必须早于或等于结束日期。",
+    "dateLabel": "日期：{date}",
+    "defaultHint": "这是默认布局。按你的喜好调整后保存。",
+    "editHint": "拖动标题移动 · 拖动右下角调整大小",
+    "addLabel": "要添加的面板",
+    "add": "添加面板",
+    "remove": "移除面板",
+    "chartType": "图表类型",
+    "metrics": {
+      "dailyRevenue": "每日收入",
+      "dailyOrders": "每日已付款订单",
+      "topProducts": "销量前 5 的商品",
+      "totalRevenue": "总收入",
+      "totalOrders": "订单总数",
+      "averageTicket": "平均客单价"
+    },
+    "types": {
+      "LINE_CHART": "折线图",
+      "BAR_CHART": "柱状图",
+      "DONUT_CHART": "环形图",
+      "KPI": "指标"
+    },
+    "series": {
+      "revenue": "收入",
+      "orders": "订单",
+      "units": "件数"
+    },
+    "kpi": {
+      "paidOrders": "{count} 个已付款订单",
+      "perPaidOrder": "每个已付款订单"
     }
   }
 }

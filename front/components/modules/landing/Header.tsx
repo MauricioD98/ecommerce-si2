@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { canAccessAdmin } from '@/utils/permissions';
 import { useTranslations } from 'next-intl';
 import { useStoreName } from '@/providers/StoreInfoProvider';
+import { useStoreAppearance } from '@/providers/StoreAppearanceProvider';
 import BranchSelector from './BranchSelector';
 import LanguageSwitcher from '../i18n/LanguageSwitcher';
 
@@ -19,6 +20,7 @@ export default function Header(){
     const router = useRouter();
     const t = useTranslations('Header');
     const storeName = useStoreName();
+    const { logoUrl } = useStoreAppearance();
 
     // Mantiene actualizado el descuento de trabajador y el rol del usuario
     useEffect(()=>{
@@ -40,7 +42,12 @@ export default function Header(){
             <div className={styles.containers}>
                {/* logo */}
                <Link href="/" className={styles.logo}>
-                {storeName}
+                {logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URL o URL externa de la tienda, no pasa por next/image
+                    <img src={logoUrl} alt={storeName} className={styles.logoImage} />
+                ) : (
+                    storeName
+                )}
                </Link>
 
                {/* Branch selector - Solo visible en pantallas grandes */}

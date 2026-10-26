@@ -65,6 +65,8 @@ model User {
  payments Payment[]
  addresses UserAddress[]
  pushSubscriptions PushSubscription[]
+ // Diseño de su dashboard de analítica en el panel (uno por usuario)
+ dashboardLayout DashboardLayout?
 
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
@@ -357,6 +359,37 @@ model PaymentSettings {
   @@map("payment_settings")
 }
 
+// Apariencia pública de la tienda (una sola fila, id "default"): la lee el layout de la vitrina en cada
+// render (cacheado en el front), así que va sin relaciones. logoUrl/faviconUrl guardan una URL externa
+// https o un data URL de la imagen subida desde el panel (el <img> público no puede mandar x-tenant-id).
+model StoreAppearance {
+  id String @id @default("default")
+
+  logoUrl String?
+  faviconUrl String?
+  primaryColor String @default("#000000")
+  secondaryColor String @default("#ffffff")
+  // SEO (<meta name="description">) y la sección "Quiénes somos"
+  description String?
+  // [{ platform: "instagram", url: "https://..." }] (ver SOCIAL_PLATFORMS en el módulo appearance)
+  socialLinks Json?
+
+  // Tipografía de toda la tienda: uno de FONT_FAMILIES (el front la mapea a next/font)
+  fontFamily String @default("Inter")
+  navbarBackgroundColor String @default("#ffffff")
+  navbarTextColor String @default("#000000")
+  searchBarBackgroundColor String @default("#333333")
+  storeBackgroundColor String @default("#ffffff")
+  // URL externa https o data URL (igual que el logo); el front la sirve desde /store-assets/background
+  storeBackgroundImage String?
+  // Menú lateral del panel de la propia tienda
+  adminMenuColor String @default("#1a1a1a")
+
+  updatedAt DateTime @updatedAt
+
+  @@map("store_appearance")
+}
+
 // Comprobante de un pago manual (BANK_QR o USDT). Tabla aparte para que los listados de pedidos no
 // carguen la imagen. Mientras está PENDIENTE el stock del pedido sigue reservado.
 model PaymentProof {
@@ -552,6 +585,23 @@ model ReturnItem {
   @@index([orderItemId])
   @@index([condition])
   @@map("return_items")
+}
+
+// Lienzo del dashboard de analítica (/admin/reports/dashboard) de cada usuario del panel.
+// widgetsConfig: [{ i, x, y, w, h, type, metric }] — posición y tamaño en unidades de la grilla de 12
+// columnas, tipo de gráfico y métrica que muestra (ver WIDGET_TYPES / WIDGET_METRICS en el módulo analytics).
+model DashboardLayout {
+  id String @id @default(uuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  widgetsConfig Json @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("dashboard_layouts")
 }
 
 // Suscripción Web Push de un navegador/dispositivo. Un usuario puede tener varias (uno por dispositivo)

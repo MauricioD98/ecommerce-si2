@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -13,15 +12,10 @@ import { ReportQueryDto, TopProductsQueryDto } from './dto/report-query.dto';
 import { DynamicReportResultDto, SalesOverviewDto, TopProductDto } from './dto/report-response.dto';
 import { validateGeneratedSql } from './sql-guard';
 import { buildSystemPrompt } from './report-prompt';
-import { hasAllBranches } from '../../common/utils/permission.util';
+import { PAID_STATUSES, fillMissingDays, resolveReportBranchId, resolveReportRange, round2 } from './report-scope';
 import { reportingRoleOf, reportingSchemaOf, requireTenant, tenantSchemaSql } from '../../tenancy/tenant-context';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 
-// Pedidos cuyo pago ya se confirmó
-const PAID_STATUSES: OrderStatus[] = [OrderStatus.PROCESANDO, OrderStatus.ENVIADO, OrderStatus.ENTREGADO];
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-const MAX_RANGE_DAYS = 366;
 const MAX_DYNAMIC_ROWS = 500;
 const DYNAMIC_TIMEOUT = '5s';
 
@@ -210,49 +204,12 @@ export class ReportsService {
 
   // Con alcance global se puede elegir sucursal (o ver todas); sin él, siempre la propia
   private resolveBranchId(actor: AuthUser, requested?: string): string | undefined {
-    if (hasAllBranches(actor)) {
-      return requested;
-    }
-    if (!actor.branchId) {
-      throw new ForbiddenException('User is not assigned to a branch');
-    }
-    if (requested && requested !== actor.branchId) {
-      throw new ForbiddenException('You can only view reports of your own branch');
-    }
-    return actor.branchId;
+    return resolveReportBranchId(actor, requested);
   }
 
   private resolveRange(query: ReportQueryDto): { from: Date; to: Date } {
-    const now = new Date();
-    const to = query.to ? endOfDay(new Date(query.to)) : now;
-    const from = query.from ? startOfDay(new Date(query.from)) : startOfDay(new Date(to.getTime() - 29 * DAY_MS));
-
-    if (from > to) {
-      throw new BadRequestException('"from" must be before "to"');
-    }
-    if ((to.getTime() - from.getTime()) / DAY_MS > MAX_RANGE_DAYS) {
-      throw new BadRequestException(`The date range cannot exceed ${MAX_RANGE_DAYS} days`);
-    }
-    return { from, to };
+    return resolveReportRange(query);
   }
-}
-
-const round2 = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
-
-const startOfDay = (date: Date): Date => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-const endOfDay = (date: Date): Date =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
-
-// Agrega los días sin ventas con valor 0 para que el gráfico no tenga huecos
-function fillMissingDays(rows: { date: string; revenue: number; orders: number }[], from: Date, to: Date) {
-  const byDate = new Map(rows.map((row) => [row.date, row]));
-  const result: { date: string; revenue: number; orders: number }[] = [];
-  for (let time = startOfDay(from).getTime(); time <= to.getTime(); time += DAY_MS) {
-    const date = new Date(time).toISOString().slice(0, 10);
-    const row = byDate.get(date);
-    result.push({ date, revenue: round2(row?.revenue ?? 0), orders: row?.orders ?? 0 });
-  }
-  return result;
 }
 
 // bigint (count) y Decimal (sum) no se pueden serializar a JSON: se pasan a número; las fechas, a texto ISO

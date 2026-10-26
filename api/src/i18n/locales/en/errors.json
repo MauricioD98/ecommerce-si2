@@ -49,5 +49,7 @@
   "ORDER_NOT_AWAITING_PROOF": "This order isn’t waiting for a payment proof.",
   "INVALID_TXID": "The TxID (transaction hash) isn’t valid.",
   "TXID_ALREADY_USED": "That TxID has already been used for another order.",
-  "PROOF_NOT_PENDING": "This payment has no proof pending review."
+  "PROOF_NOT_PENDING": "This payment has no proof pending review.",
+  "APPEARANCE_IMAGE_TOO_LARGE": "The image exceeds {max} KB.",
+  "INVALID_DASHBOARD_WIDGET": "Widget \"{id}\" is invalid: check its position, size and chart type."
 }

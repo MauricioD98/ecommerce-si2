@@ -17,6 +17,8 @@
     }
 }
 
+// Color del menú: lo elige la tienda en Personalizar (--admin-menu-bg); el texto (--admin-menu-text) se
+// calcula legible sobre ese fondo y el resto de los tonos (bordes, hovers, activo) se deriva de él.
 .sidebar {
     display: flex;
     flex-direction: column;
@@ -24,8 +26,9 @@
     width: 260px;
     height: 100%;
     padding: 1.5rem 1rem;
-    background: #fff;
-    border-right: 1px solid var(--border);
+    background: var(--admin-menu-bg, #fff);
+    color: var(--admin-menu-text, #000);
+    border-right: 1px solid color-mix(in srgb, var(--admin-menu-text, #000) 12%, transparent);
     // Si el rol tiene muchos enlaces y no entran en la pantalla, scrollea el menú, no la página
     overflow-y: auto;
     @include scroll.thin-scrollbar;
@@ -36,7 +39,7 @@
         flex-shrink: 0;
         padding: 1rem;
         border-right: none;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid color-mix(in srgb, var(--admin-menu-text, #000) 12%, transparent);
         overflow-y: visible;
     }
 }
@@ -48,7 +51,7 @@
     font-size: 1.25rem;
     font-weight: 800;
     letter-spacing: -0.02rem;
-    color: #000;
+    color: inherit;
 }
 
 .roleLabel {
@@ -57,7 +60,7 @@
     padding: 0 0.75rem;
     font-size: 0.75rem;
     font-weight: 500;
-    color: var(--muted-foreground);
+    color: color-mix(in srgb, var(--admin-menu-text, #000) 60%, transparent);
     text-transform: uppercase;
     letter-spacing: 0.05em;
 
@@ -89,13 +92,13 @@
     border-radius: 0.375rem;
     font-size: 0.9375rem;
     font-weight: 500;
-    color: #4b5563;
+    color: color-mix(in srgb, var(--admin-menu-text, #000) 75%, transparent);
     white-space: nowrap;
     transition: all 0.2s ease;
 
     &:hover {
-        background: #f5f5f5;
-        color: #000;
+        background: color-mix(in srgb, var(--admin-menu-text, #000) 8%, transparent);
+        color: var(--admin-menu-text, #000);
     }
 
     @media (max-width: 900px) {
@@ -105,14 +108,30 @@
     }
 }
 
+// "Personalizar" (apariencia de la tienda): ícono con el degradé de la paleta para que se encuentre
+// rápido entre los ítems grises. Va antes de .navLinkActive para que el estado activo siga ganando.
+.navLinkHighlight {
+    color: var(--admin-menu-text, #000);
+    font-weight: 600;
+}
+
+.navIconHighlight {
+    flex-shrink: 0;
+    padding: 2px;
+    border-radius: 0.3rem;
+    color: #fff;
+    background: linear-gradient(135deg, #ec4899, #8b5cf6 55%, #0ea5e9);
+    box-sizing: content-box;
+}
+
 .navLinkActive {
-    background: #f5f5f5;
-    border-left-color: var(--primary);
-    color: #000;
+    background: color-mix(in srgb, var(--admin-menu-text, #000) 10%, transparent);
+    border-left-color: var(--color-primary, var(--primary));
+    color: var(--admin-menu-text, #000);
 
     @media (max-width: 900px) {
         border-left-color: transparent;
-        border-bottom-color: var(--primary);
+        border-bottom-color: var(--color-primary, var(--primary));
     }
 }
 
@@ -121,7 +140,7 @@
     flex-direction: column;
     gap: 0.5rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid color-mix(in srgb, var(--admin-menu-text, #000) 12%, transparent);
 
     @media (max-width: 900px) {
         margin-top: 0.75rem;
@@ -131,7 +150,7 @@
 .userEmail {
     padding: 0 0.75rem;
     font-size: 0.8125rem;
-    color: var(--muted-foreground);
+    color: color-mix(in srgb, var(--admin-menu-text, #000) 60%, transparent);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -152,13 +171,13 @@
     border-radius: 0.375rem;
     font-size: 0.875rem;
     font-family: inherit;
-    color: #4b5563;
+    color: color-mix(in srgb, var(--admin-menu-text, #000) 75%, transparent);
     text-align: left;
     cursor: pointer;
 
     &:hover {
-        background: #f5f5f5;
-        color: #000;
+        background: color-mix(in srgb, var(--admin-menu-text, #000) 8%, transparent);
+        color: var(--admin-menu-text, #000);
     }
 }
 

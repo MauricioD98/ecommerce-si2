@@ -4,19 +4,20 @@
     display: inline-flex;
     align-items: center;
     height: 38px;
-    border: 1px solid #e5e5e5;
+    border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
     border-radius: 0.375rem;
     background: transparent;
-    color: #000;
+    color: inherit;
     transition: all 0.2s ease;
 
+    // Derivado del color del texto: sirve sobre la cabecera de la tienda y sobre el menú del panel
     &:hover {
-        background: #f5f5ff;
-        border-color: #d4d4d4;
+        background: color-mix(in srgb, currentColor 6%, transparent);
+        border-color: color-mix(in srgb, currentColor 25%, transparent);
     }
 
     &:focus-within {
-        outline: 2px solid #000;
+        outline: 2px solid currentColor;
         outline-offset: 2px;
     }
 
@@ -31,6 +32,13 @@
         font-size: 0.8125rem;
         font-weight: 500;
         cursor: pointer;
+
+        // La lista desplegable es nativa y siempre clara: sin esto, en una cabecera oscura el texto
+        // heredado (blanco) quedaría invisible
+        option {
+            color: #000;
+            background: #fff;
+        }
 
         &:focus {
             outline: none;

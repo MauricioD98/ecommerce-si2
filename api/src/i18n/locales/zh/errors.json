@@ -48,5 +48,7 @@
   "ORDER_NOT_AWAITING_PROOF": "此订单不需要付款凭证。",
   "INVALID_TXID": "TxID（交易哈希）无效。",
   "TXID_ALREADY_USED": "该 TxID 已用于其他订单。",
-  "PROOF_NOT_PENDING": "此付款没有待审核的凭证。"
+  "PROOF_NOT_PENDING": "此付款没有待审核的凭证。",
+  "APPEARANCE_IMAGE_TOO_LARGE": "图片超过 {max} KB。",
+  "INVALID_DASHBOARD_WIDGET": "组件“{id}”无效：请检查其位置、尺寸和图表类型。"
 }

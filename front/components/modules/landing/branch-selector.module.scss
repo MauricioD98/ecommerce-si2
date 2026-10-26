@@ -12,23 +12,24 @@
     gap: 0.5rem;
     padding: 0.625rem 1rem;
     background: transparent;
-    color: #000;
-    border: 1px solid #e5e5e5;
+    color: inherit;
+    border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
     border-radius: 0.25rem;
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
 
+    // Derivado del color del texto: sirve sobre la cabecera de la tienda y sobre el menú del panel
     &:hover {
-        background: #f5f5ff;
-        border-color: #d4d4d4;
+        background: color-mix(in srgb, currentColor 6%, transparent);
+        border-color: color-mix(in srgb, currentColor 25%, transparent);
     }
 
     @media (max-width: 768px) {
         width: 100%;
         justify-content: space-between;
-        background: #fff;
+        background: transparent;
         padding: 0.5rem 0.875rem;
         font-size: 0.8125rem;
     }
@@ -36,7 +37,7 @@
 
 // Aún no se eligió sucursal: se resalta para invitar a elegir
 .triggerEmpty {
-    border-color: #000;
+    border-color: currentColor;
 }
 
 .triggerLabel {

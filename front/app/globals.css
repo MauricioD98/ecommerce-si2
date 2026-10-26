@@ -42,8 +42,13 @@ body {
   display: flex;
   flex-direction: column;
   color: var(--primary);
-  background: var(--background);
-  font-family: var(--font-poppins);
+  /* Fondo y tipografía de la tienda: variables que inyecta app/layout.tsx (apariencia del panel) */
+  background-color: var(--store-bg-color, var(--background));
+  background-image: var(--store-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  font-family: var(--font-store, var(--font-poppins)), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
