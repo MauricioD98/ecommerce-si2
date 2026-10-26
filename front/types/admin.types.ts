@@ -1,3 +1,4 @@
+import type { PaymentProofSummary } from "./orders.types";
 import type { ProductTranslations } from "./product.types";
 import { FulfillmentType } from "./branch.types";
 
@@ -105,6 +106,9 @@ export interface AdminOrder {
     branchId: string | null;
     userEmail?: string;
     userName?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    paymentProof?: PaymentProofSummary | null;
     createdAt: string;
 }
 

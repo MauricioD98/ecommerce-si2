@@ -38,5 +38,16 @@
   "BILLING_OWNER_ONLY": "Seul le Super Admin de la boutique peut gérer l’abonnement",
   "CONNECT_NOT_ENABLED": "Votre compte Stripe n’a pas encore activé Connect. Activez-le dans le Dashboard Stripe (Connect → Commencer) et réessayez.",
   "ROLE_PERMISSIONS_EXCEED": "Vous ne pouvez pas accorder des autorisations que votre rôle n’a pas : {permissions}",
-  "ROLE_TOO_POWERFUL": "Vous ne pouvez pas modifier un rôle ayant plus d’autorisations que le vôtre"
+  "ROLE_TOO_POWERFUL": "Vous ne pouvez pas modifier un rôle ayant plus d’autorisations que le vôtre",
+  "PAYMENT_METHOD_UNAVAILABLE": "Ce moyen de paiement n’est pas disponible dans cette boutique.",
+  "IMAGE_REQUIRED": "Joignez une image.",
+  "IMAGE_TOO_LARGE": "L’image dépasse 2 Mo.",
+  "INVALID_IMAGE": "L’image doit être au format PNG, JPG ou WebP.",
+  "QR_IMAGE_MISSING": "Importez l’image du QR avant de l’activer.",
+  "INVALID_WALLET": "L’adresse n’est pas valide pour le réseau {network}.",
+  "USDT_SETTINGS_INCOMPLETE": "Choisissez le réseau et saisissez l’adresse du portefeuille avant d’activer l’USDT.",
+  "ORDER_NOT_AWAITING_PROOF": "Cette commande n’attend pas de justificatif de paiement.",
+  "INVALID_TXID": "Le TxID (hash de la transaction) n’est pas valide.",
+  "TXID_ALREADY_USED": "Ce TxID a déjà été utilisé pour une autre commande.",
+  "PROOF_NOT_PENDING": "Ce paiement n’a aucun justificatif en attente de vérification."
 }

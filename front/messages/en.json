@@ -162,7 +162,7 @@
     "notifications": "Notifications",
     "roles": "Roles",
     "subscription": "Subscription",
-    "payments": "Card payments"
+    "payments": "Payment settings"
   },
   "AdminShell": {
     "checkingAccess": "Checking access...",
@@ -334,7 +334,11 @@
       "selectHint": "Choose a payment method to continue",
       "offlineSaveFailed": "Couldn’t save the order on this device.",
       "gatewayFailed": "Couldn’t initialize the payment gateway.",
-      "cardUnavailable": "This store doesn’t accept card payments yet: you can pay by QR."
+      "cardUnavailable": "This store doesn’t accept card payments yet: choose another payment method.",
+      "bankQr": "Bank QR",
+      "bankQrDescription": "Pay from your banking app and upload the receipt",
+      "usdt": "USDT",
+      "usdtDescription": "Transfer on the {network} network"
     },
     "summary": {
       "title": "Order summary",
@@ -406,6 +410,46 @@
       "goToStore": "Go to store",
       "errorTitle": "Error processing the payment",
       "backHome": "Back to home"
+    },
+    "manual": {
+      "qrTitle": "Scan the QR with your banking app",
+      "qrSubtitle": "Pay the exact amount, then upload a screenshot of the receipt.",
+      "usdtTitle": "Send USDT to the store’s wallet",
+      "usdtSubtitle": "Once the transfer is confirmed, paste the transaction TxID (hash).",
+      "qrAlt": "Store bank QR",
+      "walletQrAlt": "Wallet address QR",
+      "qrLoadFailed": "Couldn’t load the store’s QR.",
+      "amount": "Amount to pay",
+      "usdtAmountHint": "Send the equivalent in USDT. The store checks the amount before approving the payment.",
+      "instructions": "Instructions",
+      "network": "Network",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "wallet": "Address",
+      "copy": "Copy",
+      "copied": "Copied!",
+      "networkWarning": "Only send USDT on the {network} network. Funds sent on another network are lost.",
+      "uploadReceipt": "Upload receipt",
+      "changeReceipt": "Change receipt",
+      "receiptHint": "Screenshot or photo of the receipt (PNG, JPG or WebP, max 2 MB).",
+      "invalidImage": "The image must be PNG, JPG or WebP.",
+      "imageTooLarge": "The image is larger than 2 MB.",
+      "txId": "Transaction TxID",
+      "txIdPlaceholderTron": "64 hexadecimal characters",
+      "txIdPlaceholderEvm": "0x followed by 64 characters",
+      "txIdHint": "You’ll find it in the transaction details of your wallet or exchange.",
+      "submit": "Send receipt",
+      "submitting": "Sending...",
+      "submitFailed": "Couldn’t send the receipt.",
+      "orderFailed": "Couldn’t create the order.",
+      "reviewNote": "Your order stays reserved while the store verifies the payment.",
+      "submittedTitle": "We got your receipt!",
+      "submittedText": "The store will verify the payment and confirm your order. You can track it in My orders.",
+      "viewOrder": "View my order"
     }
   },
   "Store": {
@@ -582,7 +626,13 @@
       "employeeDiscount": "Employee discount",
       "shippingCost": "Shipping cost",
       "total": "Total",
-      "cancelled": "This order was cancelled."
+      "cancelled": "This order was cancelled.",
+      "proofLabel": "Payment verification",
+      "proofStates": {
+        "PENDIENTE": "Being reviewed by the store",
+        "APROBADO": "Approved",
+        "RECHAZADO": "Rejected"
+      }
     },
     "status": {
       "PENDIENTE": "Pending",
@@ -748,6 +798,42 @@
       "ENVIADO": "Shipped",
       "ENTREGADO": "Delivered",
       "CANCELADO": "Cancelled"
+    },
+    "payment": "Payment",
+    "methods": {
+      "STRIPE": "Card",
+      "CASH": "Cash",
+      "PHYSICAL_CARD": "Card (POS)",
+      "QR": "Simple QR",
+      "BANK_QR": "Bank QR",
+      "USDT": "USDT",
+      "other": "Other"
+    },
+    "paymentStatuses": {
+      "PENDIENTE": "Payment pending",
+      "COMPLETADO": "Paid",
+      "FALLIDO": "Payment failed",
+      "REEMBOLSADO": "Refunded",
+      "other": "—"
+    },
+    "proof": {
+      "states": {
+        "PENDIENTE": "To verify",
+        "APROBADO": "Approved",
+        "RECHAZADO": "Rejected"
+      },
+      "review": "Review payment",
+      "title": "Payment for order #{id}",
+      "method": "Payment method",
+      "sentAt": "Sent",
+      "txId": "TxID",
+      "imageFailed": "Couldn’t load the receipt.",
+      "imageAlt": "Payment receipt",
+      "qrHint": "Check with your bank that the full amount arrived before approving.",
+      "usdtHint": "Look up the TxID in the network explorer and check the amount and destination wallet before approving.",
+      "approve": "Approve payment",
+      "reject": "Reject",
+      "confirmReject": "Reject the payment? The order will be cancelled and the stock released."
     }
   },
   "AdminProducts": {
@@ -949,6 +1035,10 @@
       "PROCESS_RETURNS": {
         "label": "Returns",
         "description": "Receive returns and put them back into stock or write-offs"
+      },
+      "MANAGE_PAYMENTS": {
+        "label": "Payment settings",
+        "description": "Set up the store’s Stripe account, bank QR and USDT wallet"
       }
     },
     "baseRoles": {
@@ -1420,8 +1510,8 @@
     "mrrNote": "MRR estimated from each plan’s list price in Stripe, for active or past-due subscriptions. Coupons aren’t deducted."
   },
   "AdminPayments": {
-    "title": "Card payments",
-    "subtitle": "Connect the Stripe account where your store’s card sales are deposited.",
+    "title": "Payment settings",
+    "subtitle": "Choose how customers pay you: card with Stripe, your bank QR or USDT.",
     "refresh": "Refresh",
     "loading": "Loading status...",
     "loadFailed": "Couldn’t load the payments status.",
@@ -1443,6 +1533,54 @@
     "redirecting": "Opening Stripe...",
     "linkExpired": "The Stripe link expired. Open the form again to continue.",
     "enabledNow": "Done! Your store now accepts card payments.",
-    "note": "Stripe asks for your business details and a bank account to deposit sales. Until it’s enabled, checkout only offers QR payment."
+    "note": "Stripe asks for your business details and a bank account to deposit sales. Until it’s enabled, checkout doesn’t offer card payments.",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Changes saved.",
+    "saveFailed": "Couldn’t save the changes.",
+    "active": "Active",
+    "inactive": "Inactive",
+    "stripe": {
+      "title": "Stripe (card)",
+      "accountId": "Connected account",
+      "disconnect": "Disconnect",
+      "confirmDisconnect": "Disconnect the Stripe account? Your store will stop accepting cards until you connect it again.",
+      "disconnected": "Stripe account disconnected."
+    },
+    "qr": {
+      "title": "Local QR (bank)",
+      "description": "Show your bank’s QR at checkout. Customers pay from their banking app and upload the receipt; you approve it in Orders.",
+      "previewAlt": "Store bank QR",
+      "noImage": "You haven’t uploaded the QR yet",
+      "uploadImage": "Upload QR",
+      "replaceImage": "Replace QR",
+      "removeImage": "Remove",
+      "confirmRemove": "Remove the QR image? QR payments will be disabled.",
+      "imageUploaded": "QR updated.",
+      "imageRemoved": "QR removed.",
+      "imageHint": "PNG, JPG or WebP up to 2 MB.",
+      "invalidImage": "The image must be PNG, JPG or WebP.",
+      "imageTooLarge": "The image is larger than 2 MB.",
+      "instructions": "Payment instructions",
+      "instructionsPlaceholder": "Bank, account holder, account number, reference to include...",
+      "enable": "Offer QR payment at checkout",
+      "enableHint": "Upload the QR to enable it."
+    },
+    "usdt": {
+      "title": "USDT (crypto)",
+      "description": "Customers send USDT to your wallet and enter the transaction TxID; you verify and approve it in Orders.",
+      "network": "Network",
+      "networkPlaceholder": "Choose the network",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "address": "Wallet address",
+      "invalidAddress": "The address isn’t valid for the {network} network.",
+      "warning": "Double-check the network and address: funds sent to the wrong network or address can’t be recovered.",
+      "enable": "Offer USDT payment at checkout"
+    }
   }
 }

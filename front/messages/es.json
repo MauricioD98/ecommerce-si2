@@ -162,7 +162,7 @@
     "notifications": "Notificaciones",
     "roles": "Roles",
     "subscription": "Suscripción",
-    "payments": "Pagos con tarjeta"
+    "payments": "Gestión de pagos"
   },
   "AdminShell": {
     "checkingAccess": "Verificando acceso...",
@@ -334,7 +334,11 @@
       "selectHint": "Selecciona un método de pago para continuar",
       "offlineSaveFailed": "No se pudo guardar el pedido en este dispositivo.",
       "gatewayFailed": "No se pudo inicializar la pasarela de pago.",
-      "cardUnavailable": "Esta tienda todavía no acepta pagos con tarjeta: puedes pagar con QR."
+      "cardUnavailable": "Esta tienda todavía no acepta pagos con tarjeta: elige otro medio de pago.",
+      "bankQr": "QR bancario",
+      "bankQrDescription": "Paga desde la app de tu banco y sube el comprobante",
+      "usdt": "USDT",
+      "usdtDescription": "Transferencia en la red {network}"
     },
     "summary": {
       "title": "Resumen del pedido",
@@ -406,6 +410,46 @@
       "goToStore": "Ir a la tienda",
       "errorTitle": "Error al procesar el pago",
       "backHome": "Volver al inicio"
+    },
+    "manual": {
+      "qrTitle": "Escanea el QR con la app de tu banco",
+      "qrSubtitle": "Paga el monto exacto y luego sube la captura del comprobante.",
+      "usdtTitle": "Envía USDT a la wallet de la tienda",
+      "usdtSubtitle": "Cuando la transferencia se confirme, pega el TxID (hash) de la transacción.",
+      "qrAlt": "QR bancario de la tienda",
+      "walletQrAlt": "QR de la dirección de la wallet",
+      "qrLoadFailed": "No se pudo cargar el QR de la tienda.",
+      "amount": "Monto a pagar",
+      "usdtAmountHint": "Envía el equivalente en USDT. La tienda verifica el monto antes de aprobar el pago.",
+      "instructions": "Instrucciones",
+      "network": "Red",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "wallet": "Dirección",
+      "copy": "Copiar",
+      "copied": "¡Copiado!",
+      "networkWarning": "Envía solo USDT por la red {network}. Si usas otra red, los fondos se pierden.",
+      "uploadReceipt": "Subir comprobante",
+      "changeReceipt": "Cambiar comprobante",
+      "receiptHint": "Captura o foto del comprobante (PNG, JPG o WebP, máx. 2 MB).",
+      "invalidImage": "La imagen debe ser PNG, JPG o WebP.",
+      "imageTooLarge": "La imagen supera los 2 MB.",
+      "txId": "TxID de la transacción",
+      "txIdPlaceholderTron": "64 caracteres hexadecimales",
+      "txIdPlaceholderEvm": "0x seguido de 64 caracteres",
+      "txIdHint": "Lo encuentras en el detalle de la transacción de tu wallet o exchange.",
+      "submit": "Enviar comprobante",
+      "submitting": "Enviando...",
+      "submitFailed": "No se pudo enviar el comprobante.",
+      "orderFailed": "No se pudo crear el pedido.",
+      "reviewNote": "Tu pedido queda reservado mientras la tienda verifica el pago.",
+      "submittedTitle": "¡Recibimos tu comprobante!",
+      "submittedText": "La tienda verificará el pago y confirmará tu pedido. Puedes seguir su estado en Mis pedidos.",
+      "viewOrder": "Ver mi pedido"
     }
   },
   "Store": {
@@ -582,7 +626,13 @@
       "employeeDiscount": "Descuento de empleado",
       "shippingCost": "Costo de envío",
       "total": "Total",
-      "cancelled": "Este pedido fue cancelado."
+      "cancelled": "Este pedido fue cancelado.",
+      "proofLabel": "Verificación del pago",
+      "proofStates": {
+        "PENDIENTE": "En revisión por la tienda",
+        "APROBADO": "Aprobado",
+        "RECHAZADO": "Rechazado"
+      }
     },
     "status": {
       "PENDIENTE": "Pendiente",
@@ -748,6 +798,42 @@
       "ENVIADO": "Enviado",
       "ENTREGADO": "Entregado",
       "CANCELADO": "Cancelado"
+    },
+    "payment": "Pago",
+    "methods": {
+      "STRIPE": "Tarjeta",
+      "CASH": "Efectivo",
+      "PHYSICAL_CARD": "Tarjeta (POS)",
+      "QR": "QR simple",
+      "BANK_QR": "QR bancario",
+      "USDT": "USDT",
+      "other": "Otro"
+    },
+    "paymentStatuses": {
+      "PENDIENTE": "Pago pendiente",
+      "COMPLETADO": "Pagado",
+      "FALLIDO": "Pago fallido",
+      "REEMBOLSADO": "Reembolsado",
+      "other": "—"
+    },
+    "proof": {
+      "states": {
+        "PENDIENTE": "Por verificar",
+        "APROBADO": "Aprobado",
+        "RECHAZADO": "Rechazado"
+      },
+      "review": "Revisar pago",
+      "title": "Pago del pedido #{id}",
+      "method": "Medio de pago",
+      "sentAt": "Enviado",
+      "txId": "TxID",
+      "imageFailed": "No se pudo cargar el comprobante.",
+      "imageAlt": "Comprobante de pago",
+      "qrHint": "Comprueba en tu banco que el pago llegó por el monto total antes de aprobarlo.",
+      "usdtHint": "Busca el TxID en el explorador de la red y comprueba el monto y la wallet de destino antes de aprobarlo.",
+      "approve": "Aprobar pago",
+      "reject": "Rechazar",
+      "confirmReject": "¿Rechazar el pago? El pedido se cancelará y el stock volverá a estar disponible."
     }
   },
   "AdminProducts": {
@@ -949,6 +1035,10 @@
       "PROCESS_RETURNS": {
         "label": "Devoluciones",
         "description": "Recibir devoluciones y reingresarlas al stock o a mermas"
+      },
+      "MANAGE_PAYMENTS": {
+        "label": "Gestión de pagos",
+        "description": "Configurar Stripe, el QR bancario y la wallet USDT de la tienda"
       }
     },
     "baseRoles": {
@@ -1420,8 +1510,8 @@
     "mrrNote": "MRR estimado con el precio de lista de cada plan en Stripe, para suscripciones activas o con pago pendiente. No descuenta cupones."
   },
   "AdminPayments": {
-    "title": "Pagos con tarjeta",
-    "subtitle": "Conecta la cuenta de Stripe donde se depositan las ventas con tarjeta de tu tienda.",
+    "title": "Gestión de pagos",
+    "subtitle": "Elige cómo te pagan tus clientes: tarjeta con Stripe, tu QR bancario o USDT.",
     "refresh": "Actualizar",
     "loading": "Cargando estado...",
     "loadFailed": "No se pudo cargar el estado de los pagos.",
@@ -1443,6 +1533,54 @@
     "redirecting": "Abriendo Stripe...",
     "linkExpired": "El enlace de Stripe venció. Vuelve a abrir el formulario para continuar.",
     "enabledNow": "¡Listo! Tu tienda ya acepta pagos con tarjeta.",
-    "note": "Stripe pide los datos del negocio y una cuenta bancaria para depositar las ventas. Mientras no esté habilitado, el checkout ofrece solo pago con QR."
+    "note": "Stripe pide los datos del negocio y una cuenta bancaria para depositar las ventas. Mientras no esté habilitado, el checkout no ofrece tarjeta.",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "saved": "Cambios guardados.",
+    "saveFailed": "No se pudieron guardar los cambios.",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "stripe": {
+      "title": "Stripe (tarjeta)",
+      "accountId": "Cuenta conectada",
+      "disconnect": "Desvincular",
+      "confirmDisconnect": "¿Desvincular la cuenta de Stripe? Tu tienda dejará de aceptar tarjetas hasta que vuelvas a conectarla.",
+      "disconnected": "Cuenta de Stripe desvinculada."
+    },
+    "qr": {
+      "title": "QR local (banco)",
+      "description": "Muestra el QR de tu banco en el checkout. El cliente paga desde su app y sube el comprobante; tú lo apruebas en Pedidos.",
+      "previewAlt": "QR bancario de la tienda",
+      "noImage": "Todavía no subiste el QR",
+      "uploadImage": "Subir QR",
+      "replaceImage": "Cambiar QR",
+      "removeImage": "Quitar",
+      "confirmRemove": "¿Quitar la imagen del QR? El pago con QR se desactivará.",
+      "imageUploaded": "QR actualizado.",
+      "imageRemoved": "QR eliminado.",
+      "imageHint": "PNG, JPG o WebP de hasta 2 MB.",
+      "invalidImage": "La imagen debe ser PNG, JPG o WebP.",
+      "imageTooLarge": "La imagen supera los 2 MB.",
+      "instructions": "Instrucciones de pago",
+      "instructionsPlaceholder": "Banco, titular, número de cuenta, glosa a indicar...",
+      "enable": "Ofrecer pago con QR en el checkout",
+      "enableHint": "Sube el QR para poder activarlo."
+    },
+    "usdt": {
+      "title": "USDT (cripto)",
+      "description": "El cliente envía USDT a tu wallet e informa el TxID de la transacción; tú lo verificas y lo apruebas en Pedidos.",
+      "network": "Red",
+      "networkPlaceholder": "Elige la red",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "address": "Dirección de la wallet",
+      "invalidAddress": "La dirección no es válida para la red {network}.",
+      "warning": "Revisa bien la red y la dirección: un envío a una red o dirección equivocada no se puede recuperar.",
+      "enable": "Ofrecer pago con USDT en el checkout"
+    }
   }
 }

@@ -316,7 +316,68 @@ enum PaymentMethod {
   STRIPE
   CASH
   PHYSICAL_CARD
+  // QR simulado (demo): se confirma solo al escanearlo
   QR
+  // QR bancario real de la tienda: el cliente sube el comprobante y la tienda lo aprueba a mano
+  BANK_QR
+  // Transferencia USDT a la wallet de la tienda: el cliente informa el TxID y la tienda lo verifica
+  USDT
+}
+
+enum UsdtNetwork {
+  TRC20
+  ERC20
+  BEP20
+  POLYGON
+}
+
+enum PaymentProofStatus {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+// Medios de cobro manuales de la tienda (una sola fila, id "default"). La cuenta de Stripe Connect
+// NO está acá: vive en public.tenants porque el webhook la necesita antes de abrir este schema.
+model PaymentSettings {
+  id String @id @default("default")
+
+  qrEnabled Boolean @default(false)
+  // Imagen del QR bancario (máx. ~2 MB); se sirve desde la API, nunca se lista junto al resto
+  qrImage Bytes?
+  qrImageType String?
+  qrInstructions String?
+
+  usdtEnabled Boolean @default(false)
+  usdtNetwork UsdtNetwork?
+  usdtWalletAddress String?
+
+  updatedAt DateTime @updatedAt
+
+  @@map("payment_settings")
+}
+
+// Comprobante de un pago manual (BANK_QR o USDT). Tabla aparte para que los listados de pedidos no
+// carguen la imagen. Mientras está PENDIENTE el stock del pedido sigue reservado.
+model PaymentProof {
+  id String @id @default(uuid())
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  method PaymentMethod
+  image Bytes?
+  imageType String?
+  txId String?
+  status PaymentProofStatus @default(PENDIENTE)
+
+  reviewedById String?
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("payment_proofs")
 }
 
 model Order {
@@ -361,6 +422,7 @@ model Order {
 
   orderItems OrderItem[]
   payment Payment?
+  paymentProof PaymentProof?
   // Devoluciones procesadas contra esta venta (puede haber varias, parciales)
   returns Return[]
 

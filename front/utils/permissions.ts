@@ -13,6 +13,7 @@ export const Permission = {
     ALL_BRANCHES: "ALL_BRANCHES",
     USE_POS: "USE_POS",
     PROCESS_RETURNS: "PROCESS_RETURNS",
+    MANAGE_PAYMENTS: "MANAGE_PAYMENTS",
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];
@@ -31,6 +32,7 @@ export const PERMISSION_OPTIONS: PermissionValue[] = [
     "ALL_BRANCHES",
     "USE_POS",
     "PROCESS_RETURNS",
+    "MANAGE_PAYMENTS",
 ];
 
 export const isPermission = (value: string): value is PermissionValue =>

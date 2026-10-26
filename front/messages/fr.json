@@ -162,7 +162,7 @@
     "notifications": "Notifications",
     "roles": "Rôles",
     "subscription": "Abonnement",
-    "payments": "Paiements par carte"
+    "payments": "Gestion des paiements"
   },
   "AdminShell": {
     "checkingAccess": "Vérification de l’accès...",
@@ -334,7 +334,11 @@
       "selectHint": "Choisissez un mode de paiement pour continuer",
       "offlineSaveFailed": "Impossible d’enregistrer la commande sur cet appareil.",
       "gatewayFailed": "Impossible d’initialiser la passerelle de paiement.",
-      "cardUnavailable": "Cette boutique n’accepte pas encore les cartes : vous pouvez payer par QR."
+      "cardUnavailable": "Cette boutique n’accepte pas encore les cartes : choisissez un autre moyen de paiement.",
+      "bankQr": "QR bancaire",
+      "bankQrDescription": "Payez depuis votre appli bancaire et importez le justificatif",
+      "usdt": "USDT",
+      "usdtDescription": "Transfert sur le réseau {network}"
     },
     "summary": {
       "title": "Récapitulatif de la commande",
@@ -406,6 +410,46 @@
       "goToStore": "Aller à la boutique",
       "errorTitle": "Erreur lors du traitement du paiement",
       "backHome": "Retour à l’accueil"
+    },
+    "manual": {
+      "qrTitle": "Scannez le QR avec votre appli bancaire",
+      "qrSubtitle": "Payez le montant exact, puis importez une capture du justificatif.",
+      "usdtTitle": "Envoyez des USDT au portefeuille de la boutique",
+      "usdtSubtitle": "Une fois le transfert confirmé, collez le TxID (hash) de la transaction.",
+      "qrAlt": "QR bancaire de la boutique",
+      "walletQrAlt": "QR de l’adresse du portefeuille",
+      "qrLoadFailed": "Impossible de charger le QR de la boutique.",
+      "amount": "Montant à payer",
+      "usdtAmountHint": "Envoyez l’équivalent en USDT. La boutique vérifie le montant avant d’approuver le paiement.",
+      "instructions": "Instructions",
+      "network": "Réseau",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "wallet": "Adresse",
+      "copy": "Copier",
+      "copied": "Copié !",
+      "networkWarning": "N’envoyez des USDT que sur le réseau {network}. Les fonds envoyés sur un autre réseau sont perdus.",
+      "uploadReceipt": "Importer le justificatif",
+      "changeReceipt": "Changer de justificatif",
+      "receiptHint": "Capture ou photo du justificatif (PNG, JPG ou WebP, 2 Mo max.).",
+      "invalidImage": "L’image doit être au format PNG, JPG ou WebP.",
+      "imageTooLarge": "L’image dépasse 2 Mo.",
+      "txId": "TxID de la transaction",
+      "txIdPlaceholderTron": "64 caractères hexadécimaux",
+      "txIdPlaceholderEvm": "0x suivi de 64 caractères",
+      "txIdHint": "Vous le trouverez dans le détail de la transaction de votre portefeuille ou plateforme d’échange.",
+      "submit": "Envoyer le justificatif",
+      "submitting": "Envoi...",
+      "submitFailed": "Impossible d’envoyer le justificatif.",
+      "orderFailed": "Impossible de créer la commande.",
+      "reviewNote": "Votre commande reste réservée pendant que la boutique vérifie le paiement.",
+      "submittedTitle": "Justificatif reçu !",
+      "submittedText": "La boutique vérifiera le paiement et confirmera votre commande. Vous pouvez la suivre dans Mes commandes.",
+      "viewOrder": "Voir ma commande"
     }
   },
   "Store": {
@@ -582,7 +626,13 @@
       "employeeDiscount": "Remise employé",
       "shippingCost": "Frais de livraison",
       "total": "Total",
-      "cancelled": "Cette commande a été annulée."
+      "cancelled": "Cette commande a été annulée.",
+      "proofLabel": "Vérification du paiement",
+      "proofStates": {
+        "PENDIENTE": "En cours de vérification par la boutique",
+        "APROBADO": "Approuvé",
+        "RECHAZADO": "Refusé"
+      }
     },
     "status": {
       "PENDIENTE": "En attente",
@@ -748,6 +798,42 @@
       "ENVIADO": "Expédiée",
       "ENTREGADO": "Livrée",
       "CANCELADO": "Annulée"
+    },
+    "payment": "Paiement",
+    "methods": {
+      "STRIPE": "Carte",
+      "CASH": "Espèces",
+      "PHYSICAL_CARD": "Carte (caisse)",
+      "QR": "QR simple",
+      "BANK_QR": "QR bancaire",
+      "USDT": "USDT",
+      "other": "Autre"
+    },
+    "paymentStatuses": {
+      "PENDIENTE": "Paiement en attente",
+      "COMPLETADO": "Payé",
+      "FALLIDO": "Paiement échoué",
+      "REEMBOLSADO": "Remboursé",
+      "other": "—"
+    },
+    "proof": {
+      "states": {
+        "PENDIENTE": "À vérifier",
+        "APROBADO": "Approuvé",
+        "RECHAZADO": "Refusé"
+      },
+      "review": "Vérifier le paiement",
+      "title": "Paiement de la commande #{id}",
+      "method": "Moyen de paiement",
+      "sentAt": "Envoyé",
+      "txId": "TxID",
+      "imageFailed": "Impossible de charger le justificatif.",
+      "imageAlt": "Justificatif de paiement",
+      "qrHint": "Vérifiez auprès de votre banque que le montant total est bien arrivé avant d’approuver.",
+      "usdtHint": "Recherchez le TxID dans l’explorateur du réseau et vérifiez le montant et le portefeuille de destination avant d’approuver.",
+      "approve": "Approuver le paiement",
+      "reject": "Refuser",
+      "confirmReject": "Refuser le paiement ? La commande sera annulée et le stock libéré."
     }
   },
   "AdminProducts": {
@@ -949,6 +1035,10 @@
       "PROCESS_RETURNS": {
         "label": "Retours",
         "description": "Recevoir les retours et les remettre en stock ou en pertes"
+      },
+      "MANAGE_PAYMENTS": {
+        "label": "Gestion des paiements",
+        "description": "Configurer le compte Stripe, le QR bancaire et le portefeuille USDT de la boutique"
       }
     },
     "baseRoles": {
@@ -1420,8 +1510,8 @@
     "mrrNote": "MRR estimé à partir du prix catalogue de chaque offre dans Stripe, pour les abonnements actifs ou en retard de paiement. Les coupons ne sont pas déduits."
   },
   "AdminPayments": {
-    "title": "Paiements par carte",
-    "subtitle": "Connectez le compte Stripe sur lequel sont versées les ventes par carte de votre boutique.",
+    "title": "Gestion des paiements",
+    "subtitle": "Choisissez comment vos clients vous paient : carte avec Stripe, votre QR bancaire ou USDT.",
     "refresh": "Actualiser",
     "loading": "Chargement du statut...",
     "loadFailed": "Impossible de charger le statut des paiements.",
@@ -1443,6 +1533,54 @@
     "redirecting": "Ouverture de Stripe...",
     "linkExpired": "Le lien Stripe a expiré. Rouvrez le formulaire pour continuer.",
     "enabledNow": "C’est fait ! Votre boutique accepte désormais les paiements par carte.",
-    "note": "Stripe demande les informations de votre entreprise et un compte bancaire pour verser les ventes. Tant que ce n’est pas activé, le paiement ne propose que le QR."
+    "note": "Stripe demande les informations de votre entreprise et un compte bancaire pour verser les ventes. Tant que ce n’est pas activé, le paiement par carte n’est pas proposé.",
+    "save": "Enregistrer",
+    "saving": "Enregistrement...",
+    "saved": "Modifications enregistrées.",
+    "saveFailed": "Impossible d’enregistrer les modifications.",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "stripe": {
+      "title": "Stripe (carte)",
+      "accountId": "Compte connecté",
+      "disconnect": "Dissocier",
+      "confirmDisconnect": "Dissocier le compte Stripe ? Votre boutique n’acceptera plus les cartes jusqu’à ce que vous le reconnectiez.",
+      "disconnected": "Compte Stripe dissocié."
+    },
+    "qr": {
+      "title": "QR local (banque)",
+      "description": "Affichez le QR de votre banque au paiement. Le client paie depuis son appli bancaire et importe le justificatif ; vous l’approuvez dans Commandes.",
+      "previewAlt": "QR bancaire de la boutique",
+      "noImage": "Vous n’avez pas encore importé le QR",
+      "uploadImage": "Importer le QR",
+      "replaceImage": "Remplacer le QR",
+      "removeImage": "Supprimer",
+      "confirmRemove": "Supprimer l’image du QR ? Le paiement par QR sera désactivé.",
+      "imageUploaded": "QR mis à jour.",
+      "imageRemoved": "QR supprimé.",
+      "imageHint": "PNG, JPG ou WebP jusqu’à 2 Mo.",
+      "invalidImage": "L’image doit être au format PNG, JPG ou WebP.",
+      "imageTooLarge": "L’image dépasse 2 Mo.",
+      "instructions": "Instructions de paiement",
+      "instructionsPlaceholder": "Banque, titulaire, numéro de compte, référence à indiquer...",
+      "enable": "Proposer le paiement par QR",
+      "enableHint": "Importez le QR pour pouvoir l’activer."
+    },
+    "usdt": {
+      "title": "USDT (crypto)",
+      "description": "Le client envoie des USDT à votre portefeuille et indique le TxID de la transaction ; vous le vérifiez et l’approuvez dans Commandes.",
+      "network": "Réseau",
+      "networkPlaceholder": "Choisissez le réseau",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "address": "Adresse du portefeuille",
+      "invalidAddress": "L’adresse n’est pas valide pour le réseau {network}.",
+      "warning": "Vérifiez bien le réseau et l’adresse : des fonds envoyés sur le mauvais réseau ou à la mauvaise adresse sont irrécupérables.",
+      "enable": "Proposer le paiement en USDT"
+    }
   }
 }

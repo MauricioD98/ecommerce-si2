@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -9,6 +9,8 @@ import styles from './orders.module.scss';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { useBranches } from '@/hooks/useBranches';
 import OrderTimeline from './OrderTimeline';
+import ManualPaymentSection from '../checkout/ManualPaymentSection';
+import { ManualPaymentMethod, PaymentOptions, paymentSettingsService } from '@/service/api/paymentSettings.service';
 import { ORDER_STATUS_BADGE_CLASS, OrderStatusValue, formatOrderDate, isOrderStatus, isPaymentStatus } from './orderStatus';
 
 interface OrderDetailClientProps {
@@ -18,10 +20,27 @@ interface OrderDetailClientProps {
 // Detalle y seguimiento de un pedido propio: qué se compró (con talla), estado del pago,
 // método de entrega/dirección y el timeline de progreso
 export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
-    const { order, isLoading, error } = useOrderDetail(orderId);
+    const { order, isLoading, error, reload } = useOrderDetail(orderId);
     const { branches } = useBranches();
     const t = useTranslations('Account');
     const locale = useLocale();
+
+    // Pedido con QR bancario / USDT que todavía no tiene comprobante (p. ej. se cerró el checkout antes
+    // de enviarlo): se puede enviar desde acá
+    const awaitingProof = Boolean(
+        order &&
+            (order.paymentMethod === 'BANK_QR' || order.paymentMethod === 'USDT') &&
+            order.status === 'PENDIENTE' &&
+            order.paymentStatus === 'PENDIENTE' &&
+            !order.paymentProof,
+    );
+    const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
+    useEffect(() => {
+        if (awaitingProof) paymentSettingsService.getOptions().then(setPaymentOptions).catch(() => undefined);
+    }, [awaitingProof]);
+    const manualMethod = order?.paymentMethod as ManualPaymentMethod | undefined;
+    const methodAvailable =
+        manualMethod === 'BANK_QR' ? Boolean(paymentOptions?.bankQr) : manualMethod === 'USDT' ? Boolean(paymentOptions?.usdt) : false;
 
     return (
         <section className={accountStyles.page}>
@@ -78,7 +97,25 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                                         {isPaymentStatus(order.paymentStatus) ? t(`payment.${order.paymentStatus}`) : order.paymentStatus}
                                     </span>
                                 </div>
+                                {order.paymentProof && (
+                                    <div className={styles.infoBlock}>
+                                        <span className={styles.infoLabel}>{t('orders.proofLabel')}</span>
+                                        <span className={styles.infoValue}>{t(`orders.proofStates.${order.paymentProof.status}`)}</span>
+                                    </div>
+                                )}
                             </div>
+
+                            {awaitingProof && paymentOptions && manualMethod && methodAvailable && (
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <ManualPaymentSection
+                                        method={manualMethod}
+                                        options={paymentOptions}
+                                        amount={Number(order.total)}
+                                        ensureOrder={async () => order.id}
+                                        onSubmitted={reload}
+                                    />
+                                </div>
+                            )}
 
                             <h2 className={accountStyles.heading} style={{ fontSize: '1.0625rem', marginBottom: '0.75rem' }}>
                                 {t('orders.items')}

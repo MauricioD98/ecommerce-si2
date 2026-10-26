@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { OrderService } from "@/service/api/order.service";
+import { paymentSettingsService } from "@/service/api/paymentSettings.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { AdminOrder, OrderStatus } from "@/types/admin.types";
 
@@ -50,6 +51,15 @@ export function useAdminOrders(page: number) {
         replaceOrder(await OrderService.cancelAdminOrder(id));
     };
 
+    // Pagos manuales: aprobar pasa el pedido a PROCESANDO; rechazar lo cancela y repone el stock
+    const approveProof = async (id: string) => {
+        replaceOrder(await paymentSettingsService.approveProof(id));
+    };
+
+    const rejectProof = async (id: string) => {
+        replaceOrder(await paymentSettingsService.rejectProof(id));
+    };
+
     return {
         orders,
         total,
@@ -58,5 +68,7 @@ export function useAdminOrders(page: number) {
         error,
         changeStatus,
         cancelOrder,
+        approveProof,
+        rejectProof,
     };
 }

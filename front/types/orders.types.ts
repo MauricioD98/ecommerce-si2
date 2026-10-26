@@ -16,9 +16,9 @@ export interface CreateOrderRequest {
     longitude?: number;
     fulfillmentType: FulfillmentType;
     branchId?: string;
-    // El backend solo valida este campo con @IsIn(['QR']) (CreateOrderDto): enviarlo únicamente para
-    // el flujo QR. Para Stripe se omite (STRIPE es el default del esquema); mandar "STRIPE" aquí da 400.
-    paymentMethod?: "QR";
+    // CreateOrderDto acepta QR, BANK_QR o USDT. Para Stripe se omite (STRIPE es el default del
+    // esquema); mandar "STRIPE" aquí da 400.
+    paymentMethod?: "QR" | "BANK_QR" | "USDT";
 }
 
 export interface OrderItemDetail {
@@ -30,6 +30,16 @@ export interface OrderItemDetail {
     quantity: number;
     price: number;
     subtotal: number;
+}
+
+// Comprobante de un pago manual (QR bancario / USDT); la imagen se pide aparte
+export interface PaymentProofSummary {
+    status: "PENDIENTE" | "APROBADO" | "RECHAZADO";
+    method: "BANK_QR" | "USDT";
+    txId: string | null;
+    hasImage: boolean;
+    createdAt: string;
+    reviewedAt: string | null;
 }
 
 export interface Order {
@@ -47,6 +57,8 @@ export interface Order {
     discountApplied: number;
     status: string;
     paymentStatus: string;
+    paymentMethod?: string;
+    paymentProof?: PaymentProofSummary | null;
     items: OrderItemDetail[];
     createdAt: string;
     updateAt: string;

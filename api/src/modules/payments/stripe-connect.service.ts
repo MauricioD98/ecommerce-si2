@@ -102,6 +102,25 @@ export class StripeConnectService {
     }
   }
 
+  /**
+   * Desvincula la cuenta conectada: la tienda deja de cobrar con tarjeta. La cuenta Express NO se
+   * borra en Stripe (puede tener saldo o pagos en curso que la tienda todavía tiene que cobrar);
+   * para volver a conectar se repite el onboarding.
+   */
+  async disconnect(tenantId: string): Promise<void> {
+    const { count } = await this.control.tenant.updateMany({
+      where: { id: tenantId },
+      data: { stripeAccountId: null, stripeChargesEnabled: false },
+    });
+    if (count === 0) throw new NotFoundException('Tienda no encontrada');
+  }
+
+  /** Cuenta conectada (para mostrarla en el panel), sin consultar a Stripe. */
+  async getAccountId(tenantId: string): Promise<string | null> {
+    const tenant = await this.control.tenant.findUnique({ where: { id: tenantId }, select: { stripeAccountId: true } });
+    return tenant?.stripeAccountId ?? null;
+  }
+
   /** Para el checkout de la tienda: sin cuenta habilitada no se ofrece el pago con tarjeta. */
   async isCardEnabled(tenantId: string): Promise<boolean> {
     const tenant = await this.control.tenant.findUnique({

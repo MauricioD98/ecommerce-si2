@@ -12,6 +12,7 @@ export const Permission = {
   ALL_BRANCHES: 'ALL_BRANCHES', // alcance global: sin este permiso solo se opera sobre la sucursal propia
   USE_POS: 'USE_POS', // caja física (punto de venta) de la sucursal propia
   PROCESS_RETURNS: 'PROCESS_RETURNS', // punto de devolución: reingresar prendas al stock o a mermas
+  MANAGE_PAYMENTS: 'MANAGE_PAYMENTS', // medios de cobro de la tienda: Stripe, QR bancario y USDT
 } as const;
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];

@@ -37,7 +37,7 @@ const NAV_ITEMS: NavItem[] = [
     { href: "/admin/notifications", icon: Bell, permission: Permission.SEND_MARKETING, label: "notifications" },
     { href: "/admin/roles", icon: ShieldCheck, permission: Permission.MANAGE_ROLES, label: "roles" },
     { href: "/admin/suscripcion", icon: CreditCard, permission: Permission.MANAGE_ROLES, label: "subscription", superAdminOnly: true },
-    { href: "/admin/pagos", icon: Landmark, permission: Permission.MANAGE_ROLES, label: "payments", superAdminOnly: true },
+    { href: "/admin/settings/payments", icon: Landmark, permission: Permission.MANAGE_PAYMENTS, label: "payments" },
 ];
 
 // Ítems del menú lateral según los permisos del usuario. Las rutas son las mismas para todos,

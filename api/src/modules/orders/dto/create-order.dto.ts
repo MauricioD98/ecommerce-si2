@@ -93,11 +93,11 @@ export class CreateOrderDto {
   branchId?: string;
 
   @ApiPropertyOptional({
-    enum: ['QR'],
+    enum: ['QR', 'BANK_QR', 'USDT'],
     description:
-      'Solo para checkout sin Stripe (ej. pedido guardado offline y sincronizado luego). Omitido, el pedido usa STRIPE (default). paymentStatus siempre queda PENDIENTE: el pago manual lo confirma el staff.',
+      'Checkout sin Stripe. QR: QR simulado (o pedido offline sincronizado). BANK_QR / USDT: medios manuales de la tienda (solo si están activos en PaymentSettings); el cliente sube luego el comprobante o el TxID. Omitido, el pedido usa STRIPE (default). paymentStatus siempre queda PENDIENTE.',
   })
   @IsOptional()
-  @IsIn(['QR'])
-  paymentMethod?: 'QR';
+  @IsIn(['QR', 'BANK_QR', 'USDT'])
+  paymentMethod?: 'QR' | 'BANK_QR' | 'USDT';
 }

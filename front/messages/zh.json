@@ -162,7 +162,7 @@
     "notifications": "通知",
     "roles": "角色",
     "subscription": "订阅",
-    "payments": "银行卡收款"
+    "payments": "支付管理"
   },
   "AdminShell": {
     "checkingAccess": "正在验证权限...",
@@ -334,7 +334,11 @@
       "selectHint": "请选择付款方式以继续",
       "offlineSaveFailed": "无法在此设备上保存订单。",
       "gatewayFailed": "无法初始化支付网关。",
-      "cardUnavailable": "此店铺暂不支持银行卡付款，可使用扫码付款。"
+      "cardUnavailable": "本店暂不支持银行卡支付：请选择其他支付方式。",
+      "bankQr": "银行二维码",
+      "bankQrDescription": "用银行 App 付款并上传凭证",
+      "usdt": "USDT",
+      "usdtDescription": "通过 {network} 网络转账"
     },
     "summary": {
       "title": "订单摘要",
@@ -406,6 +410,46 @@
       "goToStore": "前往商店",
       "errorTitle": "处理付款时出错",
       "backHome": "返回首页"
+    },
+    "manual": {
+      "qrTitle": "用银行 App 扫描二维码",
+      "qrSubtitle": "支付准确金额，然后上传付款凭证截图。",
+      "usdtTitle": "向店铺钱包转账 USDT",
+      "usdtSubtitle": "转账确认后，粘贴交易的 TxID（哈希）。",
+      "qrAlt": "店铺银行二维码",
+      "walletQrAlt": "钱包地址二维码",
+      "qrLoadFailed": "无法加载店铺二维码。",
+      "amount": "应付金额",
+      "usdtAmountHint": "请转账等值的 USDT。店铺会在审核前核对金额。",
+      "instructions": "说明",
+      "network": "网络",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "wallet": "地址",
+      "copy": "复制",
+      "copied": "已复制！",
+      "networkWarning": "仅可通过 {network} 网络转账 USDT。通过其他网络转账的资金将会丢失。",
+      "uploadReceipt": "上传凭证",
+      "changeReceipt": "更换凭证",
+      "receiptHint": "付款凭证截图或照片（PNG、JPG 或 WebP，最大 2 MB）。",
+      "invalidImage": "图片必须是 PNG、JPG 或 WebP 格式。",
+      "imageTooLarge": "图片超过 2 MB。",
+      "txId": "交易 TxID",
+      "txIdPlaceholderTron": "64 位十六进制字符",
+      "txIdPlaceholderEvm": "0x 加 64 位字符",
+      "txIdHint": "可在钱包或交易所的交易详情中找到。",
+      "submit": "提交凭证",
+      "submitting": "正在提交...",
+      "submitFailed": "无法提交凭证。",
+      "orderFailed": "无法创建订单。",
+      "reviewNote": "店铺核实付款期间，您的订单将保持预留。",
+      "submittedTitle": "已收到您的凭证！",
+      "submittedText": "店铺将核实付款并确认您的订单。您可以在“我的订单”中查看进度。",
+      "viewOrder": "查看我的订单"
     }
   },
   "Store": {
@@ -582,7 +626,13 @@
       "employeeDiscount": "员工折扣",
       "shippingCost": "运费",
       "total": "合计",
-      "cancelled": "此订单已取消。"
+      "cancelled": "此订单已取消。",
+      "proofLabel": "付款核实",
+      "proofStates": {
+        "PENDIENTE": "店铺审核中",
+        "APROBADO": "已通过",
+        "RECHAZADO": "已拒绝"
+      }
     },
     "status": {
       "PENDIENTE": "待处理",
@@ -748,6 +798,42 @@
       "ENVIADO": "已发货",
       "ENTREGADO": "已送达",
       "CANCELADO": "已取消"
+    },
+    "payment": "付款",
+    "methods": {
+      "STRIPE": "银行卡",
+      "CASH": "现金",
+      "PHYSICAL_CARD": "银行卡（收银台）",
+      "QR": "简易二维码",
+      "BANK_QR": "银行二维码",
+      "USDT": "USDT",
+      "other": "其他"
+    },
+    "paymentStatuses": {
+      "PENDIENTE": "待付款",
+      "COMPLETADO": "已付款",
+      "FALLIDO": "付款失败",
+      "REEMBOLSADO": "已退款",
+      "other": "—"
+    },
+    "proof": {
+      "states": {
+        "PENDIENTE": "待核实",
+        "APROBADO": "已通过",
+        "RECHAZADO": "已拒绝"
+      },
+      "review": "审核付款",
+      "title": "订单 #{id} 的付款",
+      "method": "支付方式",
+      "sentAt": "提交时间",
+      "txId": "TxID",
+      "imageFailed": "无法加载凭证。",
+      "imageAlt": "付款凭证",
+      "qrHint": "通过前，请在银行确认全额款项已到账。",
+      "usdtHint": "通过前，请在区块浏览器中查询该 TxID，并核对金额和收款钱包。",
+      "approve": "通过付款",
+      "reject": "拒绝",
+      "confirmReject": "要拒绝该付款吗？订单将被取消，库存将释放。"
     }
   },
   "AdminProducts": {
@@ -949,6 +1035,10 @@
       "PROCESS_RETURNS": {
         "label": "退货",
         "description": "接收退货并重新入库或计入损耗"
+      },
+      "MANAGE_PAYMENTS": {
+        "label": "支付管理",
+        "description": "配置店铺的 Stripe 账户、银行二维码和 USDT 钱包"
       }
     },
     "baseRoles": {
@@ -1420,8 +1510,8 @@
     "mrrNote": "MRR 按各套餐在 Stripe 中的标价估算，统计正常及逾期付款的订阅，未扣除优惠券。"
   },
   "AdminPayments": {
-    "title": "银行卡收款",
-    "subtitle": "连接用于接收店铺银行卡销售款的 Stripe 账户。",
+    "title": "支付管理",
+    "subtitle": "选择顾客的付款方式：Stripe 银行卡、您的银行二维码或 USDT。",
     "refresh": "刷新",
     "loading": "正在加载状态...",
     "loadFailed": "无法加载收款状态。",
@@ -1443,6 +1533,54 @@
     "redirecting": "正在打开 Stripe...",
     "linkExpired": "Stripe 链接已过期。请重新打开表单继续。",
     "enabledNow": "完成！你的店铺已支持银行卡付款。",
-    "note": "Stripe 会要求填写企业信息和用于接收销售款的银行账户。启用之前，结账时只提供扫码付款。"
+    "note": "Stripe 需要您的商家信息和用于入账的银行账户。启用之前，结账页面不提供银行卡支付。",
+    "save": "保存",
+    "saving": "正在保存...",
+    "saved": "更改已保存。",
+    "saveFailed": "无法保存更改。",
+    "active": "已启用",
+    "inactive": "未启用",
+    "stripe": {
+      "title": "Stripe（银行卡）",
+      "accountId": "已关联账户",
+      "disconnect": "解除关联",
+      "confirmDisconnect": "要解除 Stripe 账户关联吗？在重新关联之前，您的店铺将无法接受银行卡付款。",
+      "disconnected": "已解除 Stripe 账户关联。"
+    },
+    "qr": {
+      "title": "本地二维码（银行）",
+      "description": "在结账页面显示您的银行二维码。顾客用银行 App 付款并上传凭证，您在“订单”中审核通过。",
+      "previewAlt": "店铺银行二维码",
+      "noImage": "尚未上传二维码",
+      "uploadImage": "上传二维码",
+      "replaceImage": "更换二维码",
+      "removeImage": "移除",
+      "confirmRemove": "要移除二维码图片吗？二维码支付将被停用。",
+      "imageUploaded": "二维码已更新。",
+      "imageRemoved": "二维码已移除。",
+      "imageHint": "PNG、JPG 或 WebP，最大 2 MB。",
+      "invalidImage": "图片必须是 PNG、JPG 或 WebP 格式。",
+      "imageTooLarge": "图片超过 2 MB。",
+      "instructions": "付款说明",
+      "instructionsPlaceholder": "银行、户名、账号、需填写的备注...",
+      "enable": "在结账页面提供二维码支付",
+      "enableHint": "上传二维码后才能启用。"
+    },
+    "usdt": {
+      "title": "USDT（加密货币）",
+      "description": "顾客向您的钱包转账 USDT 并填写交易 TxID，您在“订单”中核实并审核通过。",
+      "network": "网络",
+      "networkPlaceholder": "选择网络",
+      "networks": {
+        "TRC20": "TRC20 (Tron)",
+        "ERC20": "ERC20 (Ethereum)",
+        "BEP20": "BEP20 (BNB Smart Chain)",
+        "POLYGON": "Polygon (PoS)"
+      },
+      "address": "钱包地址",
+      "invalidAddress": "该地址对 {network} 网络无效。",
+      "warning": "请仔细核对网络和地址：转到错误网络或地址的资金无法找回。",
+      "enable": "在结账页面提供 USDT 支付"
+    }
   }
 }

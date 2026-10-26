@@ -10,6 +10,8 @@ export function useOrderDetail(orderId: string | undefined) {
     const [order, setOrder] = useState<Order | null>(null);
     const [loadedId, setLoadedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Para volver a leer el pedido (p. ej. después de enviar el comprobante de pago)
+    const [version, setVersion] = useState(0);
     // Los nombres de producto vienen traducidos: se recarga al cambiar de idioma
     const localeVersion = useLocaleVersion();
     const t = useTranslations("Account.orders");
@@ -35,7 +37,7 @@ export function useOrderDetail(orderId: string | undefined) {
             active = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orderId, localeVersion]);
+    }, [orderId, localeVersion, version]);
 
-    return { order, isLoading: loadedId !== orderId, error };
+    return { order, isLoading: loadedId !== orderId, error, reload: () => setVersion((v) => v + 1) };
 }

@@ -1,11 +1,11 @@
 'use client';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import CheckoutSteps from './CheckoutSteps';
 import CheckoutHeader from './CheckoutHeader';
 import DeliveryStep from './DeliveryStep';
 import styles from './checkout.module.scss';
-import { CreditCard, WifiOff, QrCode } from 'lucide-react';
+import { CreditCard, WifiOff, QrCode, Landmark, Coins } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
 // IMPORTANTE: Asegúrate de que las rutas de importación apunten a los archivos reales en tu proyecto
@@ -18,6 +18,7 @@ import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { StripePaymentProvider, StripePaymentForm, StripePaymentPlaceholder } from './stripe-payment-form';
 import PaymentMethodCard from './PaymentMethodCard'; // Debes tener este componente creado
 import QrPaymentSection from './QrPaymentSection';
+import ManualPaymentSection from './ManualPaymentSection';
 import { OrderItem, CreateOrderRequest } from '@/types/orders.types';
 import { CartItem } from '@/types/cart.types';
 import { FulfillmentType } from '@/types/branch.types';
@@ -25,7 +26,7 @@ import { DeliveryAddress, formatShippingAddress } from '@/types/address.types';
 import { DELIVERY_SHIPPING_COST, round2 } from '@/utils/pricing';
 import { addOfflineOrder } from '@/utils/offlineOrderQueue';
 import { getApiErrorMessage } from '@/service/api/error.utils';
-import { connectService } from '@/service/api/connect.service';
+import { PaymentOptions, paymentSettingsService } from '@/service/api/paymentSettings.service';
 import { useStoreName } from '@/providers/StoreInfoProvider';
 
 export const revalidate = false;
@@ -58,12 +59,18 @@ export default function CheckoutClient() {
     const { createOrder, order, error: orderError } = useOrder();
     const { selectedBranch, selectedBranchId } = useBranches();
     const { isOnline } = useNetworkStatus();
-    // La tarjeta solo se ofrece si la tienda completó su cuenta de cobros (Stripe Connect); si no, el
-    // backend rechaza el PaymentIntent. null = todavía no se sabe.
-    const [cardEnabled, setCardEnabled] = useState<boolean | null>(null);
+    // Medios de cobro activos de la tienda (Gestión de pagos). La tarjeta solo se ofrece si completó su
+    // cuenta de cobros (Stripe Connect); si no, el backend rechaza el PaymentIntent. null = todavía no se sabe.
+    const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
+    const [optionsLoaded, setOptionsLoaded] = useState(false);
     useEffect(() => {
-        connectService.isCardEnabled().then(setCardEnabled).catch(() => setCardEnabled(false));
+        paymentSettingsService
+            .getOptions()
+            .then(setPaymentOptions)
+            .catch(() => setPaymentOptions({ card: false, bankQr: null, usdt: null }))
+            .finally(() => setOptionsLoaded(true));
     }, []);
+    const cardEnabled = optionsLoaded ? Boolean(paymentOptions?.card) : null;
     const [isSavingOffline, setIsSavingOffline] = useState(false);
     const [offlineError, setOfflineError] = useState<string | null>(null);
 
@@ -97,58 +104,76 @@ export default function CheckoutClient() {
     useEffect(() => {
         if (currentStep !== 2 || selectedPayment) return;
         if (!isOnline) setSelectedPayment("offline");
-        else if (cardEnabled !== null) setSelectedPayment(cardEnabled ? "stripe" : "qr");
-    }, [currentStep, selectedPayment, isOnline, cardEnabled]);
+        else if (cardEnabled !== null) {
+            // Sin tarjeta se prefieren los medios reales de la tienda (no crean el pedido hasta enviar el
+            // comprobante) antes que el QR simulado, que crea el pedido apenas se selecciona
+            setSelectedPayment(
+                cardEnabled ? "stripe" : paymentOptions?.bankQr ? "bank_qr" : paymentOptions?.usdt ? "usdt" : "qr",
+            );
+        }
+    }, [currentStep, selectedPayment, isOnline, cardEnabled, paymentOptions]);
+
+    // Creación del pedido en curso: si dos caminos la piden a la vez (p. ej. el QR simple al
+    // preseleccionarse y el envío de un comprobante), comparten la misma petición en vez de crear dos
+    const orderInFlight = useRef<Promise<string | null> | null>(null);
 
     const ensureOrderCreated = useCallback(async (forceRetry = false): Promise<string | null> => {
+        if (orderInFlight.current) return orderInFlight.current;
         let activeOrderId = orderId;
 
         // Crear la orden si no existe aún o si se fuerza reintento
         if (!activeOrderId || forceRetry) {
-            setIsCreatingOrder(true);
-            setStripeError(null);
-            setOrderFailed(false);
+            const create = async (): Promise<string | null> => {
+                setIsCreatingOrder(true);
+                setStripeError(null);
+                setOrderFailed(false);
 
-            try {
-                const cartItems: OrderItem[] = items.map((item: CartItem) => ({
-                    productId: item.product?.id || item.productId,
-                    quantity: item.quantity,
-                    selectedSize: item.selectedSize,
-                }));
+                try {
+                    const cartItems: OrderItem[] = items.map((item: CartItem) => ({
+                        productId: item.product?.id || item.productId,
+                        quantity: item.quantity,
+                        selectedSize: item.selectedSize,
+                    }));
 
-                // createOrder (useOrder) ahora lanza con el mensaje EXACTO del backend en vez de
-                // devolver null; si esta línea no lanza, createdOrder siempre viene con datos.
-                const createdOrder = await createOrder({
-                    items: cartItems,
-                    fulfillmentType,
-                    branchId: selectedBranchId ?? undefined,
-                    // El backend solo acepta 'QR' explícito (@IsIn(['QR']) en CreateOrderDto); para
-                    // Stripe hay que omitir el campo, no enviar 'STRIPE' (eso da 400 y aborta la orden).
-                    ...(selectedPayment === 'qr' ? { paymentMethod: 'QR' as const } : {}),
-                    ...(!isPickup && deliveryAddress
-                        ? {
-                            shippingAddress: formatShippingAddress(deliveryAddress),
-                            latitude: deliveryAddress.latitude,
-                            longitude: deliveryAddress.longitude,
-                        }
-                        : {}),
-                });
+                    // createOrder (useOrder) ahora lanza con el mensaje EXACTO del backend en vez de
+                    // devolver null; si esta línea no lanza, createdOrder siempre viene con datos.
+                    const createdOrder = await createOrder({
+                        items: cartItems,
+                        fulfillmentType,
+                        branchId: selectedBranchId ?? undefined,
+                        // El backend acepta QR, BANK_QR o USDT (CreateOrderDto); para Stripe hay que omitir
+                        // el campo, no enviar 'STRIPE' (eso da 400 y aborta la orden).
+                        ...(selectedPayment === 'qr' ? { paymentMethod: 'QR' as const } : {}),
+                        ...(selectedPayment === 'bank_qr' ? { paymentMethod: 'BANK_QR' as const } : {}),
+                        ...(selectedPayment === 'usdt' ? { paymentMethod: 'USDT' as const } : {}),
+                        ...(!isPickup && deliveryAddress
+                            ? {
+                                shippingAddress: formatShippingAddress(deliveryAddress),
+                                latitude: deliveryAddress.latitude,
+                                longitude: deliveryAddress.longitude,
+                            }
+                            : {}),
+                    });
 
-                activeOrderId = createdOrder.id;
-                setOrderId(createdOrder.id);
-                setOrderTotal(Number(createdOrder.total));
-                setOrderDiscount(Number(createdOrder.discountApplied ?? 0));
-                setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
-                return activeOrderId ?? null;
-            } catch (error) {
-                // error.message es ahora el texto EXACTO devuelto por NestJS (ej. "size should not
-                // be empty"), no un texto genérico fijo — ver useOrder.createOrder.
-                console.error("Error al preparar la orden:", error instanceof Error ? error.message : error);
-                setOrderFailed(true);
-                return null;
-            } finally {
-                setIsCreatingOrder(false);
-            }
+                    activeOrderId = createdOrder.id;
+                    setOrderId(createdOrder.id);
+                    setOrderTotal(Number(createdOrder.total));
+                    setOrderDiscount(Number(createdOrder.discountApplied ?? 0));
+                    setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
+                    return activeOrderId ?? null;
+                } catch (error) {
+                    // error.message es ahora el texto EXACTO devuelto por NestJS (ej. "size should not
+                    // be empty"), no un texto genérico fijo — ver useOrder.createOrder.
+                    console.error("Error al preparar la orden:", error instanceof Error ? error.message : error);
+                    setOrderFailed(true);
+                    return null;
+                } finally {
+                    setIsCreatingOrder(false);
+                    orderInFlight.current = null;
+                }
+            };
+            orderInFlight.current = create();
+            return orderInFlight.current;
         }
 
         return activeOrderId ?? null;
@@ -404,6 +429,45 @@ export default function CheckoutClient() {
                                                 isLoadingOrder={isCreatingOrder}
                                                 onSuccess={handlePaymentSuccess}
                                                 onError={handlePaymentError}
+                                            />
+                                        </PaymentMethodCard>
+                                    )}
+
+                                    {/* Medios manuales de la tienda: el pedido se crea recién al enviar el comprobante */}
+                                    {isOnline && paymentOptions?.bankQr && (
+                                        <PaymentMethodCard
+                                            method="bank_qr"
+                                            selectedMethod={selectedPayment}
+                                            onSelect={handlePaymentMethodSelect}
+                                            icon={<Landmark />}
+                                            title={t('payment.bankQr')}
+                                            description={t('payment.bankQrDescription')}
+                                        >
+                                            <ManualPaymentSection
+                                                method="BANK_QR"
+                                                options={paymentOptions}
+                                                amount={payableTotal}
+                                                ensureOrder={() => ensureOrderCreated()}
+                                                onSubmitted={clearAllCart}
+                                            />
+                                        </PaymentMethodCard>
+                                    )}
+
+                                    {isOnline && paymentOptions?.usdt && (
+                                        <PaymentMethodCard
+                                            method="usdt"
+                                            selectedMethod={selectedPayment}
+                                            onSelect={handlePaymentMethodSelect}
+                                            icon={<Coins />}
+                                            title={t('payment.usdt')}
+                                            description={t('payment.usdtDescription', { network: paymentOptions.usdt.network })}
+                                        >
+                                            <ManualPaymentSection
+                                                method="USDT"
+                                                options={paymentOptions}
+                                                amount={payableTotal}
+                                                ensureOrder={() => ensureOrderCreated()}
+                                                onSubmitted={clearAllCart}
                                             />
                                         </PaymentMethodCard>
                                     )}

@@ -7,6 +7,8 @@ import { BranchesModule } from '../branches/branches.module';
 @Module({
   imports: [BranchesModule],
   controllers: [OrdersController],
-  providers: [OrdersService]
+  providers: [OrdersService],
+  // PaymentsModule lo usa para cancelar (y reponer stock) al rechazar un comprobante
+  exports: [OrdersService],
 })
 export class OrdersModule {}

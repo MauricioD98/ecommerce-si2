@@ -519,7 +519,8 @@ export class PaymentsService {
     };
   }
 
-  async markQrPaymentSucceeded(orderId: string, customTxId?: string): Promise<any> {
+  // QR simulado (method QR) o pago manual aprobado por la tienda (BANK_QR / USDT): mismo cierre que Stripe
+  async markQrPaymentSucceeded(orderId: string, customTxId?: string, method: PaymentMethod = PaymentMethod.QR): Promise<any> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { payment: true },
@@ -545,14 +546,14 @@ export class PaymentsService {
           orderId,
           userId: order.userId,
           amount: order.totalAmount,
-          currency: 'BOB',
+          currency: method === PaymentMethod.USDT ? 'USDT' : 'BOB',
           status: PaymentStatus.COMPLETADO,
-          paymentMethod: 'QR',
+          paymentMethod: method,
           transactionId,
         },
         update: {
           status: PaymentStatus.COMPLETADO,
-          paymentMethod: 'QR',
+          paymentMethod: method,
           transactionId,
         },
       }),
@@ -561,7 +562,7 @@ export class PaymentsService {
         data: {
           paymentStatus: PaymentStatus.COMPLETADO,
           status: OrderStatus.PROCESANDO,
-          paymentMethod: PaymentMethod.QR,
+          paymentMethod: method,
         },
       }),
     ]);

@@ -3,7 +3,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { currentLanguage, localizedProductName } from '../products/product-translations';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderApiResponseDto, OrderResponseDto } from './dto/order-response.dto';
-import { FulfillmentType, Order, OrderItem, OrderStatus, Product, User } from '@prisma/client';
+import { FulfillmentType, Order, OrderItem, OrderStatus, PaymentMethod, PaymentProofStatus, Product, User } from '@prisma/client';
+import { i18nMessage } from '../../i18n/i18n-message';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
 import { BranchesService } from '../branches/branches.service';
@@ -22,6 +23,10 @@ const ORDER_STATUS_MESSAGE: Record<OrderStatus, string> = {
   ENTREGADO: '¡Tu pedido fue entregado!',
   CANCELADO: 'Tu pedido fue cancelado.',
 };
+
+// Comprobante del pago manual sin la imagen (los listados no deben cargar bytea)
+const PROOF_SUMMARY_SELECT = { status: true, method: true, txId: true, imageType: true, createdAt: true, reviewedAt: true } as const;
+type ProofSummary = { status: PaymentProofStatus; method: PaymentMethod; txId: string | null; imageType: string | null; createdAt: Date; reviewedAt: Date | null };
 
 @Injectable()
 export class OrdersService {
@@ -51,6 +56,9 @@ export class OrdersService {
     const { items, shippingAddress, branchId, latitude, longitude, paymentMethod } = createOrderDto;
     const fulfillmentType = createOrderDto.fulfillmentType ?? FulfillmentType.DELIVERY;
     const userId = user.id;
+    if (paymentMethod === PaymentMethod.BANK_QR || paymentMethod === PaymentMethod.USDT) {
+      await this.assertManualMethodEnabled(paymentMethod);
+    }
 
     let targetBranchId = branchId;
     if (!targetBranchId) {
@@ -199,6 +207,7 @@ export class OrdersService {
           },
         },
         user:true,
+        paymentProof: { select: PROOF_SUMMARY_SELECT },
       },
     
   })
@@ -272,6 +281,7 @@ if (search) where.OR = [{ id: { contains: search, mode: 'insensitive' } },
         },
       },
       user: true,
+      paymentProof: { select: PROOF_SUMMARY_SELECT },
     },
     orderBy:{createdAt:'desc'},
   }),
@@ -319,6 +329,7 @@ async findAll(
         },
       },
         user:true,
+        paymentProof: { select: PROOF_SUMMARY_SELECT },
     },
       orderBy:{ createdAt:'desc'},
   }),
@@ -350,6 +361,7 @@ async findOne(id: string, userId?: string, actor?: AuthUser): Promise<OrderApiRe
         },
       },
       user:true,
+      paymentProof: { select: PROOF_SUMMARY_SELECT },
     },
   });
 
@@ -385,6 +397,7 @@ async update(
         },
       },
       user: true,
+      paymentProof: { select: PROOF_SUMMARY_SELECT },
     },
   });
 
@@ -448,6 +461,7 @@ async cancel(
         },
       },
       user:true,
+      paymentProof: { select: PROOF_SUMMARY_SELECT },
     },
    });
   });
@@ -457,6 +471,19 @@ async cancel(
 }
 
 
+
+  // QR bancario o USDT solo si la tienda los activó (y completó) en Gestión de pagos
+  private async assertManualMethodEnabled(method: PaymentMethod): Promise<void> {
+    const settings = await this.prisma.paymentSettings.findUnique({
+      where: { id: 'default' },
+      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true },
+    });
+    const enabled =
+      method === PaymentMethod.BANK_QR
+        ? Boolean(settings?.qrEnabled && settings.qrImageType)
+        : Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress);
+    if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
+  }
 
   // Sin el permiso ALL_BRANCHES solo se ven/gestionan pedidos de la sucursal propia
   private applyBranchScope(where: any, actor?: AuthUser): void {
@@ -471,6 +498,7 @@ async cancel(
     order: Order &{
       orderItems: (OrderItem &{ product: Product})[];
       user:User; 
+      paymentProof?: ProofSummary | null;
     },
   ): OrderApiResponseDto<OrderResponseDto> {
   return {
@@ -482,6 +510,7 @@ async cancel(
 
 private map(order: Order & { orderItems: (OrderItem &{ product: Product})[];
   user:User; 
+  paymentProof?: ProofSummary | null;
   },
 ): OrderResponseDto {
   // Una sola lectura del idioma por pedido, no una por línea
@@ -501,6 +530,16 @@ private map(order: Order & { orderItems: (OrderItem &{ product: Product})[];
     discountApplied: Number(order.discountApplied),
     source: order.source,
     paymentMethod: order.paymentMethod,
+    paymentProof: order.paymentProof
+      ? {
+          status: order.paymentProof.status,
+          method: order.paymentProof.method,
+          txId: order.paymentProof.txId,
+          hasImage: Boolean(order.paymentProof.imageType),
+          createdAt: order.paymentProof.createdAt,
+          reviewedAt: order.paymentProof.reviewedAt,
+        }
+      : null,
     cashierId: order.cashierId,
     items: order.orderItems.map((item) => ({
       id: item.id,

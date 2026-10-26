@@ -1,5 +1,5 @@
 
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class OrderApiResponseDto<T> {
   @ApiProperty({
@@ -91,8 +91,18 @@ export class OrderResponseDto {
   @ApiProperty({ enum: ['WEB', 'POS'], description: 'Canal de venta' })
   source: string;
 
-  @ApiProperty({ enum: ['STRIPE', 'CASH', 'PHYSICAL_CARD'] })
+  @ApiProperty({ enum: ['STRIPE', 'CASH', 'PHYSICAL_CARD', 'QR', 'BANK_QR', 'USDT'] })
   paymentMethod: string;
+
+  @ApiPropertyOptional({ description: 'Comprobante del pago manual (BANK_QR / USDT); la imagen se pide aparte' })
+  paymentProof?: {
+    status: string;
+    method: string;
+    txId: string | null;
+    hasImage: boolean;
+    createdAt: Date;
+    reviewedAt: Date | null;
+  } | null;
 
   @ApiProperty({ nullable: true, description: 'Empleado que cobró la venta en caja (solo POS)' })
   cashierId: string | null;

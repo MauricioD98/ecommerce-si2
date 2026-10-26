@@ -1,14 +1,11 @@
-import { Suspense } from "react";
-import SuperAdminGate from "@/components/modules/admin/SuperAdminGate";
-import PaymentsSetupClient from "@/components/modules/admin/PaymentsSetupClient";
+import { redirect } from "next/navigation";
 
-// Suspense: PaymentsSetupClient lee ?connect= (vuelta del formulario de Stripe)
-export default function AdminPaymentsPage() {
-    return (
-        <SuperAdminGate>
-            <Suspense fallback={null}>
-                <PaymentsSetupClient />
-            </Suspense>
-        </SuperAdminGate>
-    );
+// Ruta anterior de los cobros con tarjeta: ahora todo está en Gestión de pagos
+export default async function AdminPaymentsLegacyPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(await searchParams)) {
+        if (typeof value === "string") params.set(key, value);
+    }
+    const query = params.toString();
+    redirect(`/admin/settings/payments${query ? `?${query}` : ""}`);
 }

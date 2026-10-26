@@ -72,6 +72,7 @@ const ALL_PERMISSIONS = [
   'ALL_BRANCHES',
   'USE_POS',
   'PROCESS_RETURNS',
+  'MANAGE_PAYMENTS',
 ];
 
 const ROLES = [

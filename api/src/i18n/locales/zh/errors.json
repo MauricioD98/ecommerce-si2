@@ -37,5 +37,16 @@
   "BILLING_OWNER_ONLY": "只有店铺的超级管理员可以管理订阅",
   "CONNECT_NOT_ENABLED": "你的 Stripe 账户尚未启用 Connect。请在 Stripe 控制台（Connect → 开始使用）中启用后重试。",
   "ROLE_PERMISSIONS_EXCEED": "你不能授予自己角色没有的权限：{permissions}",
-  "ROLE_TOO_POWERFUL": "你不能编辑权限比你更多的角色"
+  "ROLE_TOO_POWERFUL": "你不能编辑权限比你更多的角色",
+  "PAYMENT_METHOD_UNAVAILABLE": "本店不支持此支付方式。",
+  "IMAGE_REQUIRED": "请附上一张图片。",
+  "IMAGE_TOO_LARGE": "图片超过 2 MB。",
+  "INVALID_IMAGE": "图片必须是 PNG、JPG 或 WebP 格式。",
+  "QR_IMAGE_MISSING": "启用前请先上传二维码图片。",
+  "INVALID_WALLET": "该地址对 {network} 网络无效。",
+  "USDT_SETTINGS_INCOMPLETE": "启用 USDT 前请选择网络并填写钱包地址。",
+  "ORDER_NOT_AWAITING_PROOF": "此订单不需要付款凭证。",
+  "INVALID_TXID": "TxID（交易哈希）无效。",
+  "TXID_ALREADY_USED": "该 TxID 已用于其他订单。",
+  "PROOF_NOT_PENDING": "此付款没有待审核的凭证。"
 }
