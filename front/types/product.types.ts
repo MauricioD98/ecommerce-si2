@@ -6,10 +6,19 @@ export interface ProductDiscount {
     discountPercentage: number | null;
 }
 
+// Traducciones del catálogo que guarda la API (columna JSONB). El español es el texto base.
+export type ProductTranslationLanguage = "en" | "fr" | "zh";
+export type ProductTranslations = Partial<Record<ProductTranslationLanguage, { name?: string; description?: string | null }>>;
+
 export interface Product {
     id: string;
+    // name/description ya vienen en el idioma del request (Accept-Language); para editar usar base*
     name: string;
     description: string;
+    // Texto base (español) sin traducir y las traducciones guardadas: los usa el formulario del admin
+    baseName?: string;
+    baseDescription?: string | null;
+    translations?: ProductTranslations;
     quantity: number;
     price: number;
     // Precio vigente en la sucursal seleccionada (sin sucursal es el precio base)

@@ -25,10 +25,17 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refres
     }
 
 
-    async validate(req:Request, payload:{sub:string; email:string}){
+    async validate(req:Request, payload:{sub:string; email:string; tenantId?:string}){
 
         console.log('RefreshTokenStrategy.validate called');
         console.log('Payload',{sub: payload.sub, email: payload.email});
+
+        // Mismo criterio que JwtStrategy: el refresh solo vale en la tienda que lo emitió.
+        // Además this.prisma ya apunta al schema de req.tenant, así que el lookup del usuario
+        // de abajo nunca cruza tiendas.
+        if(!payload.tenantId || !req.tenant || req.tenant.tenantId !== payload.tenantId){
+            throw new UnauthorizedException('Invalid refresh token');
+        }
 
         const authHeader = req.headers.authorization;
         if(!authHeader){

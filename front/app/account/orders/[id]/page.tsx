@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import Footer from "@/components/modules/landing/Footer";
 import Header from "@/components/modules/landing/Header";
 import OrderDetailClient from "@/components/modules/account/OrderDetailClient";
@@ -21,9 +23,10 @@ export default async function Page({ params }: PageProps) {
     );
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Detalle del pedido | Stella Femme",
-        description: "Consulta el estado y los artículos de tu pedido",
+        title: t("orderTitle"),
+        description: t("orderDescription"),
     };
 }

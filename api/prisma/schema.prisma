@@ -98,8 +98,14 @@ model UserAddress {
 
 model Product {
   id        String      @id @default(uuid())
+  // name/description: texto en el idioma base de la tienda (español). Es lo que usan la búsqueda, los
+  // reportes (vistas SQL), el POS, los pedidos y los correos; por eso no se reemplazó por JSONB.
   name      String
   description String?
+  // Traducciones del catálogo (JSONB): { "en": { "name": "...", "description": "..." }, "fr": {...} }.
+  // Claves: en, fr, pt, zh (el español es name/description). Un idioma o campo ausente cae al texto
+  // base. La API devuelve name/description ya resueltos según Accept-Language (ver products.service).
+  translations Json @default("{}")
   sizes String[] @default([])
   // Colores disponibles de la prenda. Mismo modelo que `sizes`: un array simple en el producto, no
   // una variante independiente. El stock sigue siendo por producto+sucursal (ProductInventory), no

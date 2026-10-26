@@ -1,6 +1,6 @@
 # CONTEXTO — STELLA FEMME
 
-> Documento maestro para que un LLM pueda retomar este proyecto y tomar decisiones informadas sin tener que releer todo el código. Generado el 2026-09-26 a partir del estado real del repo (rama `oscar`, HEAD `b675b6d`).
+> Documento maestro para que un LLM pueda retomar este proyecto y tomar decisiones informadas sin tener que releer todo el código. Actualizado el 2026-10-24 a partir del estado real del repo (rama `main`, HEAD `ae38fe1`).
 >
 > **Regla de mantenimiento:** si cambias esquema, rutas, permisos, puertos o dependencias, actualiza este archivo en el mismo commit. Si algo aquí contradice el código, **el código manda** — este documento puede quedar desactualizado.
 >
@@ -10,7 +10,7 @@
 
 ## 1. Qué es el proyecto
 
-**Stella Femme** es un e-commerce **multi-sucursal** de ropa femenina, con sucursales físicas en Santa Cruz de la Sierra, Bolivia. Cubre: catálogo con stock y ofertas por sucursal y por talla, carrito, checkout (retiro en tienda o envío a domicilio con mapa), pago con Stripe **o QR simulado**, punto de venta físico (POS) en caja, correos transaccionales, notificaciones push, facturas en PDF, un **dashboard administrativo** con roles/permisos dinámicos, marketing por correo, reportes con IA, una **PWA offline-first** y una **app móvil Expo** independiente que consume la misma API.
+**Stella Femme** es un e-commerce **multi-sucursal** de ropa femenina, con sucursales físicas en Santa Cruz de la Sierra, Bolivia. Cubre: catálogo con stock y ofertas por sucursal y por talla, carrito, checkout (retiro en tienda o envío a domicilio con mapa), pago con Stripe **o QR simulado**, punto de venta físico (POS) en caja, **devoluciones con reingreso a stock o mermas**, **probador virtual en tiempo real con Decart**, **chatbot de Botpress**, correos transaccionales, notificaciones push, facturas en PDF, un **dashboard administrativo** con roles/permisos dinámicos, marketing por correo, reportes con IA, una **PWA offline-first** y una **app móvil Expo** independiente que consume la misma API.
 
 Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos autónomos, cada uno con su propio `package.json`, lockfile y `.env`.
 
@@ -32,8 +32,11 @@ Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos aut
 | Correo (back) | `@nestjs-modules/mailer` + `nodemailer` (SMTP) |
 | PDF (back) | `pdfkit` (facturas) |
 | Push (back) | `web-push` (VAPID, Web Push estándar) |
-| IA (back) | SDK `openai` contra **Groq** (no Gemini — migrado, ver §4.8) |
-| App móvil | **Expo ~57**, **React Native 0.86.3**, React 19.2.3, React Navigation 7, AsyncStorage |
+| IA (back) | SDK `openai` contra **Groq** (no Gemini — migrado, ver §4.7) |
+| Probador virtual (front) | `@decartai/sdk` 0.2.3 · modelo realtime `lucy-vton-latest` (Decart) vía Route Handlers de Next |
+| Chatbot | Widget Botpress Webchat v3.7 en el front + endpoint público `GET /chatbot/products` en la API |
+| Tareas programadas (back) | `@nestjs/schedule` (`ScheduleModule.forRoot`) — cron de liberación de carritos abandonados |
+| App móvil | **Expo ~57.0.24**, **React Native 0.86.3**, React 19.2.3, React Navigation 7, AsyncStorage |
 | Infra | Docker (`api/Dockerfile`, `front/Dockerfile`, `docker-compose.yml`) · deploy real en **Azure Container Apps** con BD **Neon** |
 
 **Reglas de producto que hay que respetar**
@@ -52,8 +55,8 @@ Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos aut
 
 **Producción:** API y front corren en **Azure Container Apps** (contenedores propios, ver `docker-compose.yml` y los `Dockerfile`); la base de datos real parece ser **Neon** (mencionado en `app_movil/README.md` y en el mensaje del commit `239dd94`). `main.ts` permite explícitamente orígenes que contengan `azurecontainerapps.io`.
 
-**Páginas de la tienda (web):** `/` (catálogo) · `/{productId}` (detalle) · `/cart` · `/checkout` (con paso QR en `/checkout/qr-confirm` y página estática `/checkout/offline-success`) · `/account` (+ `/account/orders/[id]`) · `/auth/login|register|forgot-password|reset-password` · `/offline` (fallback de la PWA).
-**Panel (`/admin`):** `pos`, `products`, `categories`, `collections`, `inventory`, `orders`, `branches`, `staff`, `roles`, `marketing`, `notifications`, `reports`.
+**Páginas de la tienda (web):** `/` (catálogo) · `/{productId}` (detalle, con Probador Virtual) · `/cart` · `/checkout` (con paso QR en `/checkout/qr-confirm`, retorno de Stripe en `/checkout/success` y página estática `/checkout/offline-success`) · `/account` (+ `/account/orders/[id]`) · `/auth/login|register|forgot-password|reset-password` · `/offline` (fallback de la PWA).
+**Panel (`/admin`):** `pos`, `returns`, `products`, `categories`, `collections`, `inventory`, `orders`, `branches`, `staff`, `roles`, `marketing`, `notifications`, `reports`.
 
 ---
 
@@ -79,44 +82,52 @@ si2_parcial_1/
 app/
   layout.tsx, globals.css, fonts.ts, manifest.ts, offline/, error.tsx, global-error.tsx
   (lading)/page.tsx            ← "/" catálogo (carpeta con typo histórico "lading")
-  (product)/[id]/page.tsx      ← detalle de producto
+  (product)/[id]/page.tsx      ← detalle de producto (monta el Probador Virtual)
   auth/ login | register | forgot-password | reset-password
-  cart/, checkout/ (+ qr-confirm/, offline-success/)
+  cart/, checkout/ (+ qr-confirm/, success/, offline-success/)
   account/ (+ orders/[id]/)     ← historial de pedidos del cliente (antes era un 404, ya resuelto)
-  admin/                        ← pos/, products/, categories/, collections/, inventory/, orders/,
-                                   branches/, staff/, roles/, marketing/, notifications/, reports/
+  admin/                        ← pos/, returns/, products/, categories/, collections/, inventory/,
+                                   orders/, branches/, staff/, roles/, marketing/, notifications/, reports/
+  api/decart/                   ← Route Handlers de Next: firman la sesión del probador y proxean
+                                   la imagen de la prenda (la API key de Decart no llega al navegador)
 components/modules/
-  auth/, account/, landing/, product/, cart/, checkout/, admin/  (uno por dominio, + .module.scss)
-hooks/       useAuth, useCart, useOrder, usePayment, useProducts, useBranches, useAddresses,
-             useSpeechRecognition, useAdminAccess/Branches/Orders/Products, useInventory, useStaff,
-             useRoles, useReports, usePushNotifications, useOfflineOrderSync
-service/api/ axios.config + un *.service.ts por módulo del backend, error.utils
+  auth/, account/, landing/, product/, cart/, checkout/, admin/, chatbot/
+  (uno por dominio, + .module.scss). product/ incluye VirtualTryOnModal; chatbot/ el widget Botpress.
+providers/   index.tsx (StateProvider + OfflineSyncProvider), OfflineSyncProvider.tsx, state-provider.tsx
+hooks/       useAuth, useCart, useOrder, useMyOrders, useOrderDetail, usePayment, useProducts,
+             useBranches, useAddresses, useSpeechRecognition, useAdminAccess/Branches/Categories/
+             Collections/Orders/Products, useInventory, useOfflineInventorySync, useStaff, useRoles,
+             useReports, useReturns, usePushNotifications, useOfflineOrderSync, useNetworkStatus,
+             useRegisterServiceWorker
+service/api/ axios.config + un *.service.ts por módulo del backend (incluye returns.service), error.utils
 store/       index.tsx (Redux store + persist), slices/authSlices, cartSlice, branchSlice
-utils/       pricing.ts (espejo del cálculo del backend), permissions.ts, offlineOrderQueue.ts (IndexedDB)
-types/       *.types.ts por dominio
-public/sw.js ← Service Worker manual (ver §4.11)
+utils/       pricing.ts (espejo del cálculo del backend), permissions.ts, offlineOrderQueue.ts,
+             offlineInventoryQueue.ts, productStorage.ts, printPosReceipt.ts
+types/       *.types.ts por dominio (incluye returns.types)
+public/sw.js ← Service Worker manual (ver §4.10)
 ```
 Alias `@/*` → raíz de `front/`. Gestor de paquetes: **bun** (`packageManager: bun@1.4.0`, `bun.lock`); `npm install` también funciona pero no es el flujo principal.
 
 ### 2.3 Backend (`api/`)
 
 ```
-prisma/     schema.prisma · migrations/ (22 migraciones) · seed.mjs
+prisma/     schema.prisma · migrations/ (24 migraciones) · seed.mjs · prisma.config.ts
 src/
   main.ts        ← prefijo api/v1, rawBody:true (webhook Stripe), ValidationPipe global, CORS, headers no-cache, Swagger
-  app.module.ts  ← ConfigModule global, ThrottlerModule, todos los módulos (ver lista abajo)
+  app.module.ts  ← ConfigModule global, ThrottlerModule, ScheduleModule, todos los módulos (ver lista abajo)
   prisma/        ← PrismaService (adapter-pg)
   common/
     constants/permissions.ts   ← catálogo de permisos y roles base (ver §4.1)
     decorators/                ← GetUser, @Permissions/@AnyPermission, guards (Jwt, Permissions, Branch), throttlers
     utils/                     ← pricing.ts, permission.util.ts, token-hash.ts
   modules/
-    auth · users (+ addresses) · products · category · collections · cart · orders · payments (+ webhook, dto/qr-payment)
-    branches (+ InventoryService) · roles · mail · marketing · reports · pos · notifications
+    auth · users (+ addresses) · products · category · collections · cart (+ CartCleanupService) · orders
+    payments (+ webhook, dto/qr-payment) · branches (+ InventoryService) · roles · mail · marketing
+    reports · pos · notifications · returns · chatbot
 ```
 `ValidationPipe` global: `whitelist: true`, **`forbidNonWhitelisted: false`** (cambió — antes era `true`; ver §5), `transform: true`. Es decir: los campos que no están en el DTO se **descartan silenciosamente**, ya no dan 400 (se cambió a propósito para no romper el catálogo con parámetros extra como `_t`, commit `feb64e6`).
 
-Gestor de paquetes: **npm** (`api/package-lock.json` es el lockfile trackeado). Hay un `api/bun.lock` **sin trackear** y `api/package.json` con una modificación sin commitear que resulta ser solo normalización de line-endings (CRLF/LF) — sin cambios reales de dependencias. Ver §5 sobre esta inconsistencia de tooling.
+Gestor de paquetes: **npm** (`api/package-lock.json`). Desde el commit `6645f77` también está trackeado `api/bun.lock`, así que hoy conviven los dos lockfiles (la misma inconsistencia existe en `front/`, donde están `bun.lock` y `package-lock.json`). `api/package.json` está limpio, sin cambios pendientes de line-endings. Ver §5.1.5.
 
 ### 2.4 App móvil (`app_movil/`)
 
@@ -126,39 +137,47 @@ Cliente Expo/React Native independiente, **no** un simple wrapper — tiene pant
 src/
   screens/  auth/{Login,Register}, shop/{Products,ProductDetail}, cart/{Cart,Checkout},
             orders/{Orders,OrderDetail}, payments/Payment, profile/{Profile,EditProfile,ChangePassword}
-  contexts/ AuthContext, BranchContext (selector de sucursal, igual que en el front web), CartContext
+  context/  AuthContext, BranchContext (selector de sucursal, igual que en el front web), CartContext
+            (carpeta en singular, no `contexts/`)
   api/      client.ts (axios) + *.api.ts por módulo (auth, branches, cart, categories, orders, payments, products, users)
-  config/env.ts  ← autodetecta la URL de la API: 10.0.2.2:3001 (emulador Android) / localhost / IP de LAN,
-                    editable en runtime desde Login/Profile
+            client.ts renueva el access token con el refresh token, encola las peticiones concurrentes
+            y, si el refresh falla, limpia la sesión y dispara auto-logout (`setOnAuthFailureCallback`)
+  config/env.ts  ← por defecto apunta a la API de Azure Container Apps (`CLOUD_API_URL`); si había una
+                    URL vieja guardada (localhost/10.0.2.2/IP LAN) la migra a la nube. Sigue siendo
+                    editable en runtime desde Login/Profile.
 ```
 - **No existe `eas.json`** en disco (no hay config de EAS Build/Submit pese a lo que pudiera sugerir cualquier snapshot antiguo del repo).
 - `app_movil/README.md` menciona cuentas de prueba (`admin@gmail.com` / `Admin123*`, `john.doe@example.com`) **distintas** a las del seed del backend (`superadmin@stellafemme.com`, etc.) y una BD Neon propia para desarrollo — **tratar esas credenciales del README con sospecha**, pueden estar desactualizadas; confiar en `api/prisma/seed.mjs` como fuente de verdad para usuarios de prueba.
-- Cambios recientes (ver `git log`): selector de sucursal en el catálogo sincronizado con el stock, auto-refresh de stock al enfocar la pantalla, redirect al catálogo tras pagar, fix de un bug de `setState` durante el render al resetear la navegación.
+- Cambios recientes (ver `git log`): selector de sucursal en el catálogo sincronizado con el stock, auto-refresh de stock al enfocar la pantalla, redirect al catálogo tras pagar, fix de un bug de `setState` durante el render al resetear la navegación, sincronización de stock de la compra móvil contra la sucursal (`4a6f91b`) y auto-logout limpio al expirar la sesión / faltar refresh token (`ae38fe1`).
 
 ---
 
 ## 3. Base de datos (Prisma / PostgreSQL)
 
-Archivo: `api/prisma/schema.prisma`. 12 modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`, `Collection`, `Category`, `OrderItem`, `CartItem`, `Order`, `Cart`, `PushSubscription`, `Payment` (+ enums `OrderStatus`, `FulfillmentType`, `OrderSource`, `PaymentMethod`, `PaymentStatus`).
+Archivo: `api/prisma/schema.prisma`. 16 modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`, `Collection`, `Category`, `OrderItem`, `CartItem`, `Order`, `Cart`, `Return`, `ReturnItem`, `PushSubscription`, `Payment` (+ enums `OrderStatus`, `FulfillmentType`, `OrderSource`, `PaymentMethod`, `PaymentStatus`, `ReturnReason`, `ItemCondition`).
 
 | Modelo | Campos clave / notas |
 |---|---|
 | **Role** | `id`, `name` (único), `description?`, `permissions String[]` |
-| **User** | `email` (único), `password` (bcrypt), `firstName?/lastName?/phone?`, `roleId`→Role, `branchId?`→Branch (personal, rel. `StaffBranch`), `preferredBranchId?`→Branch (rel. `PreferredBranch`, `onDelete: SetNull`), `employeeDiscount Int`, `refreshToken?` (hash SHA-256), `resetPasswordOtp?/Attempts/Expires`, `loginAttempts/lockedUntil`, relación `cashierOrders` (`CashierOrders`, ventas que cobró en POS), `pushSubscriptions[]` |
+| **User** | `email` (único), `password` (bcrypt), `firstName?/lastName?/phone?`, `roleId`→Role, `branchId?`→Branch (personal, rel. `StaffBranch`), `preferredBranchId?`→Branch (rel. `PreferredBranch`, `onDelete: SetNull`), `employeeDiscount Int`, `refreshToken?` (hash SHA-256), `resetPasswordOtp?/Attempts/Expires`, `loginAttempts/lockedUntil`, relación `cashierOrders` (`CashierOrders`, ventas que cobró en POS), `returns`/`cashierReturns` (devoluciones como cliente / atendidas como cajero), `pushSubscriptions[]` |
 | **Branch** | `name`, `address?`, **`latitude?/longitude?`** (nuevo), `phone?`, `isActive` |
 | **Product** | `sizes String[]`, **`colors String[]`** (nuevo, mismo patrón que `sizes`: array simple, no variante independiente), `price`, `stock Int` (global, legado — suma de `ProductInventory`), `sku` (único), `imageUrl?`, `categoryId`, **`branchId?` + `exclusiveToBranch`** (nuevo: `null` = visible en todas las sucursales; con valor, solo esa sucursal lo muestra — **independiente del stock**), relación m2m con **`Collection`** |
-| **ProductInventory** | **`@@unique([productId, branchId, size])`** — el stock ahora es **por producto + sucursal + talla** (antes era solo producto+sucursal; cambio de ruptura, migración `..190000_inventory_per_size`). `discountPrice`/`discountPercentage` siguen siendo por producto+sucursal (se mantienen sincronizados entre las filas de todas las tallas por el servicio, la oferta no varía por talla) |
+| **ProductInventory** | **`@@unique([productId, branchId, size])`** — el stock ahora es **por producto + sucursal + talla** (antes era solo producto+sucursal; cambio de ruptura, migración `..190000_inventory_per_size`). **`damagedStock Int`** (nuevo): mermas, es decir, unidades devueltas en mal estado; no son vendibles, quedan fuera de `stock` y de `Product.stock`, y se gestionan con `InventoryService.incrementDamaged`. `discountPrice`/`discountPercentage` siguen siendo por producto+sucursal (se mantienen sincronizados entre las filas de todas las tallas por el servicio, la oferta no varía por talla) |
 | **Collection** *(nuevo modelo)* | `name`, `slug` (único), `description?`, `bannerImageUrl?`, `isActive`, m2m con `Product`. Es ortogonal a `Category`: la categoría es "qué es" la prenda, la colección es "para qué campaña" se exhibe (ej. "Otoño-Invierno") |
 | **Category** | Sin cambios: `name`, `slug` (único), `description?`, `imageUrl?`, `isActive` |
-| **Cart / CartItem** | `CartItem` ahora único por `(cartId, productId, size)` (antes solo `(cartId, productId)`) — una fila distinta por talla |
-| **Order** | Campos nuevos: **`shippingCost`** (registro histórico, 0 en PICKUP), **`paymentStatus`** (enum `PaymentStatus`, separado del `status` logístico), **`stripePaymentIntentId`** (único), **`paymentMethod`** (enum: `STRIPE/CASH/PHYSICAL_CARD/QR`), **`source`** (enum `OrderSource`: `WEB/POS`), **`cashierId`** (→ User, null en ventas web), **`nit`/`razonSocial`** (facturación POS) |
-| **OrderItem** | **`size String?`** (nuevo — ya se guarda la talla comprada, cierra un gap del doc anterior) |
+| **Cart / CartItem** | `CartItem` único por `(cartId, productId, size)` — una fila por talla — y con **`branchId?`**: la sucursal contra la que se **reservó (descontó) stock al agregar al carrito**; `null` = reserva contra el `Product.stock` global legado. `Cart.updatedAt` se toca en cada cambio y `CartCleanupService` lo usa para detectar abandono |
+| **Order** | Campos nuevos: **`shippingCost`** (registro histórico, 0 en PICKUP), **`paymentStatus`** (enum `PaymentStatus`, separado del `status` logístico), **`stripePaymentIntentId`** (único), **`paymentMethod`** (enum: `STRIPE/CASH/PHYSICAL_CARD/QR`), **`source`** (enum `OrderSource`: `WEB/POS`), **`cashierId`** (→ User, null en ventas web), **`nit`/`razonSocial`** (facturación POS). Relación `returns[]` (una venta puede tener varias devoluciones parciales) |
+| **OrderItem** | **`size String?`** (ya se guarda la talla comprada). Relación `returnItems[]`; la suma de lo devuelto no puede superar `quantity` |
+| **Return** *(nuevo modelo)* | `returnNumber` (único), `totalRefunded` (calculado en servidor desde el precio histórico de cada `OrderItem`), `notes?`, `orderId`, `branchId` (sucursal que **recibe** la mercadería, no necesariamente la que vendió), `userId` (cliente), `cashierId` (empleado que atiende), `items[]` |
+| **ReturnItem** *(nuevo modelo)* | `quantity`, `size?` (copiada del `OrderItem`), `unitPrice` (precio histórico), `reason` (enum `ReturnReason`: `WRONG_SIZE/DEFECTIVE/CHANGED_MIND/OTHER`), `condition` (enum `ItemCondition`: `SELLABLE/DAMAGED`), `returnId`, `productId`, `orderItemId`. Un mismo `OrderItem` puede partirse en varias filas si cambia la condición |
 | **PushSubscription** *(nuevo modelo)* | `endpoint` (único), `p256dh`, `auth`, `userId?` (cascade delete con User) — suscripción Web Push por dispositivo |
 | **Payment** | Sin cambios de esquema respecto al doc anterior |
 | **UserAddress** | Sin cambios |
 
-### 3.1 Migraciones nuevas desde el estado anterior (11, ya aplicadas)
-`add_push_subscriptions` → `add_order_payment_tracking` → `add_order_shipping_cost` → `add_pos_orders` → `add_item_size` → `add_pos_billing_fields` → `add_product_branch_exclusivity` → `reporting_sales_product_views` → `add_collections_and_colors` → `inventory_per_size` → `add_branch_coordinates`.
+### 3.1 Migraciones nuevas desde el estado anterior (13, ya aplicadas)
+`add_push_subscriptions` → `add_order_payment_tracking` → `add_order_shipping_cost` → `add_pos_orders` → `add_item_size` → `add_pos_billing_fields` → `add_product_branch_exclusivity` → `reporting_sales_product_views` → `add_collections_and_colors` → `inventory_per_size` → `add_branch_coordinates` → `cart_item_branch_reservation` (`20260926230000`) → `returns_and_damaged_stock` (`20260927120000`).
+
+Las dos últimas son las que introducen la reserva de stock del carrito (`CartItem.branchId`) y las devoluciones/mermas (`Return`, `ReturnItem`, `ProductInventory.damagedStock`).
 
 Comandos sin cambios: `npx prisma migrate deploy` · `npx prisma generate`. `migrate dev` no sirve cuando el cambio migra datos existentes (se escribe la migración a mano).
 
@@ -168,8 +187,8 @@ Roles base y permisos que asigna el seed (**cambiaron** respecto al doc anterior
 | Rol | Permisos |
 |---|---|
 | Super Admin | todos (`ALL_PERMISSIONS`) |
-| Admin Sucursal | `MANAGE_USERS, MANAGE_INVENTORY, MANAGE_PRODUCTS, VIEW_ORDERS, SEND_MARKETING, VIEW_REPORTS, USE_POS` |
-| **Empleado** | **`USE_POS`** (antes no tenía ningún permiso — ahora el personal de caja puede cobrar) |
+| Admin Sucursal | `MANAGE_USERS, MANAGE_INVENTORY, MANAGE_PRODUCTS, VIEW_ORDERS, SEND_MARKETING, VIEW_REPORTS, USE_POS, PROCESS_RETURNS` |
+| **Empleado** | **`USE_POS, PROCESS_RETURNS`** (personal de caja: cobra en POS y recibe devoluciones) |
 | Cliente | ninguno |
 
 Sucursales, usuarios y categorías/productos de ejemplo: sin cambios de fondo respecto al doc anterior (revisar `seed.mjs` para las credenciales reales, no confiar en READMEs de otras carpetas).
@@ -179,30 +198,35 @@ Sucursales, usuarios y categorías/productos de ejemplo: sin cambios de fondo re
 ## 4. Estado actual de funcionalidades
 
 ### 4.1 Autenticación, roles y permisos
-Igual que antes en lo esencial (OTP de 6 dígitos para recuperar contraseña con 5 intentos y 10 min de vencimiento, bloqueo de login a 3 intentos por 5 min, JWT con `role/permissions/branchId` sin consultar la BD, refresh token hasheado SHA-256, "Mi cuenta" con perfil/direcciones/sucursal favorita). **Cambio real:** el catálogo de permisos ganó **`USE_POS`** (caja física de la sucursal propia). Los tres espejos que hay que mantener sincronizados si se agrega un permiso:
+Igual que antes en lo esencial (OTP de 6 dígitos para recuperar contraseña con 5 intentos y 10 min de vencimiento, bloqueo de login a 3 intentos por 5 min, JWT con `role/permissions/branchId` sin consultar la BD, refresh token hasheado SHA-256, "Mi cuenta" con perfil/direcciones/sucursal favorita). **Cambios reales:** el catálogo de permisos ganó **`USE_POS`** (caja física de la sucursal propia) y **`PROCESS_RETURNS`** (recibir devoluciones y reingresarlas al stock o a mermas). Los tres espejos que hay que mantener sincronizados si se agrega un permiso:
 - `api/src/common/constants/permissions.ts` (fuente de verdad)
 - `front/utils/permissions.ts` (`Permission`, `PERMISSION_OPTIONS`, `PANEL_PERMISSIONS`)
 - `api/prisma/seed.mjs` (qué rol base lo trae)
 
-`PANEL_PERMISSIONS` (qué permisos dan acceso a `/admin`) ahora incluye `USE_POS`. `front/components/modules/admin/adminNav.ts` define el menú lateral; la ruta `/admin/notifications` está gateada por `SEND_MARKETING` (no hay un permiso dedicado para push).
+`PANEL_PERMISSIONS` (qué permisos dan acceso a `/admin`) ahora incluye `USE_POS` y `PROCESS_RETURNS`. `front/components/modules/admin/adminNav.ts` define el menú lateral (incluye `/admin/returns`); la ruta `/admin/notifications` está gateada por `SEND_MARKETING` (no hay un permiso dedicado para push).
 
 ### 4.2 Catálogo, sucursales, colecciones y stock por talla
-- El stock real vive en `ProductInventory`, ahora **por talla**: `InventoryService.getInventoryForSize/getStockForSize` (`api/src/modules/branches/inventory.service.ts`) son el chequeo real de stock (usado por POS y por la creación de órdenes); `getInventory/getInventoryMap` devuelven un **agregado** (`{stock: suma, discountPrice, discountPercentage, sizes: [{size, stock}]}`) para mostrar en catálogo. Las ofertas siguen siendo por producto+sucursal, no por talla — el servicio las sincroniza entre las filas de talla.
+- El stock real vive en `ProductInventory`, ahora **por talla**: `InventoryService.getInventoryForSize/getStockForSize` (`api/src/modules/branches/inventory.service.ts`) son el chequeo real de stock (usado por POS y por la creación de órdenes); `getInventory/getInventoryMap` devuelven un **agregado** (`{stock: suma, damagedStock: suma, discountPrice, discountPercentage, sizes: [{size, stock, damagedStock}]}`) para mostrar en catálogo; `damagedStock` son las mermas (no vendibles) que dejan las devoluciones. Las ofertas siguen siendo por producto+sucursal, no por talla — el servicio las sincroniza entre las filas de talla.
 - **Exclusividad de sucursal:** `Product.branchId/exclusiveToBranch` decide si un producto aparece en el catálogo de una sucursal (visibilidad), independiente de si tiene stock ahí (`ProductInventory`, cantidad). Un producto puede ser exclusivo de una sucursal y aun así no tener stock asignado.
 - **Colecciones** (`api/src/modules/collections/`, `front/app/admin/collections/`): lectura pública (`GET /collections`, `GET /collections/slug/:slug`), CRUD gateado por `MANAGE_PRODUCTS`. Agrupación de campaña/temporada, ortogonal a `Category`.
 - `Product.colors`: mismo patrón que `sizes` (array simple en el producto, no crea variantes independientes ni afecta el stock).
 - El selector de sucursal (`BranchSelector` en el Header, y también existe en `app_movil` vía `BranchContext`) sigue siendo la fuente de `?branchId=` para catálogo/detalle/similares.
-- El botón "Probador Virtual 3D" del detalle de producto y el modelo 3D de productos **nunca se implementaron** — cualquier referencia a `Model3DModal.tsx`, `VirtualTryOn.tsx`, `common/storage/`, `common/filters/`, `api/store/` o una migración de "model3d" **no existe en el código actual**; si aparecen en algún estado de git antiguo o en una tarea pendiente, es trabajo que no llegó a implementarse (o se revirtió).
+- **Probador Virtual (implementado, ver §4.12):** el detalle de producto monta `front/components/modules/product/VirtualTryOnModal.tsx` y ofrece "Probarme virtualmente". Usa Decart (`lucy-vton-latest`) en tiempo real por WebRTC a través de `front/app/api/decart/`. **No es un modelo 3D**: es prueba de ropa sobre el video de la cámara. El comentario de `ProductDetail.tsx:104` que dice que "aún no existe" quedó obsoleto.
 
 ### 4.3 Carrito y checkout (web)
-- Carrito por Redux, líneas por `productId + selectedSize`; con el nuevo `@@unique([cartId, productId, size])` cada talla es una fila propia también en el backend.
+- Carrito por Redux, líneas por `productId + selectedSize`; con `@@unique([cartId, productId, size])` cada talla es una fila propia también en el backend.
+- **El carrito reserva stock real al agregar** (`CartService.addItem`): descuenta en `ProductInventory` por producto+sucursal+talla, o en el `Product.stock` global legado si se agregó sin sucursal. La reserva se guarda en `CartItem.branchId`.
+  - `CartCleanupService` (`api/src/modules/cart/cart-cleanup.service.ts`) corre cada 15 minutos y libera los carritos sin actividad por más de 1 hora.
+  - `OrdersService.create` no vuelve a descontar toda la cantidad: consume la reserva, descuenta solo la diferencia y libera el excedente o la reserva hecha en otra sucursal.
 - Checkout en 3 pasos (Entrega → Pago → Completado), con dos añadidos:
   - **Pago por QR** (`front/app/checkout/qr-confirm/` + `QrConfirmClient.tsx`): alternativa a Stripe, simulada y confirmada contra la BD (`ConfirmQrDto`).
   - **Cola offline** (`front/utils/offlineOrderQueue.ts` + `front/hooks/useOfflineOrderSync.ts`): si `POST /orders` falla por falta de red, el pedido se guarda en IndexedDB (`stella-femme-offline` / store `orders`) y se reintenta al recuperar conexión; el usuario ve la página estática `/checkout/offline-success` (sin id de pedido dinámico, porque debe funcionar sin red).
-- El paso "solo se ve la sucursal de la compra en Entrega" fue un fix reciente (`fc000d8`) — antes se podía confundir con otra sucursal.
+- El paso "solo se ve la sucursal de la compra en Entrega" fue un fix (`fc000d8`). El retorno de Stripe aterriza en `/checkout/success`, que confirma el pago contra la API.
 
 ### 4.4 Pedidos, pagos, facturas y webhook de Stripe
-- `OrdersService.create` sigue calculando precios en servidor y descontando stock atómicamente, ahora **por talla**.
+- `OrdersService.create` calcula precios en servidor y ajusta el stock atómicamente por talla, consumiendo la reserva que ya hizo el carrito (ver §4.3).
+- `POST /payments/create-intent` calcula el monto desde `order.totalAmount`; **el cliente no envía monto** (`payments.service.ts:67`).
+- Al confirmarse el pago, `PaymentsService` elimina los ítems del carrito y marca `checkout: true`; **no** devuelve el stock ya vendido (fix `4a6f91b`, que corrigió el bug de liberar stock de una compra pagada).
 - **Webhook real de Stripe** (`api/src/modules/payments/payments.webhook.controller.ts`): `POST /payments/webhook`, sin guards de auth — se confía únicamente en la firma `Stripe-Signature` verificada contra `STRIPE_WEBHOOK_SECRET` usando el `rawBody` que `main.ts` habilita (`NestFactory.create(AppModule, { rawBody: true })`). En desarrollo: `stripe listen --forward-to localhost:3001/api/v1/payments/webhook`.
 - **QR de pago** (`api/src/modules/payments/dto/qr-payment.dto.ts`): `GenerateQrDto{orderId}` / `ConfirmQrDto{orderId, transactionId?}`; usa `qrcode` para generar la imagen. Es un flujo simulado (no hay pasarela QR real detrás), pero el pedido/pago se registra igual en la BD (`Order.paymentMethod = QR`).
 - `Order.paymentStatus` (enum) ahora separa el estado del pago del `status` logístico (`OrderStatus`).
@@ -228,16 +252,37 @@ Métricas genéricas (`/reports/sales-overview`, `/reports/top-products`) sin ca
 Sin cambios de fondo respecto al doc anterior (`POST /marketing/send-campaign`, saneo de HTML, lotes de 10, sin unsubscribe). `MailModule` sigue sin lanzar errores (solo loguea fallos).
 
 ### 4.9 Panel administrativo — rutas nuevas
-Además de lo ya documentado (`products/inventory/orders/branches/staff/roles/marketing/reports`), el panel ganó: **`/admin/pos`** (`USE_POS`), **`/admin/categories`** (`MANAGE_PRODUCTS`), **`/admin/collections`** (`MANAGE_PRODUCTS`), **`/admin/notifications`** (`SEND_MARKETING`). Menú lateral generado dinámicamente en `adminNav.ts` con etiquetas distintas según `ALL_BRANCHES` (alcance global vs. sucursal propia).
+Además de lo ya documentado (`products/inventory/orders/branches/staff/roles/marketing/reports`), el panel ganó: **`/admin/pos`** (`USE_POS`), **`/admin/returns`** (`PROCESS_RETURNS`, ver §4.11), **`/admin/categories`** (`MANAGE_PRODUCTS`), **`/admin/collections`** (`MANAGE_PRODUCTS`), **`/admin/notifications`** (`SEND_MARKETING`). Menú lateral generado dinámicamente en `adminNav.ts` con etiquetas distintas según `ALL_BRANCHES` (alcance global vs. sucursal propia).
 
-### 4.10 PWA offline-first (front) — no existía en el doc anterior
-`front/public/sw.js`: Service Worker **escrito a mano** (explícitamente no usa Workbox/next-pwa — el propio comentario del archivo dice que son incompatibles con Turbopack). Estrategias `NetworkFirst`/`StaleWhileRevalidate`/`CacheFirst` sobre la Cache API nativa; `CACHE_VERSION = 'v6'`, tres caches (`sf-api-`, `sf-assets-`, `sf-pages-`). Solo intercepta `GET` (las mutaciones nunca pasan por el SW). Precachea `/offline` y `/checkout/offline-success` al instalar. Escucha un `postMessage` (`CLEAR_USER_CACHE`/`CLEAR_API_CACHE`, disparado desde `useAuth().logout()`) para purgar el cache de API al cerrar sesión — medida anti-fuga de datos en dispositivos compartidos.
-Cola de pedidos offline: ver §4.3.
+### 4.10 PWA offline-first (front)
+`front/public/sw.js`: Service Worker **escrito a mano** (explícitamente no usa Workbox/next-pwa — el propio comentario del archivo dice que son incompatibles con Turbopack). Estrategias `NetworkFirst`/`StaleWhileRevalidate`/`CacheFirst` sobre la Cache API nativa; `CACHE_VERSION = 'v7'`, tres caches (`sf-api-`, `sf-assets-`, `sf-pages-`). Solo intercepta `GET` (las mutaciones nunca pasan por el SW). Precachea `/`, `/offline`, `/checkout/offline-success` y `/cart` al instalar. Escucha un `postMessage` (`CLEAR_USER_CACHE`/`CLEAR_API_CACHE`, disparado desde `useAuth().logout()` y desde el sincronizador de inventario) para purgar el cache de API — medida anti-fuga de datos en dispositivos compartidos.
+- **Catálogo offline:** `utils/productStorage.ts` guarda los productos vistos en `localStorage`; `useProducts` cae a esa copia si falla la red. `ProductCard` tiene quick-add (elige la primera talla con stock) además del detalle.
+- **Cola de pedidos offline:** `utils/offlineOrderQueue.ts` + `useOfflineOrderSync` (IndexedDB `stella-femme-offline`, store `orders`). Ver §4.3.
+- **Inventario offline (admin/staff):** `utils/offlineInventoryQueue.ts` usa la misma base IndexedDB (DB v2, store `inventory_queue`); `useOfflineInventorySync` (montado en `InventoryClient`) reintenta los cambios de stock al volver la conexión y emite `inventory-synced`. `providers/OfflineSyncProvider.tsx` monta globalmente la sincronización de pedidos y registra el SW; `useNetworkStatus` y `useRegisterServiceWorker` completan el soporte.
+- `useAuth().logout()` limpia auth, carrito Redux (`clearAllCart`) y cache de API del SW.
 
-### 4.11 Contrato front ↔ API (puntos importantes, sin cambios de fondo)
-`NEXT_PUBLIC_API_URL`, pago vía `/payments/create-intent|confirm`, pedido con `items[].{productId, quantity, selectedSize→size}`, refresh token en `Authorization: Bearer` (no en el body), `error.utils.ts` centraliza mensajes de error en español.
+### 4.11 Devoluciones y mermas — módulo nuevo
+`api/src/modules/returns/` (`ReturnsController`, `ReturnsService`), permiso `PROCESS_RETURNS`, ruta `/admin/returns` en el front (`ReturnsClient`, `useReturns`, `returns.service`, `types/returns.types`).
+- `GET /returns/search-order?query=&branchId?` (`PROCESS_RETURNS`): busca la venta original por ticket, UUID, NIT, razón social, email o nombre. Solo ventas cobradas (`paymentStatus = COMPLETADO`) y no canceladas; devuelve por ítem cuánto se vendió, cuánto ya se devolvió y cuánto queda. Sin `ALL_BRANCHES` limita a la sucursal propia más los pedidos web sin sucursal.
+- `POST /returns/process` (`PROCESS_RETURNS`, `ProcessReturnDto`): en una transacción valida el tope contra devoluciones anteriores, calcula el reembolso desde el precio histórico del `OrderItem` (nunca desde el cliente) y reingresa cada prenda: `SELLABLE` → `ProductInventory.stock`; `DAMAGED` → `damagedStock` (merma, no vuelve al catálogo). Si ya no queda nada por devolver, marca `Order.paymentStatus = REEMBOLSADO`.
+- `GET /returns` (`PROCESS_RETURNS` o `MANAGE_INVENTORY`): historial paginado, filtro `productId` para auditar mermas; `GET /returns/:id` para el detalle.
+- Reglas: la talla se copia del `OrderItem` (no se pregunta); la sucursal que recibe la mercadería puede no ser la que vendió; una misma línea puede partirse en varias filas si cambia la condición. Inventario muestra `damagedStock` por talla.
 
-### 4.12 Referencia rápida de endpoints (detalle real en Swagger `/api/docs`)
+### 4.12 Probador Virtual (Decart) — nuevo
+- `front/components/modules/product/VirtualTryOnModal.tsx` se abre desde el botón "Probarme virtualmente" del detalle. Requiere sesión: si no hay usuario, redirige a `/auth/login?redirect=...`.
+- Usa `@decartai/sdk` con el modelo realtime `lucy-vton-latest`: la cámara entra por WebRTC y vuelve el video con la prenda puesta. No es un modelo 3D.
+- Rutas Next (`front/app/api/decart/`): `POST /api/decart/session` valida el access token contra `GET /users/me` y firma un token efímero (`ek_...`) con `allowedModels`, `allowedOrigins` y `maxSessionDuration`; `GET /api/decart/garment?url=` proxea la imagen de la prenda con bloqueo de hosts privados (SSRF).
+- Control de costo por segundo: token de 60 s, techo de sesión de 25 s en el servidor, corte del cliente a los 15 s y botón para terminar antes.
+- Requiere `DECART_API_KEY` (solo servidor, ver §6.4); el prompt se arma en inglés con nombre + primer color del producto.
+
+### 4.13 Chatbot (Botpress) — nuevo
+- API: `GET /chatbot/products` es **público** (sin JWT), con `ThrottlerGuard` + `RelaxedThrottle` (20 req/s). DTO `QueryChatbotProductsDto`: `search?`, `branchId?`, `inStockOnly?`, `limit?` (1-50, default 20). Devuelve el catálogo aplanado con stock por talla, precio efectivo de la sucursal y moneda `BOB`; si la BD falla responde **503** (distinto de "no hay stock").
+- Front: `components/modules/chatbot/BotpressChat.tsx` se monta en `app/layout.tsx` y carga el widget de Botpress v3.7 (inject.js + configuración externa). La configuración del bot vive en Botpress, no en este repo.
+
+### 4.14 Contrato front ↔ API
+`NEXT_PUBLIC_API_URL`, pago vía `/payments/create-intent|confirm`, pedido con `items[].{productId, quantity, size}` y carrito con `branchId`, refresh token en `Authorization: Bearer` (no en el body), devoluciones por `orderItemId`, probador virtual con `Authorization` hacia `/api/decart/session`, `error.utils.ts` centraliza mensajes de error en español.
+
+### 4.15 Referencia rápida de endpoints (detalle real en Swagger `/api/docs`)
 - **auth:** `register|login|refresh|logout|forgot-password|verify-otp|reset-password`
 - **users:** `GET/PATCH /users/me`, `PATCH /users/me/password`, `DELETE /users/me`, `GET|POST /users/staff`, `PATCH /users/staff/:id`, `GET|POST /users/me/addresses`, `PUT|PATCH|DELETE /users/me/addresses/:id`, `PATCH /users/me/addresses/:id/default`
 - **branches:** `GET /branches`, `GET /branches/manage/all`, `POST/PATCH/DELETE`, `GET|PUT /branches/:branchId/inventory[/:productId]`
@@ -246,10 +291,12 @@ Cola de pedidos offline: ver §4.3.
 - **categories:** `GET` público; `POST|PATCH|DELETE` (`MANAGE_PRODUCTS`)
 - **collections** *(nuevo)*: `GET /collections`, `GET /collections/slug/:slug`, `POST|PATCH|DELETE` (`MANAGE_PRODUCTS`)
 - **cart:** `GET /cart[?branchId]`, `POST /cart/items`, `PATCH|DELETE /cart/items/:itemId`, `DELETE /cart`
-- **orders:** `POST|GET /orders`, `GET|PATCH|DELETE /orders/:id`, `GET|PATCH|DELETE /orders/admin/...`
-- **payments:** `POST /payments/create-intent|confirm`, `GET /payments[/:id]`, `GET /payments/order/:orderId`, **`POST /payments/webhook`** *(nuevo, sin guards, verificado por firma)*, QR (`GenerateQrDto`/`ConfirmQrDto`)
+- **orders:** `POST /orders`, `GET /orders`, `GET /orders/me`, `GET /orders/:id`, `GET /orders/admin/all`, `GET /orders/admin/:id`, `PATCH|DELETE /orders/:id`, `PATCH|DELETE /orders/admin/:id`
+- **payments:** `POST /payments/create-intent|confirm`, `GET /payments[/:id]`, `GET /payments/order/:orderId`, **`POST /payments/webhook`** *(sin guards, verificado por firma)*; QR: `POST /payments/qr/generate`, `GET /payments/qr/status/:orderId`, `POST /payments/qr/confirm`, `GET /payments/qr-confirm/:orderId` (HTML que se abre al escanear)
 - **pos** *(nuevo)*: `GET /pos/products`, `POST /pos/checkout`
+- **returns** *(nuevo)*: `GET /returns/search-order`, `POST /returns/process`, `GET /returns`, `GET /returns/:id`
 - **notifications** *(nuevo)*: `GET /notifications/vapid-public-key`, `POST /notifications/subscribe`
+- **chatbot** *(nuevo, público)*: `GET /chatbot/products`
 - **marketing:** `POST /marketing/send-campaign`
 - **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic` (ahora vía Groq)
 
@@ -262,14 +309,17 @@ Cola de pedidos offline: ver §4.3.
 2. **`ValidationPipe.forbidNonWhitelisted` ahora es `false`** (antes `true`). Los campos fuera del DTO ya no dan 400, se descartan en silencio. Es un cambio deliberado (commit `feb64e6`, para no romper el catálogo con `_t` de cache-busting), pero relaja la validación de entrada en toda la API.
 3. **Clave pública de Stripe hardcodeada en `docker-compose.yml`** (`pk_test_51UIJq...`, en texto plano, dos veces). Es la clave *pública* (no la secreta), pero conviene confirmar con el usuario si es apropiado tenerla en un archivo que pueda compartirse/subirse a un repo público, y moverla a `.env`/secret si no.
 4. **Webhook de Stripe sin guard de autenticación** por diseño (se valida solo por firma) — correcto en principio, pero cualquier cambio en `main.ts` que quite `rawBody: true` rompe la verificación de firma sin dar un error obvio.
-5. **Mezcla de gestores de paquete en `api/`:** el lockfile trackeado es `package-lock.json` (npm), pero existe un `api/bun.lock` sin trackear (sugiere que alguien corrió `bun install` ahí en algún momento). Si se sigue usando `bun` en `api/`, hay que decidir cuál lockfile es la fuente de verdad y trackear el correcto; si fue un error, borrar `api/bun.lock`.
+5. **Doble lockfile en `api/` y en `front/`:** están trackeados `api/package-lock.json` + `api/bun.lock` y `front/bun.lock` + `front/package-lock.json`. `api/bun.lock` se commiteó en `6645f77`. Hay que decidir el gestor oficial por proyecto y dejar de trackear el lockfile del otro para evitar dependencias divergentes.
 6. **`app_movil/README.md` documenta credenciales de prueba y una BD Neon distintas** a las del seed real del backend (`api/prisma/seed.mjs`). No asumir que ese README está al día — verificar contra el seed antes de dar credenciales a alguien.
 7. **No existe `app_movil/eas.json`** — no hay pipeline de EAS Build/Submit configurado, aunque en algún momento se haya visto un `eas.json` untracked en un `git status` (puede haber sido un archivo local nunca commiteado, o ya se borró).
-8. **El "Probador Virtual 3D" y el modelo 3D de producto no existen.** Cualquier tarea, ticket o memoria que hable de subir modelos 3D, `Model3DModal`, `VirtualTryOn`, `api/store/`, `common/storage/`, `common/filters/` describe trabajo **no implementado** en el estado actual del código — no asumir que existe solo porque aparezca mencionado en otro lado.
+8. **El Probador Virtual ya existe (ver §4.12), pero `ProductDetail.tsx:104` conserva un comentario que dice que "aún no existe".** No confundir ese comentario con el estado real. Tampoco es un modelo 3D: es Decart sobre video en tiempo real.
+9. **`DECART_API_KEY` está hardcodeada en `docker-compose.yml`** (clave real `dct_probador_...`, en texto plano). Moverla a `.env`/secret y rotarla antes de compartir el repo o hacerlo público; el front la necesita en runtime para `/api/decart/*`.
 
 ### 5.2 Pendientes ya conocidos que siguen sin resolver
-- `POST /payments/create-intent` — verificar si sigue confiando en el `amount` que manda el cliente sin validarlo contra la orden (el front ya envía el total correcto, pero conviene revisar el servicio antes de asumir que el backend lo re-valida).
-- Stock se descuenta al crear la orden (antes del pago); si el pago se abandona no se restituye salvo cancelación manual de un pedido `PENDIENTE`.
+- **Reserva de stock en carrito:** se descuenta al agregar y se libera al quitar/vaciar, al expirar por abandono (cron de 1 h) o al consumirse la orden. Si la API está caída, el cron no corre y la reserva puede quedar tomada hasta el siguiente arranque.
+- Devoluciones: solo se procesan en mostrador (no hay autoservicio web); no existe endpoint para dar de baja mermas ni para reembolsar dinero real — el "reembolso" es un registro contable.
+- Probador virtual: depende de `DECART_API_KEY` y cuesta por segundo; sin la key el endpoint responde 500.
+- Chatbot: la configuración vive en Botpress (URLs hardcodeadas en `BotpressChat.tsx`); cambiar de bot exige tocar el front.
 - Cambios de rol/permisos tardan hasta 15 min en verse (vida del access token); usuario eliminado sigue con token válido hasta que expire.
 - Sin cierre de sesión forzado al eliminar una cuenta.
 - Text-to-SQL: la seguridad real es el rol de solo lectura + vistas, no el validador por regex.
@@ -279,6 +329,14 @@ Cola de pedidos offline: ver §4.3.
 
 ### 5.3 Historial de commits recientes (más nuevo primero, `git log --oneline`)
 ```
+ae38fe1 fix(app_movil): resolve 'No refresh token' error, handle expired sessions and auto logout cleanly
+4a6f91b fix(mobile/api): resolve mobile purchase stock sync with Neon database and branch inventory
+97c325b feat(pwa): offline cart selection and admin/staff offline stock inventory sync with Neon
+8cd3d28 feat(pwa): optimizar funcionamiento offline, almacenamiento en IndexedDB y desplegar v2.7 en Azure
+9efa4e8 chore(docker): add DECART_API_KEY to front in docker-compose
+fffafec v2.0.0
+7eda63c probador   ← Probador Virtual con Decart
+6645f77 Implemenracion del area de devoluciòn para la venta fisica   ← devoluciones, mermas, reserva de stock del carrito
 b675b6d fix: import PassportModule in PaymentsModule and define empty constructor on OptionalJwtAuthGuard
 feb64e6 fix: remove _t query param and allow non-whitelisted params to prevent 400 on product catalog
 239dd94 fix(store): descontar stock correctamente en compras, registrar pagos QR y Stripe en Neon, y eliminar cache estatico
@@ -297,7 +355,7 @@ b2db73f v3.0.0
 ```
 
 ### 5.4 Estado de git al escribir este documento
-Rama `oscar`, HEAD `b675b6d`. Todo lo de arriba (POS, colecciones, stock por talla, push, QR, PWA offline, selector de sucursal en móvil, deploy en Azure) **ya está commiteado**. Lo único sin commitear en ese momento era: `PROJECT_CONTEXT.md` borrado (reemplazado por este archivo), un cambio trivial de line-endings en `api/package.json`, y un `api/bun.lock` sin trackear (ver §5.1.5). Correr `git status --short` de nuevo antes de asumir que sigue siendo así.
+Rama `main`, HEAD `ae38fe1`, árbol de trabajo limpio (`git status --short` sin salida). Todo lo descrito arriba (POS, colecciones, stock por talla, push, QR, PWA offline, devoluciones, probador virtual, chatbot, selector de sucursal en móvil, deploy en Azure) **ya está commiteado**. `api/bun.lock` ya está trackeado (ver §5.1.5). Correr `git status --short` y `git log --oneline -10` de nuevo antes de asumir que sigue siendo así.
 
 ---
 
@@ -321,7 +379,7 @@ npm run dev          # nest start --watch → http://localhost:3001/api/v1 (Swag
 ```bash
 cd front
 bun install          # o: npm install
-# crear front/.env  (NEXT_PUBLIC_API_URL, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY — no hay .env.example en front/)
+# crear front/.env  (NEXT_PUBLIC_API_URL, NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, DECART_API_KEY — no hay .env.example en front/)
 bun run dev          # → http://localhost:3000
 ```
 Primero la API, luego el front.
@@ -330,7 +388,7 @@ Primero la API, luego el front.
 ```bash
 cd app_movil
 npm install
-# ajustar src/config/env.ts o la pantalla de Login/Profile si la API no está en localhost/emulador estándar
+# por defecto apunta a la API de Azure; ajustar src/config/env.ts o la pantalla de Login/Profile si se usa otra URL
 npx expo start
 ```
 
@@ -348,10 +406,10 @@ npx expo start
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push (`npx web-push generate-vapid-keys`) |
 
 **`front/.env`** (no hay `.env.example` en `front/`, a diferencia de `api/` — crearlo a mano):
-`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
+`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `DECART_API_KEY` (solo servidor; la usan los Route Handlers de `/api/decart/*` y hoy también está hardcodeada en `docker-compose.yml`, ver §5.1.9). La configuración del chatbot Botpress no usa variables de entorno: las URLs están hardcodeadas en `BotpressChat.tsx`.
 
 ### 6.5 Docker
-`docker-compose.yml` en la raíz levanta `api` (3001) y `front` (3000) en una red bridge. `api/Dockerfile`: Node 22-alpine, corre `prisma migrate deploy && node dist/main` al iniciar el contenedor (migraciones automáticas). `front/Dockerfile`: Node 20-alpine, `output: "standalone"`, las `NEXT_PUBLIC_*` se hornean en el build (hay que pasarlas como build args, no solo en runtime). **Revisar y posiblemente rotar/mover a secret** la clave pública de Stripe hardcodeada antes de compartir este archivo (ver §5.1.3).
+`docker-compose.yml` en la raíz levanta `api` (3001) y `front` (3000) en una red bridge. `api/Dockerfile`: Node 22-alpine, corre `prisma migrate deploy && node dist/main` al iniciar el contenedor (migraciones automáticas). `front/Dockerfile`: Node 20-alpine, `output: "standalone"`, las `NEXT_PUBLIC_*` se hornean en el build (hay que pasarlas como build args, no solo en runtime). **Revisar y rotar/mover a secret** las claves hardcodeadas antes de compartir este archivo: la pública de Stripe (§5.1.3) y `DECART_API_KEY` (§5.1.9).
 
 ### 6.6 Problemas frecuentes (Windows)
 - Puertos ocupados tras detener `npm run dev`: `Get-NetTCPConnection -LocalPort 3000,3001 -State Listen | Select -Expand OwningProcess -Unique | % { Stop-Process -Id $_ -Force }`
@@ -363,7 +421,9 @@ npx expo start
 ## 7. Cómo usar este documento
 
 - Si vas a tocar **permisos**, actualiza los tres espejos (§4.1) y este documento.
-- Si vas a tocar **inventario/stock**, recuerda que ahora es por **talla**, no solo por sucursal — `InventoryService` tiene métodos separados para el detalle por talla y el agregado para catálogo.
+- Si vas a tocar **inventario/stock**, recuerda que es por **talla** y que hay dos cantidades por fila: `stock` (vendible) y `damagedStock` (mermas). `InventoryService` tiene métodos separados para el detalle por talla, el agregado para catálogo y el reingreso por devolución (`increment`/`incrementDamaged`).
+- Si vas a tocar **devoluciones**, lee §4.11: el tope se valida contra los `OrderItem` ya devueltos y el reembolso se calcula desde el precio histórico, nunca desde el cliente.
 - Si vas a tocar **CORS o validación de entrada**, lee primero §5.1.1 y §5.1.2 — son comportamientos actuales del código, no supuestos.
-- Si una tarea menciona **modelo 3D / probador virtual**, confirma primero que no se está confundiendo con una versión antigua de este documento o con una idea que nunca se implementó (§5.1.8).
+- Si una tarea menciona **probador virtual**, revisa §4.12: ya existe (Decart, no 3D). La clave `DECART_API_KEY` es un requisito real y hoy está hardcodeada (§5.1.9).
+- Si una tarea menciona **chatbot**, revisa §4.13: el widget vive en Botpress y la API solo expone `GET /chatbot/products`.
 - Antes de dar por buena cualquier afirmación de este archivo sobre un archivo, endpoint o campo específico, verifícalo en el código — este documento resume decisiones de diseño, pero el código es la fuente de verdad.

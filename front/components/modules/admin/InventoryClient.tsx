@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { CloudOff, RefreshCw } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import { InventoryRow, useInventory } from '@/hooks/useInventory';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
@@ -10,7 +11,7 @@ import { useReturnHistory } from '@/hooks/useReturns';
 import { useOfflineInventorySync } from '@/hooks/useOfflineInventorySync';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { ProductDiscountPayload, SetInventoryPayload } from '@/types/admin.types';
-import { ITEM_CONDITION_LABELS, RETURN_REASON_LABELS } from '@/types/returns.types';
+import { formatMoney, intlLocale } from '@/i18n/config';
 
 const toNumberOrNull = (value: string): number | null => (value.trim() === '' ? null : Number(value));
 const toDraft = (value: number | null): string => (value != null ? String(value) : '');
@@ -28,6 +29,9 @@ interface InventoryRowEditorProps {
 
 function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, onViewReturns, isPendingSync }: InventoryRowEditorProps) {
     const { product } = row;
+    const t = useTranslations('AdminInventory');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
     // Un draft de stock por talla (clave = talla), en vez de un solo input general
     const [sizeDrafts, setSizeDrafts] = useState<Record<string, string>>(
         () => Object.fromEntries(row.sizes.map((s) => [s.size, String(s.stock)])),
@@ -54,11 +58,11 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
     const readDiscount = (): { discount: ProductDiscountPayload } | { error: string } => {
         const price = toNumberOrNull(discountPrice);
         if (price !== null && (Number.isNaN(price) || price < 0 || price >= Number(product.price))) {
-            return { error: 'El precio de oferta debe ser menor al precio normal.' };
+            return { error: t('errors.salePrice') };
         }
         const pct = toNumberOrNull(discountPercentage);
         if (pct !== null && (!Number.isInteger(pct) || pct < 0 || pct > 100)) {
-            return { error: 'El porcentaje debe ser un entero entre 0 y 100.' };
+            return { error: t('errors.percentage') };
         }
         return { discount: { discountPrice: price, discountPercentage: pct } };
     };
@@ -70,7 +74,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
         try {
             setMessage(await action());
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudieron guardar los cambios.'));
+            setError(getApiErrorMessage(error, t('errors.saveFailed')));
         } finally {
             setIsSaving(false);
         }
@@ -83,7 +87,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
             const draft = sizeDrafts[size] ?? '';
             const value = Number(draft);
             if (draft.trim() === '' || !Number.isInteger(value) || value < 0) {
-                setError(`El stock de la talla ${size} debe ser un entero mayor o igual a 0.`);
+                setError(t('errors.sizeStock', { size }));
                 return;
             }
             sizes.push({ size, stock: value });
@@ -98,9 +102,9 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
         run(async () => {
             const res = await onSave(product.id, { sizes, ...result.discount }, product.name);
             if (res && res.isOffline) {
-                return 'Guardado localmente (sin internet). Se sincronizará con Neon al reconectar.';
+                return t('savedOffline');
             }
-            return 'Guardado';
+            return t('saved');
         });
     };
 
@@ -113,13 +117,13 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
         }
         const removing = result.discount.discountPrice === null && result.discount.discountPercentage === null;
         const question = removing
-            ? `¿Quitar el descuento de "${product.name}" en TODAS las sucursales?`
-            : `¿Aplicar este descuento a "${product.name}" en TODAS las sucursales? Reemplaza el descuento actual de cada una.`;
+            ? t('confirmRemoveAll', { name: product.name })
+            : t('confirmApplyAll', { name: product.name });
         if (!window.confirm(question)) return;
 
         run(async () => {
             await onApplyToAll(product.id, result.discount);
-            return 'Aplicado a todas las sucursales';
+            return t('appliedAll');
         });
     };
 
@@ -128,15 +132,15 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
             <td>
                 <div className={styles.cellMain}>
                     <span className={styles.cellTitle}>{product.name}</span>
-                    <span className={styles.cellSub}>SKU: {product.sku}</span>
+                    <span className={styles.cellSub}>{t('sku', { sku: product.sku })}</span>
                     {isPendingSync && (
                         <span className={`${styles.badge} ${styles.badgeWarning}`}>
-                            Pendiente de sincronizar con Neon
+                            {t('pendingSync')}
                         </span>
                     )}
                 </div>
             </td>
-            <td className={styles.numeric}>Bs {Number(product.price).toFixed(2)}</td>
+            <td className={styles.numeric}>{formatMoney(Number(product.price), locale)}</td>
             <td>
                 <input
                     type="number"
@@ -146,7 +150,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                     value={discountPrice}
                     onChange={(e) => { setDiscountPrice(e.target.value); markEdited(); }}
                     placeholder="—"
-                    aria-label={`Precio de oferta de ${product.name}${branchName ? ` en ${branchName}` : ''}`}
+                    aria-label={branchName ? t('salePriceLabelBranch', { name: product.name, branch: branchName }) : t('salePriceLabel', { name: product.name })}
                 />
             </td>
             <td>
@@ -159,7 +163,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                     value={discountPercentage}
                     onChange={(e) => { setDiscountPercentage(e.target.value); markEdited(); }}
                     placeholder="—"
-                    aria-label={`Porcentaje de descuento de ${product.name}${branchName ? ` en ${branchName}` : ''}`}
+                    aria-label={branchName ? t('discountLabelBranch', { name: product.name, branch: branchName }) : t('discountLabel', { name: product.name })}
                 />
             </td>
             <td>
@@ -174,7 +178,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                                 className={`${styles.input} ${styles.inputSmall}`}
                                 value={sizeDrafts[size] ?? ''}
                                 onChange={(e) => setSizeDraft(size, e.target.value)}
-                                aria-label={`Stock de ${product.name}, talla ${size}`}
+                                aria-label={t('sizeStockLabel', { name: product.name, size })}
                             />
                         </label>
                     ))}
@@ -187,7 +191,7 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                     <span className={styles.cellSub}>—</span>
                 ) : (
                     <div className={styles.cellMain}>
-                        <span className={`${styles.badge} ${styles.badgeDanger}`}>{row.damagedStock} en mermas</span>
+                        <span className={`${styles.badge} ${styles.badgeDanger}`}>{t('damagedCount', { count: row.damagedStock })}</span>
                         <span className={styles.cellSub}>
                             {row.sizes
                                 .filter((size) => (size.damagedStock ?? 0) > 0)
@@ -197,18 +201,18 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                     </div>
                 )}
                 <button type="button" className={styles.linkButton} onClick={() => onViewReturns(product.id)}>
-                    Ver devoluciones
+                    {t('viewReturns')}
                 </button>
             </td>
             <td>
                 <div className={styles.actions}>
                     {message && !isDirty && <span className={`${styles.badge} ${styles.badgeSuccess}`}>{message}</span>}
                     <button type="button" className={styles.button} onClick={handleSave} disabled={!isDirty || isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                     {isGlobal && (
                         <button type="button" className={styles.buttonSecondary} onClick={handleApplyToAll} disabled={isSaving}>
-                            Aplicar descuento a todas las sucursales
+                            {t('applyToAll')}
                         </button>
                     )}
                 </div>
@@ -232,6 +236,10 @@ function ReturnsAuditPanel({
     onClearProduct: () => void;
 }) {
     const { returns, isLoading, error } = useReturnHistory({ productId, branchId, enabled: !!branchId });
+    const t = useTranslations('AdminInventory.audit');
+    const tr = useTranslations('AdminReturns');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
 
     const rows = returns.flatMap((record) =>
         record.items.map((item) => ({ record, item, key: item.id })),
@@ -242,10 +250,10 @@ function ReturnsAuditPanel({
             {productId && (
                 <div className={styles.toolbar}>
                     <span className={`${styles.badge} ${styles.badgeInfo}`}>
-                        Solo devoluciones de {productName ?? 'la prenda seleccionada'}
+                        {t('onlyProduct', { name: productName ?? t('selectedProduct') })}
                     </span>
                     <button type="button" className={styles.linkButton} onClick={onClearProduct}>
-                        Ver todas las devoluciones
+                        {t('viewAll')}
                     </button>
                 </div>
             )}
@@ -254,32 +262,30 @@ function ReturnsAuditPanel({
 
             <div className={styles.tableCard}>
                 {isLoading ? (
-                    <div className={styles.loadingState}>Cargando devoluciones...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : rows.length === 0 ? (
                     <div className={styles.emptyState}>
-                        {productId
-                            ? 'Esta prenda no tiene devoluciones registradas en esta sucursal.'
-                            : 'Todavía no se registraron devoluciones en esta sucursal.'}
+                        {productId ? t('emptyProduct') : t('empty')}
                     </div>
                 ) : (
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>Fecha</th>
-                                    <th>Prenda</th>
-                                    <th>Talla</th>
-                                    <th className={styles.numeric}>Cant.</th>
-                                    <th>Motivo</th>
-                                    <th>Estado en que volvió</th>
-                                    <th className={styles.numeric}>Reembolso</th>
-                                    <th>Venta / Devolución</th>
+                                    <th>{tc('date')}</th>
+                                    <th>{t('item')}</th>
+                                    <th>{t('size')}</th>
+                                    <th className={styles.numeric}>{t('quantity')}</th>
+                                    <th>{t('reason')}</th>
+                                    <th>{t('condition')}</th>
+                                    <th className={styles.numeric}>{t('refund')}</th>
+                                    <th>{t('saleReturn')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {rows.map(({ record, item, key }) => (
                                     <tr key={key}>
-                                        <td>{formatDate(record.createdAt)}</td>
+                                        <td>{formatDate(record.createdAt, locale)}</td>
                                         <td>
                                             <div className={styles.cellMain}>
                                                 <span className={styles.cellTitle}>{item.productName}</span>
@@ -288,19 +294,19 @@ function ReturnsAuditPanel({
                                         </td>
                                         <td>{item.size ?? '—'}</td>
                                         <td className={styles.numeric}>{item.quantity}</td>
-                                        <td>{RETURN_REASON_LABELS[item.reason]}</td>
+                                        <td>{tr(`reasons.${item.reason}`)}</td>
                                         <td>
                                             <span
                                                 className={`${styles.badge} ${item.condition === 'SELLABLE' ? styles.badgeSuccess : styles.badgeDanger}`}
                                             >
-                                                {ITEM_CONDITION_LABELS[item.condition]}
+                                                {tr(`conditions.${item.condition}`)}
                                             </span>
                                         </td>
-                                        <td className={styles.numeric}>Bs {item.subtotal.toFixed(2)}</td>
+                                        <td className={styles.numeric}>{formatMoney(item.subtotal, locale)}</td>
                                         <td>
                                             <div className={styles.cellMain}>
-                                                <span className={styles.cellSub}>Venta #{record.orderNumber}</span>
-                                                <span className={styles.cellSub}>Atendió: {record.cashierName}</span>
+                                                <span className={styles.cellSub}>{t('sale', { number: record.orderNumber })}</span>
+                                                <span className={styles.cellSub}>{t('cashier', { name: record.cashierName })}</span>
                                             </div>
                                         </td>
                                     </tr>
@@ -314,12 +320,14 @@ function ReturnsAuditPanel({
     );
 }
 
-const formatDate = (value: string) =>
-    new Date(value).toLocaleDateString('es-BO', { day: '2-digit', month: 'short', year: 'numeric' });
+const formatDate = (value: string, locale: string) =>
+    new Date(value).toLocaleDateString(intlLocale(locale), { day: '2-digit', month: 'short', year: 'numeric' });
 
 export default function InventoryClient() {
     const { isGlobal, branchId: ownBranchId } = useAdminRole();
     const { branches, isLoading: branchesLoading } = useAdminBranches();
+    const t = useTranslations('AdminInventory');
+    const tc = useTranslations('AdminCommon');
     const [chosenBranchId, setChosenBranchId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<'stock' | 'returns'>('stock');
@@ -356,11 +364,9 @@ export default function InventoryClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>{isGlobal ? 'Inventario y Ofertas' : 'Mi Inventario'}</h1>
+                    <h1>{isGlobal ? t('title') : t('titleOwn')}</h1>
                     <p>
-                        {isGlobal
-                            ? 'Actualiza el stock y las ofertas de cada sucursal, o aplica una oferta a todas a la vez.'
-                            : `Actualiza el stock y las ofertas de ${branchName ?? 'tu sucursal'}. Las ofertas solo afectan a tu sucursal.`}
+                        {isGlobal ? t('subtitleGlobal') : t('subtitleOwn', { branch: branchName ?? t('yourBranch') })}
                     </p>
                 </div>
 
@@ -370,7 +376,7 @@ export default function InventoryClient() {
                             className={styles.input}
                             value={branchId ?? ''}
                             onChange={(e) => setChosenBranchId(e.target.value)}
-                            aria-label="Sucursal"
+                            aria-label={tc('branch')}
                             disabled={branchesLoading || branches.length === 0}
                         >
                             {branches.map((branch) => (
@@ -383,8 +389,8 @@ export default function InventoryClient() {
                             className={styles.input}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Buscar por nombre o SKU"
-                            aria-label="Buscar producto"
+                            placeholder={t('searchPlaceholder')}
+                            aria-label={t('searchLabel')}
                         />
                     )}
                 </div>
@@ -395,7 +401,7 @@ export default function InventoryClient() {
                     <div className={styles.syncInfo}>
                         <CloudOff size={18} />
                         <span>
-                            Tienes <strong>{pendingCount}</strong> cambio(s) de stock guardados localmente sin conexión a internet.
+                            {t.rich('pendingBanner', { count: pendingCount, strong: (chunks) => <strong>{chunks}</strong> })}
                         </span>
                     </div>
                     <button
@@ -405,7 +411,7 @@ export default function InventoryClient() {
                         disabled={isSyncing}
                     >
                         <RefreshCw size={14} className={isSyncing ? styles.spinner : ''} />
-                        {isSyncing ? 'Sincronizando con Neon...' : 'Sincronizar ahora'}
+                        {isSyncing ? t('syncing') : t('syncNow')}
                     </button>
                 </div>
             )}
@@ -431,14 +437,14 @@ export default function InventoryClient() {
                     className={`${styles.tab} ${activeTab === 'stock' ? styles.tabActive : ''}`}
                     onClick={() => setActiveTab('stock')}
                 >
-                    Stock y ofertas
+                    {t('tabStock')}
                 </button>
                 <button
                     type="button"
                     className={`${styles.tab} ${activeTab === 'returns' ? styles.tabActive : ''}`}
                     onClick={() => setActiveTab('returns')}
                 >
-                    Devoluciones y mermas{totalDamaged > 0 ? ` (${totalDamaged})` : ''}
+                    {totalDamaged > 0 ? t('tabReturnsCount', { count: totalDamaged }) : t('tabReturns')}
                 </button>
             </div>
 
@@ -454,23 +460,23 @@ export default function InventoryClient() {
             ) : (
             <div className={styles.tableCard}>
                 {!branchId && !branchesLoading ? (
-                    <div className={styles.emptyState}>No hay una sucursal para mostrar el inventario.</div>
+                    <div className={styles.emptyState}>{t('noBranch')}</div>
                 ) : isLoading ? (
-                    <div className={styles.loadingState}>Cargando inventario...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : visibleRows.length === 0 ? (
-                    <div className={styles.emptyState}>No se encontraron productos.</div>
+                    <div className={styles.emptyState}>{t('noProducts')}</div>
                 ) : (
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>Producto</th>
-                                    <th className={styles.numeric}>Precio</th>
-                                    <th>Precio oferta</th>
-                                    <th>% descuento</th>
-                                    <th>Stock por talla</th>
-                                    <th>Mermas</th>
-                                    <th className={styles.numeric}>Acciones</th>
+                                    <th>{t('product')}</th>
+                                    <th className={styles.numeric}>{t('price')}</th>
+                                    <th>{t('salePrice')}</th>
+                                    <th>{t('discountPct')}</th>
+                                    <th>{t('stockBySize')}</th>
+                                    <th>{t('damaged')}</th>
+                                    <th className={styles.numeric}>{tc('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>

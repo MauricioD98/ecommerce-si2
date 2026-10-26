@@ -3,20 +3,23 @@ import styles from "./auth-form.module.scss"
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Circle, Eye, EyeOff, Info } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
 
+// key: Auth.requirements.<key> en messages/<idioma>.json
 const PASSWORD_REQUIREMENTS = [
-    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
-    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
-    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
-    { label: "Un número", test: (p: string) => /\d/.test(p) },
-    { label: "Un carácter especial (@$!%*?&)", test: (p: string) => /[@$!%*?&]/.test(p) },
-];
+    { key: "minLength", test: (p: string) => p.length >= 8 },
+    { key: "uppercase", test: (p: string) => /[A-Z]/.test(p) },
+    { key: "lowercase", test: (p: string) => /[a-z]/.test(p) },
+    { key: "number", test: (p: string) => /\d/.test(p) },
+    { key: "special", test: (p: string) => /[@$!%*?&]/.test(p) },
+] as const;
 
 export default function RegisterForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { register, error, isLoading } = useAuth();
+    const t = useTranslations("Auth");
 
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
@@ -33,8 +36,8 @@ export default function RegisterForm() {
     const passwordsMatch = password === confirmPassword;
     const confirmMismatch = confirmPassword.length > 0 && !passwordsMatch;
     const confirmRequirements = [
-        { label: "La contraseña no está vacía", met: password.length > 0 },
-        { label: "Las contraseñas coinciden", met: confirmPassword.length > 0 && passwordsMatch },
+        { label: t("requirements.notEmpty"), met: password.length > 0 },
+        { label: t("requirements.match"), met: confirmPassword.length > 0 && passwordsMatch },
     ];
     const canSubmit = allRequirementsMet && confirmPassword.length > 0 && passwordsMatch;
 
@@ -66,8 +69,8 @@ export default function RegisterForm() {
             <div className={styles.container}>
                 {/*from */}
                 <div className={styles.fromWrapper}>
-                    <h1 className={styles.title}>Crea tu cuenta</h1>
-                    <p className={styles.subtitle}>Regístrate para comenzar a comprar</p>
+                    <h1 className={styles.title}>{t("register.title")}</h1>
+                    <p className={styles.subtitle}>{t("register.subtitle")}</p>
 
                     <form className={styles.form} onSubmit={handleSubmit} noValidate>
                         {error && (
@@ -78,29 +81,29 @@ export default function RegisterForm() {
                         )}
 
                         <div className={styles.field}>
-                            <label htmlFor="fullName">Nombre y Apellido</label>
-                            <input type="text" id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ingresa tu nombre y apellido" required />
+                            <label htmlFor="fullName">{t("register.fullName")}</label>
+                            <input type="text" id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t("register.fullNamePlaceholder")} required />
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="email">Correo electrónico</label>
-                            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" required />
+                            <label htmlFor="email">{t("email")}</label>
+                            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("emailPlaceholder")} required />
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="phone">Teléfono celular</label>
-                            <input type="tel" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ingresa tu teléfono celular" required />
+                            <label htmlFor="phone">{t("register.phone")}</label>
+                            <input type="tel" id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={t("register.phonePlaceholder")} required />
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="password">Contraseña</label>
+                            <label htmlFor="password">{t("password")}</label>
                             <div className={styles.inputWrapper}>
-                                <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ingresa tu contraseña" required onFocus={() => setIsPasswordFocused(true)} onBlur={() => setIsPasswordFocused(false)} />
+                                <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("passwordPlaceholder")} required onFocus={() => setIsPasswordFocused(true)} onBlur={() => setIsPasswordFocused(false)} />
                                 <button
                                     type="button"
                                     className={styles.toggleButton}
                                     onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -109,9 +112,9 @@ export default function RegisterForm() {
                                         {PASSWORD_REQUIREMENTS.map((req) => {
                                             const met = req.test(password);
                                             return (
-                                                <li key={req.label} className={`${styles.checkItem} ${met ? styles.checkItemMet : ""}`}>
+                                                <li key={req.key} className={`${styles.checkItem} ${met ? styles.checkItemMet : ""}`}>
                                                     {met ? <Check size={14} strokeWidth={3} /> : <Circle size={10} />}
-                                                    {req.label}
+                                                    {t(`requirements.${req.key}`)}
                                                 </li>
                                             );
                                         })}
@@ -121,14 +124,14 @@ export default function RegisterForm() {
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="confirmPassword">Confirmar contraseña</label>
+                            <label htmlFor="confirmPassword">{t("confirmPassword")}</label>
                             <div className={styles.inputWrapper}>
-                                <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repite tu contraseña" required aria-invalid={confirmMismatch} onFocus={() => setIsConfirmPasswordFocused(true)} onBlur={() => setIsConfirmPasswordFocused(false)} />
+                                <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t("confirmPasswordPlaceholder")} required aria-invalid={confirmMismatch} onFocus={() => setIsConfirmPasswordFocused(true)} onBlur={() => setIsConfirmPasswordFocused(false)} />
                                 <button
                                     type="button"
                                     className={styles.toggleButton}
                                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                    aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    aria-label={showConfirmPassword ? t("hidePassword") : t("showPassword")}
                                 >
                                     {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
@@ -143,18 +146,18 @@ export default function RegisterForm() {
                                     </ul>
                                 )}
                             </div>
-                            {confirmMismatch && <span className={styles.fieldError}>Las contraseñas no coinciden</span>}
+                            {confirmMismatch && <span className={styles.fieldError}>{t("passwordsDontMatch")}</span>}
                         </div>
 
                         <button type="submit" className={styles.submitButton} disabled={!canSubmit || isLoading}>
-                            {isLoading ? "Creando cuenta..." : "Registrarse"}
+                            {isLoading ? t("register.submitting") : t("register.submit")}
                         </button>
                     </form>
 
                     <p className={styles.footerText}>
-                        ¿Ya tienes una cuenta?{" "}
+                        {t("register.haveAccount")}{" "}
                         <button type="button" className={styles.link} onClick={() => router.push("/auth/login")}>
-                            Iniciar sesión
+                            {t("register.login")}
                         </button>
                     </p>
 

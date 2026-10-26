@@ -1,6 +1,8 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { appStorage } from '../utils/storage';
 import { getCurrentApiBaseUrl, getApiBaseUrl } from '../config/env';
+import { TENANT_HEADER, TENANT_REQUIRED, getTenantId, notifyTenantRequired } from '../config/tenant';
+import { getCurrentLanguage } from '../i18n';
 
 export const ACCESS_TOKEN_KEY = '@access_token';
 export const REFRESH_TOKEN_KEY = '@refresh_token';
@@ -24,8 +26,42 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Idioma elegido en Perfil (o el del teléfono): la API traduce con él los errores y el
+  // nombre/descripción de los productos. Se lee en cada petición para que el cambio aplique ya.
+  if (config.headers) {
+    config.headers['Accept-Language'] = getCurrentLanguage();
+  }
+
+  // Se resuelve en cada petición (no al crear el cliente) para que un cambio de tienda aplique
+  // de inmediato. Los reintentos de la cola pasan otra vez por acá, así que también lo llevan.
+  const tenantId = await getTenantId();
+  if (tenantId && config.headers && !config.headers.has(TENANT_HEADER)) {
+    config.headers.set(TENANT_HEADER, tenantId);
+  }
+
+  // Sin tienda no se sale a la red: el 401 caería en el refresh y en el auto-logout. /platform/*
+  // es la excepción (el selector de tienda lo usa para resolver el slug).
+  if (!tenantId && !config.url?.startsWith('/platform/')) {
+    notifyTenantRequired();
+    return Promise.reject(tenantRequiredError(config));
+  }
   return config;
 }, (error) => Promise.reject(error));
+
+const isTenantRequiredError = (error: AxiosError): boolean =>
+  error.response?.status === 401 &&
+  (error.response.data as { code?: string } | undefined)?.code === TENANT_REQUIRED;
+
+// Mismo shape que el 401 real del backend: getErrorMessage devuelve data.message
+const tenantRequiredError = (config: InternalAxiosRequestConfig) =>
+  new AxiosError('Selecciona una tienda para continuar.', 'ERR_TENANT_REQUIRED', config, undefined, {
+    status: 401,
+    statusText: 'Unauthorized',
+    headers: {},
+    config,
+    data: { statusCode: 401, code: TENANT_REQUIRED, message: 'Selecciona una tienda para continuar.' },
+  } as AxiosResponse);
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -55,6 +91,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // 401 por falta de tienda ≠ sesión vencida: ni refresh, ni cola, ni auto-logout (los tokens
+    // siguen guardados por si la tienda vuelve a estar disponible). Se pide elegir tienda.
+    if (isTenantRequiredError(error)) {
+      notifyTenantRequired();
+      return Promise.reject(error);
+    }
 
     // Don't retry auth endpoints
     if (
@@ -89,12 +132,16 @@ apiClient.interceptors.response.use(
         }
 
         const currentBase = await getApiBaseUrl();
+        // axios "limpio" (sin interceptores): el header de tienda va explícito. Sin él el backend
+        // rechaza el refresh y caería al auto-logout aunque la sesión fuera válida.
+        const tenantId = await getTenantId();
         const refreshResponse = await axios.post(
           `${currentBase}/auth/refresh`,
           {},
           {
             headers: {
               Authorization: `Bearer ${refreshToken}`,
+              ...(tenantId ? { [TENANT_HEADER]: tenantId } : {}),
             },
           }
         );

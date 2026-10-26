@@ -1,10 +1,22 @@
 import { PosReceipt } from "@/types/pos.types";
+import { formatMoney, intlLocale } from "@/i18n/config";
 
-export const PAYMENT_METHOD_LABEL: Record<string, string> = {
-    CASH: "Efectivo",
-    PHYSICAL_CARD: "Tarjeta (POS)",
-    QR: "QR / Transferencia",
-};
+// Textos ya traducidos (AdminPos.receipt): esto corre fuera de React, sin acceso a useTranslations
+export interface ReceiptTexts {
+    store: string;
+    order: string;
+    cashier: string;
+    customer: string;
+    nit: string | null;
+    razonSocial: string | null;
+    subtotal: string;
+    discount: string;
+    total: string;
+    payment: string;
+    received: string | null;
+    change: string | null;
+    thanks: string;
+}
 
 const escapeHtml = (value: string) =>
     value
@@ -13,11 +25,9 @@ const escapeHtml = (value: string) =>
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 
-const money = (value: number) => `Bs ${value.toFixed(2)}`;
-
-const buildReceiptHtml = (receipt: PosReceipt): string => {
-    const date = new Date(receipt.createdAt).toLocaleString("es-BO");
-    const paymentLabel = PAYMENT_METHOD_LABEL[receipt.paymentMethod] ?? receipt.paymentMethod;
+const buildReceiptHtml = (receipt: PosReceipt, texts: ReceiptTexts, locale: string): string => {
+    const money = (value: number) => formatMoney(value, locale);
+    const date = new Date(receipt.createdAt).toLocaleString(intlLocale(locale));
 
     const itemsHtml = receipt.items
         .map(
@@ -32,12 +42,12 @@ const buildReceiptHtml = (receipt: PosReceipt): string => {
     const cashLinesHtml =
         receipt.paymentMethod === "CASH" && receipt.amountReceived != null
             ? `
-                <p>Monto Recibido: ${money(receipt.amountReceived)}</p>
-                <p>Cambio: ${money(receipt.change ?? 0)}</p>`
+                <p>${escapeHtml(texts.received ?? "")}</p>
+                <p>${escapeHtml(texts.change ?? "")}</p>`
             : "";
 
     return `<!DOCTYPE html>
-<html>
+<html lang="${locale}">
 <head>
 <meta charset="utf-8" />
 <style>
@@ -61,24 +71,24 @@ const buildReceiptHtml = (receipt: PosReceipt): string => {
 </style>
 </head>
 <body>
-    <p class="store">STELLA FEMME</p>
+    <p class="store">${escapeHtml(texts.store)}</p>
     <p>${escapeHtml(receipt.branchName)}</p>
     <p>${date}</p>
-    <p>Pedido #${escapeHtml(receipt.orderNumber)}</p>
-    <p>Cajero: ${escapeHtml(receipt.cashierName)}</p>
-    <p>Cliente: ${escapeHtml(receipt.customerName)}</p>
-    ${receipt.nit ? `<p>NIT/CI: ${escapeHtml(receipt.nit)}</p>` : ""}
-    ${receipt.razonSocial ? `<p>Razón Social: ${escapeHtml(receipt.razonSocial)}</p>` : ""}
+    <p>${escapeHtml(texts.order)}</p>
+    <p>${escapeHtml(texts.cashier)}</p>
+    <p>${escapeHtml(texts.customer)}</p>
+    ${texts.nit ? `<p>${escapeHtml(texts.nit)}</p>` : ""}
+    ${texts.razonSocial ? `<p>${escapeHtml(texts.razonSocial)}</p>` : ""}
     <hr class="divider" />
     ${itemsHtml}
     <hr class="divider" />
-    <div class="row"><span>Subtotal</span><span>${money(receipt.subtotal)}</span></div>
-    ${receipt.discountApplied > 0 ? `<div class="row"><span>Descuento</span><span>-${money(receipt.discountApplied)}</span></div>` : ""}
-    <div class="row total"><span>Total</span><span>${money(receipt.total)}</span></div>
-    <p>Pago: ${escapeHtml(paymentLabel)}</p>
+    <div class="row"><span>${escapeHtml(texts.subtotal)}</span><span>${money(receipt.subtotal)}</span></div>
+    ${receipt.discountApplied > 0 ? `<div class="row"><span>${escapeHtml(texts.discount)}</span><span>-${money(receipt.discountApplied)}</span></div>` : ""}
+    <div class="row total"><span>${escapeHtml(texts.total)}</span><span>${money(receipt.total)}</span></div>
+    <p>${escapeHtml(texts.payment)}</p>
     ${cashLinesHtml}
     <hr class="divider" />
-    <p class="footer">¡Gracias por su compra!</p>
+    <p class="footer">${escapeHtml(texts.thanks)}</p>
 </body>
 </html>`;
 };
@@ -86,7 +96,7 @@ const buildReceiptHtml = (receipt: PosReceipt): string => {
 // Imprime el recibo en un iframe oculto con su propio documento HTML, sin depender del árbol de
 // CSS de la app (el modal usa position: fixed + overflow-y: auto, que en varios navegadores hace
 // que la impresión con visibility:hidden/position:absolute salga en blanco o en varias hojas).
-export function printPosReceipt(receipt: PosReceipt): void {
+export function printPosReceipt(receipt: PosReceipt, texts: ReceiptTexts, locale: string): void {
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.right = "0";
@@ -107,7 +117,7 @@ export function printPosReceipt(receipt: PosReceipt): void {
     }
 
     doc.open();
-    doc.write(buildReceiptHtml(receipt));
+    doc.write(buildReceiptHtml(receipt, texts, locale));
     doc.close();
 
     let cleaned = false;

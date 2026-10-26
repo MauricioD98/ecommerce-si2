@@ -1,3 +1,4 @@
+import type { ProductTranslations } from "./product.types";
 import { FulfillmentType } from "./branch.types";
 
 export interface BranchPayload {
@@ -181,6 +182,8 @@ export interface ProductPayload {
     branchId?: string | null;
     // Colecciones a las que pertenece (ej. Otoño-Invierno). Omitido: no se toca; [] las quita todas.
     collectionIds?: string[];
+    // Nombre y descripción en en/fr/pt/zh. Reemplaza el objeto completo; un idioma vacío se quita.
+    translations?: ProductTranslations;
 }
 
 export interface CategoryOption {

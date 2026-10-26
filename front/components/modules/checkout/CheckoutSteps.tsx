@@ -1,14 +1,16 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import styles from "./checkout.module.scss";
 
 
 export default function CheckoutSteps({ currentStep }: { currentStep: number }) {
 
-    const steps = [{ number: 1, title: "Entrega" },
-    { number: 2, title: "Pago" },
-    { number: 3, title: "Completado" }]
+    const t = useTranslations("Checkout.steps");
+    const steps = [{ number: 1, title: t("delivery") },
+    { number: 2, title: t("payment") },
+    { number: 3, title: t("completed") }]
 
 
     return (

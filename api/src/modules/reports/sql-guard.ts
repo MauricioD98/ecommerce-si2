@@ -13,7 +13,12 @@ const FORBIDDEN_KEYWORDS = [
 ];
 
 // Referencias a objetos internos de PostgreSQL
-const FORBIDDEN_PATTERNS: RegExp[] = [/\bpg_\w*/i, /\binformation_schema\b/i, /\bset_config\b/i, /\bcurrent_setting\b/i, /\bdblink\b/i];
+// tenant_* / reports_* / *_reporting: nombres de schemas y roles de otras tiendas. El rol por tienda
+// ya impide leerlos; esto evita además que la consulta los mencione (y revele que existen).
+const FORBIDDEN_PATTERNS: RegExp[] = [
+  /\bpg_\w*/i, /\binformation_schema\b/i, /\bset_config\b/i, /\bcurrent_setting\b/i, /\bdblink\b/i,
+  /\btenant_\w*/i, /\breports_\w*/i, /\w*_reporting\b/i, /\breporting\s*\./i,
+];
 
 // Únicas funciones que la consulta puede llamar. Cualquier otra (set_config, query_to_xml, pg_read_file...)
 // se rechaza: así una consulta no puede alterar la variable de sesión que limita la sucursal.

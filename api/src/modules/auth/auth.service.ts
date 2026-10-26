@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { i18nMessage } from '../../i18n/i18n-message';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -12,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { DEFAULT_ROLE } from '../../common/constants/permissions';
 import { MailService } from '../mail/mail.service';
 import { USER_SELECT, UserWithRole, toUserResponse } from '../users/user.mapper';
+import { requireTenant } from '../../tenancy/tenant-context';
 
 @Injectable()
 export class AuthService {
@@ -38,7 +40,7 @@ export class AuthService {
             // sigue siendo la garantía real: si dos registros llegan a la vez, se captura P2002 más abajo
             const existingUser = await this.prisma.user.findUnique({ where: { email } });
             if (existingUser) {
-                throw new ConflictException('El correo electrónico ya está registrado');
+                throw new ConflictException(i18nMessage('errors.EMAIL_TAKEN'));
             }
 
             // Toda cuenta nueva parte con el rol base "Cliente"
@@ -76,10 +78,10 @@ export class AuthService {
             }
             // Violación de la restricción única del correo (registro simultáneo con el mismo email)
             if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-                throw new ConflictException('El correo electrónico ya está registrado');
+                throw new ConflictException(i18nMessage('errors.EMAIL_TAKEN'));
             }
             console.error('Error durante el registro del usuario', error);
-            throw new InternalServerErrorException('Ocurrio un error durante el registro');
+            throw new InternalServerErrorException(i18nMessage('errors.REGISTER_FAILED'));
         }
     }
 
@@ -97,15 +99,19 @@ export class AuthService {
 
     // El access token lleva el rol y sus permisos: así los guards no consultan la BD en cada petición.
     // Los cambios de rol/permisos se reflejan al renovar el token (cada 15 min o al volver a iniciar sesión).
+    // tenantId sale del contexto de la request (TenantMiddleware): el usuario se acaba de leer de
+    // ese schema, así que el token queda atado a la tienda donde existe ese usuario.
     private async generateTokens(user: Pick<UserWithRole, 'id' | 'email' | 'branchId' | 'role'>): Promise<{ accessToken: string; refreshToken: string }> {
+      const { tenantId } = requireTenant();
       const accessPayload = {
         sub: user.id,
         email: user.email,
+        tenantId,
         role: { id: user.role.id, name: user.role.name },
         permissions: user.role.permissions,
         branchId: user.branchId,
       };
-      const refreshPayload = { sub: user.id, email: user.email, refreshId: randomBytes(16).toString('hex') };
+      const refreshPayload = { sub: user.id, email: user.email, tenantId, refreshId: randomBytes(16).toString('hex') };
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(accessPayload,{expiresIn: '15m'}),
         // El refresh token se firma con su propio secreto: RefreshTokenStrategy lo verifica con JWT_REFRESH_SECRET
@@ -133,7 +139,7 @@ export class AuthService {
         });
 
         if(!user){
-            throw new UnauthorizedException('Usuario no encontrado');
+            throw new UnauthorizedException(i18nMessage('errors.USER_NOT_FOUND'));
         }
 
         const tokens = await this.generateTokens(user);
@@ -251,7 +257,7 @@ export class AuthService {
         if (user?.lockedUntil && user.lockedUntil > new Date()) {
             const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
             throw new HttpException(
-                `Demasiados intentos fallidos. Inténtalo de nuevo en ${minutes} minuto${minutes === 1 ? '' : 's'}`,
+                i18nMessage('errors.TOO_MANY_ATTEMPTS', { count: minutes }),
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
@@ -269,12 +275,12 @@ export class AuthService {
                 });
                 if (lock) {
                     throw new HttpException(
-                        'Demasiados intentos fallidos. Tu cuenta quedó bloqueada por 5 minutos',
+                        i18nMessage('errors.ACCOUNT_LOCKED'),
                         HttpStatus.TOO_MANY_REQUESTS,
                     );
                 }
             }
-            throw new UnauthorizedException('Email o password invalido')
+            throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'))
         }
 
         if (user.loginAttempts > 0 || user.lockedUntil) {

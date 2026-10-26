@@ -1,8 +1,8 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import Footer from '@/components/modules/landing/Footer';
 import Header from '@/components/modules/landing/Header';
 import ProductDetailClient from '@/components/modules/product/ProductDetailClient';
-import { icons } from 'lucide-react';
-import { title } from 'process';
 import React from 'react';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,10 @@ export default async function Page({ params }: PageProps) {
     </>
 };
 
-export function generateMetadato() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: 'Detalle del producto',
-        description: 'Consulta los detalles del producto',
+        title: t("productTitle"),
+        description: t("productDescription"),
     };
 }

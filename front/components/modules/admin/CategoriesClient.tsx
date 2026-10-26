@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import CategoryFormModal from './CategoryFormModal';
 import { useAdminCategories } from '@/hooks/useAdminCategories';
@@ -9,6 +10,8 @@ import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Category, CategoryPayload } from '@/types/admin.types';
 
 export default function CategoriesClient() {
+    const t = useTranslations('AdminCategories');
+    const tc = useTranslations('AdminCommon');
     const [page, setPage] = useState(1);
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
@@ -40,11 +43,11 @@ export default function CategoriesClient() {
     const handleDelete = async (category: Category) => {
         if (category.productCount > 0) {
             window.alert(
-                `"${category.name}" tiene ${category.productCount} producto${category.productCount === 1 ? '' : 's'} asociado${category.productCount === 1 ? '' : 's'}. Reasígnalos a otra categoría antes de eliminarla.`,
+                t('hasProducts', { name: category.name, count: category.productCount }),
             );
             return;
         }
-        if (!window.confirm(`¿Eliminar la categoría "${category.name}"?`)) return;
+        if (!window.confirm(t('confirmDelete', { name: category.name }))) return;
 
         setBusyId(category.id);
         setActionError(null);
@@ -52,7 +55,7 @@ export default function CategoriesClient() {
             await deleteCategory(category.id);
             if (categories.length === 1 && page > 1) setPage(page - 1);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar la categoría.'));
+            setActionError(getApiErrorMessage(error, t('deleteFailed')));
         } finally {
             setBusyId(null);
         }
@@ -62,20 +65,20 @@ export default function CategoriesClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Categorías</h1>
-                    <p>Organiza el catálogo. Una categoría con productos asociados no se puede eliminar.</p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                 </div>
                 <div className={styles.toolbar}>
                     <input
                         className={styles.input}
                         value={searchInput}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre"
-                        aria-label="Buscar categoría"
+                        placeholder={tc('search')}
+                        aria-label={t('searchLabel')}
                     />
                     <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                         <Plus size={16} />
-                        Nueva categoría
+                        {t('new')}
                     </button>
                 </div>
             </div>
@@ -84,10 +87,10 @@ export default function CategoriesClient() {
 
             <div className={styles.tableCard}>
                 {isLoading && categories.length === 0 ? (
-                    <div className={styles.loadingState}>Cargando categorías...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : categories.length === 0 ? (
                     <div className={styles.emptyState}>
-                        {search ? `No se encontraron categorías para "${search}".` : 'Aún no hay categorías.'}
+                        {search ? t('noResults', { search }) : t('empty')}
                     </div>
                 ) : (
                     <>
@@ -95,12 +98,12 @@ export default function CategoriesClient() {
                             <table className={styles.table}>
                                 <thead>
                                     <tr>
-                                        <th>Nombre</th>
-                                        <th>Slug</th>
-                                        <th>Descripción</th>
-                                        <th className={styles.numeric}>Productos</th>
-                                        <th>Estado</th>
-                                        <th className={styles.numeric}>Acciones</th>
+                                        <th>{tc('name')}</th>
+                                        <th>{t('slug')}</th>
+                                        <th>{tc('description')}</th>
+                                        <th className={styles.numeric}>{t('products')}</th>
+                                        <th>{tc('status')}</th>
+                                        <th className={styles.numeric}>{tc('actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -118,14 +121,14 @@ export default function CategoriesClient() {
                                             <td className={styles.numeric}>{category.productCount}</td>
                                             <td>
                                                 <span className={`${styles.badge} ${category.isActive === false ? styles.badgeMuted : styles.badgeSuccess}`}>
-                                                    {category.isActive === false ? 'Inactiva' : 'Activa'}
+                                                    {category.isActive === false ? t('inactive') : t('active')}
                                                 </span>
                                             </td>
                                             <td>
                                                 <div className={styles.actions}>
                                                     <button type="button" className={styles.buttonSecondary} onClick={() => setEditing(category)}>
                                                         <Pencil size={14} />
-                                                        Editar
+                                                        {tc('edit')}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -134,7 +137,7 @@ export default function CategoriesClient() {
                                                         onClick={() => handleDelete(category)}
                                                     >
                                                         <Trash2 size={14} />
-                                                        Eliminar
+                                                        {tc('delete')}
                                                     </button>
                                                 </div>
                                             </td>
@@ -147,11 +150,11 @@ export default function CategoriesClient() {
                         {totalPages > 1 && (
                             <div className={styles.pagination}>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
-                                    Anterior
+                                    {tc('previous')}
                                 </button>
-                                <span>Página {page} de {totalPages} ({total} en total)</span>
+                                <span>{t('pageInfo', { page, totalPages, total })}</span>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>
-                                    Siguiente
+                                    {tc('next')}
                                 </button>
                             </div>
                         )}

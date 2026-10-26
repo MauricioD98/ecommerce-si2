@@ -6,6 +6,7 @@ import CheckoutHeader from './CheckoutHeader';
 import DeliveryStep from './DeliveryStep';
 import styles from './checkout.module.scss';
 import { CreditCard, WifiOff, QrCode } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 // IMPORTANTE: Asegúrate de que las rutas de importación apunten a los archivos reales en tu proyecto
 import { useAuth } from '@/hooks/useAuth';
@@ -24,12 +25,16 @@ import { DeliveryAddress, formatShippingAddress } from '@/types/address.types';
 import { DELIVERY_SHIPPING_COST, round2 } from '@/utils/pricing';
 import { addOfflineOrder } from '@/utils/offlineOrderQueue';
 import { getApiErrorMessage } from '@/service/api/error.utils';
+import { connectService } from '@/service/api/connect.service';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 
 export const revalidate = false;
 
 export default function CheckoutClient() {
     const { isAuthenticated } = useAuth()
     const router = useRouter();
+    const t = useTranslations('Checkout');
+    const storeName = useStoreName();
     useEffect(() => {
         if (!isAuthenticated) {
             router.push("/auth/login?redirect=/checkout")
@@ -53,6 +58,12 @@ export default function CheckoutClient() {
     const { createOrder, order, error: orderError } = useOrder();
     const { selectedBranch, selectedBranchId } = useBranches();
     const { isOnline } = useNetworkStatus();
+    // La tarjeta solo se ofrece si la tienda completó su cuenta de cobros (Stripe Connect); si no, el
+    // backend rechaza el PaymentIntent. null = todavía no se sabe.
+    const [cardEnabled, setCardEnabled] = useState<boolean | null>(null);
+    useEffect(() => {
+        connectService.isCardEnabled().then(setCardEnabled).catch(() => setCardEnabled(false));
+    }, []);
     const [isSavingOffline, setIsSavingOffline] = useState(false);
     const [offlineError, setOfflineError] = useState<string | null>(null);
 
@@ -84,10 +95,10 @@ export default function CheckoutClient() {
 
     // Al llegar al paso 2, preseleccionar automáticamente el método según conectividad
     useEffect(() => {
-        if (currentStep === 2 && !selectedPayment) {
-            setSelectedPayment(isOnline ? "stripe" : "offline");
-        }
-    }, [currentStep, selectedPayment, isOnline]);
+        if (currentStep !== 2 || selectedPayment) return;
+        if (!isOnline) setSelectedPayment("offline");
+        else if (cardEnabled !== null) setSelectedPayment(cardEnabled ? "stripe" : "qr");
+    }, [currentStep, selectedPayment, isOnline, cardEnabled]);
 
     const ensureOrderCreated = useCallback(async (forceRetry = false): Promise<string | null> => {
         let activeOrderId = orderId;
@@ -157,12 +168,12 @@ export default function CheckoutClient() {
             try {
                 const paymentCreated = await createPaymentIntent({
                     orderId: activeOrderId,
-                    description: "Pago de orden en Stella Femme",
+                    description: `Pago de orden en ${storeName}`,
                     currency: "usd"
                 });
 
                 if (!paymentCreated) {
-                    throw new Error("No se pudo inicializar la pasarela de pago.");
+                    throw new Error(t('payment.gatewayFailed'));
                 }
             } catch (error) {
                 console.error("Error al preparar Stripe:", error);
@@ -242,7 +253,7 @@ export default function CheckoutClient() {
             clearAllCart();
             router.push('/checkout/offline-success');
         } catch (error) {
-            setOfflineError(getApiErrorMessage(error, 'No se pudo guardar el pedido en este dispositivo.'));
+            setOfflineError(getApiErrorMessage(error, t('payment.offlineSaveFailed')));
         } finally {
             setIsSavingOffline(false);
         }
@@ -274,7 +285,7 @@ export default function CheckoutClient() {
                                     );
                                     if (invalidItem) {
                                         setStockError(
-                                            `"${invalidItem.product.name}" ya no tiene stock suficiente (disponible: ${invalidItem.product.stock}). Ajusta la cantidad en tu carrito antes de continuar.`,
+                                            t('delivery.stockError', { name: invalidItem.product.name, stock: invalidItem.product.stock }),
                                         );
                                         return;
                                     }
@@ -291,13 +302,20 @@ export default function CheckoutClient() {
                     {currentStep === 2 && (
                         <div className={styles.paymentLayout}>
                             <div className={styles.stepContent}>
-                                <h2>Selecciona un método de pago</h2>
+                                <h2>{t('payment.title')}</h2>
 
                                 <div className={styles.deliverySummary}>
                                     <p>
                                         {isPickup
-                                            ? <>Retiro en <strong>{selectedBranch?.name ?? "sucursal"}</strong></>
-                                            : <>Envío a <strong>{deliveryAddress ? formatShippingAddress(deliveryAddress) : ""}</strong> (desde {selectedBranch?.name ?? "sucursal"})</>}
+                                            ? t.rich('payment.pickupAt', {
+                                                branch: selectedBranch?.name ?? t('payment.branchFallback'),
+                                                strong: (chunks) => <strong>{chunks}</strong>,
+                                            })
+                                            : t.rich('payment.shipTo', {
+                                                address: deliveryAddress ? formatShippingAddress(deliveryAddress) : '',
+                                                branch: selectedBranch?.name ?? t('payment.branchFallback'),
+                                                strong: (chunks) => <strong>{chunks}</strong>,
+                                            })}
                                     </p>
                                     <button
                                         type="button"
@@ -309,7 +327,7 @@ export default function CheckoutClient() {
                                             setCurrentStep(1);
                                         }}
                                     >
-                                        Cambiar
+                                        {t('payment.change')}
                                     </button>
                                 </div>
 
@@ -317,21 +335,22 @@ export default function CheckoutClient() {
                                     {!isOnline && (
                                         <div className={styles.offlineNotice}>
                                             <WifiOff size={18} />
-                                            <span>
-                                                Estás sin conexión: el pago con tarjeta no está disponible. Guarda tu pedido
-                                                y se enviará solo cuando vuelva el internet.
-                                            </span>
+                                            <span>{t('payment.offlineNotice')}</span>
                                         </div>
                                     )}
 
-                                    {isOnline ? (
+                                    {isOnline && cardEnabled === false && (
+                                        <p className={styles.paymentHint}>{t('payment.cardUnavailable')}</p>
+                                    )}
+
+                                    {isOnline && cardEnabled ? (
                                         <PaymentMethodCard
                                             method="stripe"
                                             selectedMethod={selectedPayment}
                                             onSelect={handlePaymentMethodSelect}
                                             icon={<CreditCard />}
-                                            title="Tarjeta de crédito / débito"
-                                            description="Pago seguro con Stripe"
+                                            title={t('payment.card')}
+                                            description={t('payment.cardDescription')}
                                         >
                                             {displayedError && (
                                                 <div className={styles.errorMessage}>
@@ -341,7 +360,7 @@ export default function CheckoutClient() {
                                                         onClick={handleRetry}
                                                         className={styles.retryButton}
                                                     >
-                                                        Reintentar preparar pago
+                                                        {t('payment.retryPrepare')}
                                                     </button>
                                                 </div>
                                             )}
@@ -376,8 +395,8 @@ export default function CheckoutClient() {
                                             selectedMethod={selectedPayment}
                                             onSelect={handlePaymentMethodSelect}
                                             icon={<QrCode />}
-                                            title="Pago con QR Simple"
-                                            description="Escanea el código QR con tu celular o confirma el pago al instante"
+                                            title={t('payment.qr')}
+                                            description={t('payment.qrDescription')}
                                         >
                                             <QrPaymentSection
                                                 orderId={orderId}
@@ -395,8 +414,8 @@ export default function CheckoutClient() {
                                             selectedMethod={selectedPayment}
                                             onSelect={handlePaymentMethodSelect}
                                             icon={<WifiOff />}
-                                            title="Pago por QR / contra entrega"
-                                            description="Se confirma con el vendedor al recibir tu pedido"
+                                            title={t('payment.offline')}
+                                            description={t('payment.offlineDescription')}
                                         >
                                             {offlineError && <div className={styles.errorMessage}>{offlineError}</div>}
                                             <button
@@ -405,15 +424,15 @@ export default function CheckoutClient() {
                                                 disabled={isSavingOffline}
                                                 onClick={handleSaveOfflineOrder}
                                             >
-                                                {isSavingOffline ? 'Guardando...' : 'Guardar pedido'}
+                                                {isSavingOffline ? t('payment.saving') : t('payment.saveOrder')}
                                             </button>
                                         </PaymentMethodCard>
                                     )}
 
                                     {isOnline && !selectedPayment && (
                                         <>
-                                            <p className={styles.paymentHint}>Selecciona un método de pago para continuar</p>
-                                            <StripePaymentPlaceholder amount={payableTotal} isLoading={false} />
+                                            <p className={styles.paymentHint}>{t('payment.selectHint')}</p>
+                                            {cardEnabled && <StripePaymentPlaceholder amount={payableTotal} isLoading={false} />}
                                         </>
                                     )}
                                 </div>
@@ -431,42 +450,42 @@ export default function CheckoutClient() {
     function renderSummary() {
         return (
             <aside className={styles.summary}>
-                <h3>Resumen del pedido</h3>
+                <h3>{t('summary.title')}</h3>
                 <div className={styles.summaryRow}>
-                    <span>Artículos ({items.length})</span>
+                    <span>{t('summary.items', { count: items.length })}</span>
                     <span>Bs {totals.listSubtotal.toFixed(2)}</span>
                 </div>
                 {items.map((item) => (
                     <div className={styles.summaryRow} key={item.id}>
                         <span>
                             {item.product.name}
-                            {item.selectedSize ? ` (Talla: ${item.selectedSize})` : ""} x{item.quantity}
+                            {item.selectedSize ? ` ${t('summary.size', { size: item.selectedSize })}` : ""} x{item.quantity}
                         </span>
                     </div>
                 ))}
                 <hr className={styles.divider} />
                 {totals.productDiscount > 0 && (
                     <div className={`${styles.summaryRow} ${styles.discountRow}`}>
-                        <span>Descuento en productos</span>
+                        <span>{t('summary.productDiscount')}</span>
                         <span>-Bs {totals.productDiscount.toFixed(2)}</span>
                     </div>
                 )}
                 {employeeDiscount > 0 && (
                     <div className={`${styles.summaryRow} ${styles.discountRow}`}>
-                        <span>Descuento de empleado ({totals.employeeDiscountPercent}%)</span>
+                        <span>{t('summary.employeeDiscount', { percent: totals.employeeDiscountPercent })}</span>
                         <span>-Bs {employeeDiscount.toFixed(2)}</span>
                     </div>
                 )}
                 {/* Recojo en sucursal no tiene costo de envío: la fila se oculta en vez de mostrar $0.00 */}
                 {!isPickup && (
                     <div className={styles.summaryRow}>
-                        <span>Costo de envío</span>
+                        <span>{t('summary.shipping')}</span>
                         <span>Bs {shippingCost.toFixed(2)}</span>
                     </div>
                 )}
                 <hr className={styles.divider} />
                 <div className={styles.summaryTotal}>
-                    <span>Total</span>
+                    <span>{t('summary.total')}</span>
                     <span>Bs {payableTotal.toFixed(2)}</span>
                 </div>
             </aside>

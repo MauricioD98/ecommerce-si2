@@ -1,6 +1,9 @@
 import { Product } from "@/types/product.types";
 
-const PRODUCTS_CACHE_KEY = "sf_cached_products";
+import { tenantScopedKey } from "./tenant";
+
+// Catálogo cacheado por tienda: sin prefijo, offline se mostrarían productos de otra tienda
+const PRODUCTS_CACHE_KEY = tenantScopedKey("sf_cached_products");
 
 // Guarda una lista de productos en el almacenamiento local para disponibilidad offline
 export function saveCatalogProducts(products: Product[]): void {

@@ -8,8 +8,11 @@ import { Product } from '@/types/product.types';
 import ProductCard from './ProductCard';
 import ProductFilters from './ProductFilters';
 import { useBranches } from '@/hooks/useBranches';
+import { LOCALE_CHANGED_EVENT } from '@/i18n/client';
+import { useTranslations } from 'next-intl';
 
 export default function ProductList() {
+  const t = useTranslations('Store');
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -65,9 +68,11 @@ export default function ProductList() {
       });
     };
     window.addEventListener('inventory-changed', handleRefresh);
+    window.addEventListener(LOCALE_CHANGED_EVENT, handleRefresh);
     window.addEventListener('focus', handleRefresh);
     return () => {
       window.removeEventListener('inventory-changed', handleRefresh);
+      window.removeEventListener(LOCALE_CHANGED_EVENT, handleRefresh);
       window.removeEventListener('focus', handleRefresh);
     };
   }, [debouncedSearch, page, selectedBranchId, filtersKey, getProducts, category, collectionSlug, sizes, minPriceParam, maxPriceParam]);
@@ -103,18 +108,18 @@ export default function ProductList() {
     <section className={styles.section}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <h2>Productos</h2>
+          <h2>{t('title')}</h2>
           <p>
             {selectedBranch
-              ? `Stock y ofertas de ${selectedBranch.name}`
-              : 'Todos los productos disponibles. Elige una sucursal para ver su stock y sus ofertas'}
+              ? t('branchSubtitle', { branch: selectedBranch.name })
+              : t('allSubtitle')}
           </p>
         </div>
 
         <div className={styles.searchBar}>
           <input
             type="text"
-            placeholder="Buscar productos"
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={handleSearchChange}
           />
@@ -123,12 +128,12 @@ export default function ProductList() {
         <ProductFilters />
 
         {isLoading ? (
-          <div className={styles.loading}>Cargando productos...</div>
+          <div className={styles.loading}>{t('loading')}</div>
         ) : products.length === 0 ? (
           <div className={styles.empty}>
             {debouncedSearch
-              ? `No se encontraron productos para "${debouncedSearch}"`
-              : 'No se encontraron productos con estos filtros'}
+              ? t('noResultsSearch', { search: debouncedSearch })
+              : t('noResultsFilters')}
           </div>
         ) : (
           <>
@@ -144,13 +149,13 @@ export default function ProductList() {
                 <button
                   onClick={handlePrevPage} disabled={page === 1}
                 >
-                  Anterior
+                  {t('previous')}
                 </button>
                 <span className={styles.pageInfo}>
-                  Página {page} de {meta.totalPages}
+                  {t('pageOf', { page, total: meta.totalPages })}
                 </span>
                 <button onClick={handleNextPage} disabled={page >= meta.totalPages}>
-                  Siguiente
+                  {t('next')}
                 </button>
               </div>
             )}

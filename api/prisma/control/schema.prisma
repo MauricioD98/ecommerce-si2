@@ -1,0 +1,164 @@
+// Plano de control (schema "public"): registro de tiendas y sus credenciales.
+// Los datos de negocio de cada tienda viven en su propio schema "tenant_<uuid>",
+// estructurado con prisma/schema.prisma + prisma/migrations.
+//
+// Generar:  npx prisma generate --config prisma.control.config.ts
+// Migrar:   npx prisma migrate deploy --config prisma.control.config.ts
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../../src/generated/control"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TenantStatus {
+  PROVISIONING // schema creado, migraciones en curso
+  ACTIVE
+  SUSPENDED
+  FAILED // falló el aprovisionamiento; ver provisionError
+}
+
+enum CredentialType {
+  OWNER_PASSWORD // login del dueño de la tienda al panel SaaS
+  API_KEY // integraciones server-to-server
+}
+
+model Tenant {
+  id             String       @id @default(uuid()) @db.Uuid
+  // Subdominio / identificador público: mitienda.tuapp.com
+  slug           String       @unique
+  name           String
+  // Nombre real del schema en Postgres: "tenant_" + uuid sin guiones (39 chars < límite de 63)
+  schemaName     String       @unique @map("schema_name")
+
+  // Dominio propio de la tienda (boutiquemia.com): front/proxy.ts lo resuelve desde el header Host
+  // para que el cliente final no vea el SaaS. Normalizado: minúsculas, sin puerto, sin "www.".
+  // Solo se enruta con domainVerifiedAt != null: sin verificar, cualquiera podría registrar un
+  // dominio ajeno y la tienda real quedaría sirviendo el catálogo de otra.
+  domain           String?   @unique
+  domainVerifiedAt DateTime? @map("domain_verified_at")
+  status         TenantStatus @default(PROVISIONING)
+  plan           String       @default("free")
+  // Última migración aplicada en su schema, para saber quién quedó atrasado tras un deploy
+  schemaVersion  String?      @map("schema_version")
+  provisionError String?      @map("provision_error")
+
+  // Stripe Connect: cuenta conectada (acct_...) que recibe los fondos de las ventas de la tienda.
+  // chargesEnabled lo actualiza el webhook account.updated cuando Stripe aprueba el onboarding.
+  stripeAccountId      String? @unique @map("stripe_account_id")
+  stripeChargesEnabled Boolean @default(false) @map("stripe_charges_enabled")
+  // Comisión de la plataforma en puntos básicos (250 = 2.5%) retenida en cada cobro
+  platformFeeBps       Int     @default(0) @map("platform_fee_bps")
+
+  // Suscripción de la tienda AL SaaS (lo que la tienda le paga a la plataforma; distinto de Connect,
+  // que es lo que los clientes le pagan a la tienda). La actualizan los webhooks customer.subscription.*
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+  // Estado de Stripe tal cual (active, past_due, unpaid, canceled…)
+  subscriptionStatus   String? @map("subscription_status")
+
+  credentials  TenantCredential[]
+  integrations TenantIntegration[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("tenants")
+}
+
+enum SignupStatus {
+  PENDING // checkout creado, esperando el pago
+  PROVISIONING // pagado: creando schema, migraciones, roles y Super Admin
+  COMPLETED
+  FAILED // pagado pero el aprovisionamiento falló: reintentar desde la plataforma
+  EXPIRED // la sesión de Checkout venció sin pago
+}
+
+// Solicitud de alta self-service (landing /planes → Stripe Checkout → webhook). Existe para que la
+// contraseña del dueño NO viaje a Stripe: el metadata de una sesión se ve en el dashboard, en los
+// logs de webhooks y en la API. A Stripe solo va signupId; los datos viven acá hasta aprovisionar.
+model TenantSignup {
+  id           String       @id @default(uuid()) @db.Uuid
+  plan         String
+  tenantName   String       @map("tenant_name")
+  // Opcional y SIN verificar: se guarda en la tienda pero no se enruta hasta que la plataforma
+  // compruebe el DNS (PATCH /platform/tenants/:id/domain)
+  domain       String?
+  adminEmail   String       @map("admin_email")
+  // bcrypt. Se vacía al completar o expirar: no tiene sentido conservarlo una vez creado el usuario
+  passwordHash String       @map("password_hash")
+  status       SignupStatus @default(PENDING)
+
+  // Id que tendrá la tienda: se fija ANTES de aprovisionar, así un reintento retoma la misma tienda
+  // en vez de crear otra (y no choca con la credencial del dueño ya registrada)
+  tenantId             String? @unique @map("tenant_id") @db.Uuid
+  stripeCheckoutId     String? @unique @map("stripe_checkout_id")
+  stripeCustomerId     String? @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+  error                String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status, updatedAt])
+  @@map("tenant_signups")
+}
+
+enum IntegrationProvider {
+  DECART // Probador Virtual: { apiKey }
+  WEBPUSH // Notificaciones push: { publicKey, privateKey, subject }
+  // Reservado. Con Stripe Connect (destination charges) la tienda NO tiene secretos propios: su
+  // cuenta conectada (acct_…) no es secreta y vive en tenants.stripe_account_id. Sirve si algún
+  // día una tienda usa su propia cuenta de Stripe en vez de Connect.
+  STRIPE
+}
+
+// Credenciales de terceros de cada tienda. Reemplazan a DECART_API_KEY / VAPID_* globales.
+// El payload completo (un objeto JSON) va cifrado con AES-256-GCM por EncryptionService; en
+// variables de entorno solo queda la llave maestra TENANT_SECRETS_KEYS.
+model TenantIntegration {
+  tenantId      String              @map("tenant_id") @db.Uuid
+  provider      IntegrationProvider
+  // "<versión de llave>:<base64(ciphertext ‖ auth tag)>". La versión permite rotar la llave maestra
+  // y el auth tag es lo que hace a GCM autenticado: sin él no se puede descifrar ni detectar
+  // manipulación. Se autentica además con "<tenantId>:<provider>" (AAD): copiar el valor de una
+  // tienda a otra no descifra.
+  encryptedData String              @map("encrypted_data")
+  // Nonce de 12 bytes en base64, único por cifrado (se regenera en cada guardado)
+  iv            String
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([tenantId, provider])
+  @@map("tenant_integrations")
+}
+
+model TenantCredential {
+  id         String         @id @default(uuid()) @db.Uuid
+  tenantId   String         @map("tenant_id") @db.Uuid
+  type       CredentialType
+  // Email (OWNER_PASSWORD) o prefijo público de la key (API_KEY)
+  identifier String
+  // bcrypt del password o de la API key; el secreto en claro nunca se guarda
+  secretHash String         @map("secret_hash")
+  label      String?
+  lastUsedAt DateTime?      @map("last_used_at")
+  expiresAt  DateTime?      @map("expires_at")
+  revokedAt  DateTime?      @map("revoked_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([type, identifier])
+  @@index([tenantId])
+  @@map("tenant_credentials")
+}

@@ -14,7 +14,7 @@ export class NotificationsController {
 
   @Get('vapid-public-key')
   @ApiOperation({ summary: 'Obtener la llave pública VAPID para suscribirse a notificaciones push' })
-  @ApiOkResponse({ description: 'Llave pública VAPID (null si el servicio no está configurado)' })
+  @ApiOkResponse({ description: 'Llave pública VAPID de la tienda actual (null si la tienda no tiene push configurado)' })
   getVapidPublicKey() {
     return this.notificationsService.getPublicKey();
   }

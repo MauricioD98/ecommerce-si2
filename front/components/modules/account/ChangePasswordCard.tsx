@@ -5,19 +5,23 @@ import { Check, Circle, Eye, EyeOff, Info } from 'lucide-react';
 import styles from './account.module.scss';
 import { authService } from '@/service/api/auth.service';
 import { getApiErrorMessage } from '@/service/api/error.utils';
+import { useTranslations } from 'next-intl';
 
+// key: Auth.requirements.<key> en messages/<idioma>.json (mismos requisitos que el registro)
 const PASSWORD_REQUIREMENTS = [
-    { label: 'Al menos 8 caracteres', test: (p: string) => p.length >= 8 },
-    { label: 'Una mayúscula', test: (p: string) => /[A-Z]/.test(p) },
-    { label: 'Una minúscula', test: (p: string) => /[a-z]/.test(p) },
-    { label: 'Un número', test: (p: string) => /\d/.test(p) },
-    { label: 'Un carácter especial (@$!%*?&)', test: (p: string) => /[@$!%*?&]/.test(p) },
-];
+    { key: 'minLength', test: (p: string) => p.length >= 8 },
+    { key: 'uppercase', test: (p: string) => /[A-Z]/.test(p) },
+    { key: 'lowercase', test: (p: string) => /[a-z]/.test(p) },
+    { key: 'number', test: (p: string) => /\d/.test(p) },
+    { key: 'special', test: (p: string) => /[@$!%*?&]/.test(p) },
+] as const;
 
 type FieldName = 'current' | 'next' | 'confirm';
 
 // Seguridad: cambio de contraseña desde "Mi perfil" (pide la contraseña actual)
 export default function ChangePasswordCard() {
+    const t = useTranslations('Account.security');
+    const tAuth = useTranslations('Auth');
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -51,7 +55,7 @@ export default function ChangePasswordCard() {
             setConfirmPassword('');
             setSuccess(true);
         } catch (err) {
-            setError(getApiErrorMessage(err, 'No se pudo cambiar la contraseña. Inténtalo de nuevo.'));
+            setError(getApiErrorMessage(err, t('failed')));
         } finally {
             setIsSaving(false);
         }
@@ -83,7 +87,7 @@ export default function ChangePasswordCard() {
                     type="button"
                     className={styles.toggleButton}
                     onClick={() => toggle(field)}
-                    aria-label={visible[field] ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    aria-label={visible[field] ? tAuth('hidePassword') : tAuth('showPassword')}
                 >
                     {visible[field] ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -93,8 +97,8 @@ export default function ChangePasswordCard() {
 
     return (
         <div className={styles.card}>
-            <h2 className={styles.heading}>Seguridad</h2>
-            <p className={styles.subheading}>Cambia tu contraseña. Necesitas ingresar la actual para confirmar que eres tú.</p>
+            <h2 className={styles.heading}>{t('title')}</h2>
+            <p className={styles.subheading}>{t('subtitle')}</p>
 
             <form className={styles.form} onSubmit={handleSubmit} noValidate>
                 {error && (
@@ -106,22 +110,22 @@ export default function ChangePasswordCard() {
                 {success && (
                     <div className={styles.alertSuccess} role="status">
                         <Check size={18} />
-                        <span>Tu contraseña se actualizó correctamente.</span>
+                        <span>{t('success')}</span>
                     </div>
                 )}
 
-                {renderPasswordField('current', 'currentPassword', 'Contraseña actual', currentPassword, setCurrentPassword, 'current-password')}
+                {renderPasswordField('current', 'currentPassword', t('current'), currentPassword, setCurrentPassword, 'current-password')}
 
                 <div>
-                    {renderPasswordField('next', 'newPassword', 'Nueva contraseña', newPassword, setNewPassword, 'new-password')}
+                    {renderPasswordField('next', 'newPassword', t('new'), newPassword, setNewPassword, 'new-password')}
                     {newPassword.length > 0 && (
                         <ul className={styles.checklist}>
                             {PASSWORD_REQUIREMENTS.map((req) => {
                                 const met = req.test(newPassword);
                                 return (
-                                    <li key={req.label} className={`${styles.checkItem} ${met ? styles.checkItemMet : ''}`}>
+                                    <li key={req.key} className={`${styles.checkItem} ${met ? styles.checkItemMet : ''}`}>
                                         {met ? <Check size={14} strokeWidth={3} /> : <Circle size={10} />}
-                                        {req.label}
+                                        {tAuth(`requirements.${req.key}`)}
                                     </li>
                                 );
                             })}
@@ -130,12 +134,12 @@ export default function ChangePasswordCard() {
                 </div>
 
                 <div>
-                    {renderPasswordField('confirm', 'confirmPassword', 'Confirmar nueva contraseña', confirmPassword, setConfirmPassword, 'new-password')}
-                    {confirmMismatch && <span className={styles.fieldError}>Las contraseñas no coinciden</span>}
+                    {renderPasswordField('confirm', 'confirmPassword', t('confirm'), confirmPassword, setConfirmPassword, 'new-password')}
+                    {confirmMismatch && <span className={styles.fieldError}>{tAuth('passwordsDontMatch')}</span>}
                 </div>
 
                 <button type="submit" className={styles.primaryButton} disabled={!canSubmit}>
-                    {isSaving ? 'Actualizando...' : 'Actualizar contraseña'}
+                    {isSaving ? t('updating') : t('update')}
                 </button>
             </form>
         </div>

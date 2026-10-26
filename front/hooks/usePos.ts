@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { PosService } from "@/service/api/pos.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Product } from "@/types/product.types";
 
 export function usePosCatalog(branchId: string | null, search: string) {
+    const t = useTranslations("AdminErrors");
     const [products, setProducts] = useState<Product[]>([]);
     const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -23,7 +25,7 @@ export function usePosCatalog(branchId: string | null, search: string) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar los productos."));
+                if (active) setError(getApiErrorMessage(error, t("products")));
             })
             .finally(() => {
                 if (active) setLoadedKey(key);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { CollectionService } from "@/service/api/collection.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Collection, CollectionPayload } from "@/types/admin.types";
@@ -7,6 +8,7 @@ const PAGE_SIZE = 10;
 
 // Colecciones paginadas (incluye inactivas) con búsqueda por nombre/descripción, para el panel admin
 export function useAdminCollections(page: number, search: string) {
+    const t = useTranslations("AdminErrors");
     const [collections, setCollections] = useState<Collection[]>([]);
     const [total, setTotal] = useState(0);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -26,7 +28,7 @@ export function useAdminCollections(page: number, search: string) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar las colecciones."));
+                if (active) setError(getApiErrorMessage(error, t("collections")));
             })
             .finally(() => {
                 if (active) setLoadedKey(key);

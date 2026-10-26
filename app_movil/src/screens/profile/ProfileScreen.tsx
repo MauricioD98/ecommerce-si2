@@ -10,12 +10,14 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
+import { LanguageSelector } from '../../components/LanguageSelector';
 import { Colors, Shadows } from '../../theme/colors';
 import {
   getApiBaseUrl,
@@ -30,6 +32,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, logout, refreshUser } = useAuth();
+  const { t } = useTranslation();
 
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [apiUrlInput, setApiUrlInput] = useState<string>('');
@@ -44,12 +47,12 @@ export const ProfileScreen: React.FC = () => {
 
   const handleLogout = () => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que deseas salir de tu cuenta?',
+      t('profile.logout'),
+      t('profile.logoutConfirm'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Cerrar Sesión',
+          text: t('profile.logout'),
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -65,7 +68,7 @@ export const ProfileScreen: React.FC = () => {
     const updated = await getApiBaseUrl();
     setCurrentUrlDisplay(updated);
     setShowConfigModal(false);
-    Alert.alert('URL Guardada', `Conectando con: ${updated}`);
+    Alert.alert(t('profile.urlSaved'), t('profile.urlSavedBody', { url: updated }));
   };
 
   const handleResetApiUrl = async () => {
@@ -73,7 +76,7 @@ export const ProfileScreen: React.FC = () => {
     setApiUrlInput(def);
     setCurrentUrlDisplay(def);
     setShowConfigModal(false);
-    Alert.alert('URL Restaurada', `URL por defecto: ${def}`);
+    Alert.alert(t('profile.urlRestored'), t('profile.urlRestoredBody', { url: def }));
   };
 
   const initials =
@@ -84,7 +87,7 @@ export const ProfileScreen: React.FC = () => {
   const fullName =
     user?.firstName || user?.lastName
       ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
-      : 'Usuario';
+      : t('profile.defaultUser');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -133,8 +136,8 @@ export const ProfileScreen: React.FC = () => {
               <Ionicons name="person-outline" size={20} color={Colors.primary} />
             </View>
             <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Editar Perfil</Text>
-              <Text style={styles.menuDesc}>Nombre, apellido y correo</Text>
+              <Text style={styles.menuTitle}>{t('profile.editProfile')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.editProfileDesc')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
@@ -150,8 +153,8 @@ export const ProfileScreen: React.FC = () => {
               <Ionicons name="lock-closed-outline" size={20} color="#D97706" />
             </View>
             <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Seguridad y Contraseña</Text>
-              <Text style={styles.menuDesc}>Actualizar contraseña</Text>
+              <Text style={styles.menuTitle}>{t('profile.security')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.securityDesc')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
@@ -167,11 +170,15 @@ export const ProfileScreen: React.FC = () => {
               <Ionicons name="receipt-outline" size={20} color="#8B5CF6" />
             </View>
             <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Mis Pedidos</Text>
-              <Text style={styles.menuDesc}>Historial y seguimiento de compras</Text>
+              <Text style={styles.menuTitle}>{t('profile.orders')}</Text>
+              <Text style={styles.menuDesc}>{t('profile.ordersDesc')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
           </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <LanguageSelector />
 
           <View style={styles.menuDivider} />
 
@@ -184,7 +191,7 @@ export const ProfileScreen: React.FC = () => {
               <Ionicons name="server-outline" size={20} color={Colors.textSecondary} />
             </View>
             <View style={styles.menuTextContainer}>
-              <Text style={styles.menuTitle}>Servidor API</Text>
+              <Text style={styles.menuTitle}>{t('profile.apiServer')}</Text>
               <Text style={styles.menuDesc} numberOfLines={1}>
                 {currentUrlDisplay}
               </Text>
@@ -195,7 +202,7 @@ export const ProfileScreen: React.FC = () => {
 
         {/* Logout Button */}
         <Button
-          title="Cerrar Sesión"
+          title={t('profile.logout')}
           onPress={handleLogout}
           variant="outline"
           size="lg"
@@ -216,14 +223,12 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Ionicons name="settings-outline" size={22} color={Colors.primary} />
-              <Text style={styles.modalTitle}>Configurar Servidor API</Text>
+              <Text style={styles.modalTitle}>{t('profile.apiModalTitle')}</Text>
             </View>
-            <Text style={styles.modalDesc}>
-              Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.
-            </Text>
+            <Text style={styles.modalDesc}>{t('profile.apiModalDesc')}</Text>
 
             <Input
-              label="URL Base de la API"
+              label={t('profile.apiUrlLabel')}
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
               placeholder={CLOUD_API_URL}
@@ -235,9 +240,7 @@ export const ProfileScreen: React.FC = () => {
               onPress={() => setApiUrlInput(CLOUD_API_URL)}
             >
               <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
-              <Text style={styles.presetIpText}>
-                Servidor en la Nube (Azure Producción)
-              </Text>
+              <Text style={styles.presetIpText}>{t('profile.cloudServer')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -246,20 +249,20 @@ export const ProfileScreen: React.FC = () => {
             >
               <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
               <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
-                Servidor Local (PC): 192.168.100.240:3001
+                {t('profile.localServer', { address: '192.168.100.240:3001' })}
               </Text>
             </TouchableOpacity>
 
             <View style={styles.modalButtonsRow}>
               <Button
-                title="Restaurar"
+                title={t('common.restore')}
                 onPress={handleResetApiUrl}
                 variant="outline"
                 size="sm"
                 style={{ flex: 1 }}
               />
               <Button
-                title="Guardar"
+                title={t('common.save')}
                 onPress={handleSaveApiUrl}
                 variant="primary"
                 size="sm"
@@ -268,7 +271,7 @@ export const ProfileScreen: React.FC = () => {
             </View>
 
             <Button
-              title="Cerrar"
+              title={t('common.close')}
               onPress={() => setShowConfigModal(false)}
               variant="ghost"
               size="sm"

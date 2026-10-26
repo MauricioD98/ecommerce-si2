@@ -1,5 +1,6 @@
 import axios from "axios";
 import { apiClient, getApiBaseUrl } from "./axios.config";
+import { TENANT_HEADER, getCurrentTenantId } from "@/utils/tenant";
 import { User, AutoResponse, LoginCredential, RegisterCredential, UpdateProfilePayload } from "@/types/auth.types";
 
 export const authService = {
@@ -13,7 +14,10 @@ export const authService = {
             console.warn("No se pudo notificar el logout al backend (se cierra la sesión localmente igual):", error);
         }
     },
-    refreshToken: async (refreshToken: string): Promise<string | null> => {
+    // Devuelve AMBOS tokens: el backend rota el refresh token en cada renovación (guarda el hash del
+    // nuevo), así que el anterior deja de valer. Si solo se guardara el access token, la próxima
+    // renovación usaría un refresh token ya invalidado y terminaría en un logout que no corresponde.
+    refreshToken: async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> => {
         if (!refreshToken) return null;
         try {
             // El backend espera el refresh token en el header Authorization (no en el body).
@@ -21,9 +25,12 @@ export const authService = {
             const response = await axios.post<AutoResponse>(
                 `${getApiBaseUrl()}/auth/refresh`,
                 undefined,
-                { headers: { Authorization: `Bearer ${refreshToken}` }, timeout: 10000 }
+                // Sin interceptor tampoco hay x-tenant-id automático: el backend valida que el refresh
+                // token sea de esta tienda, así que se manda explícito.
+                { headers: { Authorization: `Bearer ${refreshToken}`, [TENANT_HEADER]: getCurrentTenantId() ?? "" }, timeout: 10000 }
             );
-            return response.data.accessToken;
+            const { accessToken, refreshToken: rotated } = response.data;
+            return accessToken ? { accessToken, refreshToken: rotated ?? refreshToken } : null;
         } catch (error) {
             console.error("Token refresh failed", error);
             return null

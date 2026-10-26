@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { useStaff } from '@/hooks/useStaff';
@@ -11,6 +12,7 @@ import { useAssignableRoles } from '@/hooks/useRoles';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Branch } from '@/types/branch.types';
 import { CreateStaffPayload, RoleItem, StaffUser, UpdateStaffPayload } from '@/types/admin.types';
+import { BASE_ROLE_KEYS } from '@/utils/permissions';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
@@ -25,6 +27,9 @@ interface StaffFormModalProps {
 }
 
 function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, onUpdate }: StaffFormModalProps) {
+    const t = useTranslations('AdminStaff');
+    const tc = useTranslations('AdminCommon');
+    const tRoles = useTranslations('AdminRoles');
     const [email, setEmail] = useState(member?.email ?? '');
     const [password, setPassword] = useState('');
     const [firstName, setFirstName] = useState(member?.firstName ?? '');
@@ -44,15 +49,15 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
     const validate = (): string | null => {
         const discount = Number(employeeDiscount);
         if (!Number.isInteger(discount) || discount < 0 || discount > 100) {
-            return 'El descuento debe ser un entero entre 0 y 100.';
+            return t('errors.discount');
         }
-        if (!roleId) return 'Selecciona un rol.';
+        if (!roleId) return t('errors.role');
         // Con el permiso ALL_BRANCHES se elige la sucursal; sin él se asigna la propia automáticamente
-        if (isGlobal && !branchId) return 'Selecciona una sucursal.';
+        if (isGlobal && !branchId) return t('errors.branch');
         if (!member) {
-            if (!email.trim()) return 'El correo es obligatorio.';
+            if (!email.trim()) return t('errors.email');
             if (!PASSWORD_REGEX.test(password)) {
-                return 'La contraseña debe tener al menos 8 caracteres, con mayúscula, minúscula, número y un símbolo (@$!%*?&).';
+                return t('errors.password');
             }
         }
         return null;
@@ -89,13 +94,13 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
             }
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar el usuario.'));
+            setError(getApiErrorMessage(error, t('saveFailed')));
             setIsSaving(false);
         }
     };
 
     return (
-        <AdminModal title={member ? 'Editar usuario' : 'Nuevo empleado'} onClose={onClose}>
+        <AdminModal title={member ? t('editTitle') : t('newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
@@ -103,22 +108,22 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
                     <>
                         <div className={styles.formRow}>
                             <div className={styles.field}>
-                                <label htmlFor="staff-first">Nombre</label>
+                                <label htmlFor="staff-first">{t('firstName')}</label>
                                 <input id="staff-first" className={styles.input} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                             </div>
                             <div className={styles.field}>
-                                <label htmlFor="staff-last">Apellido</label>
+                                <label htmlFor="staff-last">{t('lastName')}</label>
                                 <input id="staff-last" className={styles.input} value={lastName} onChange={(e) => setLastName(e.target.value)} />
                             </div>
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="staff-email">Correo electrónico</label>
+                            <label htmlFor="staff-email">{t('email')}</label>
                             <input id="staff-email" type="email" className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} />
                         </div>
 
                         <div className={styles.field}>
-                            <label htmlFor="staff-password">Contraseña inicial</label>
+                            <label htmlFor="staff-password">{t('password')}</label>
                             <input id="staff-password" type="password" className={styles.input} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
                         </div>
                     </>
@@ -132,16 +137,16 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
 
                 <div className={styles.formRow}>
                     <div className={styles.field}>
-                        <label htmlFor="staff-role">Rol</label>
+                        <label htmlFor="staff-role">{t('role')}</label>
                         <select id="staff-role" className={styles.input} value={roleId} onChange={(e) => setRoleId(e.target.value)}>
                             {roleOptions.map((role) => (
-                                <option key={role.id} value={role.id}>{role.name}</option>
+                                <option key={role.id} value={role.id}>{BASE_ROLE_KEYS[role.name] ? tRoles(`baseRoles.${BASE_ROLE_KEYS[role.name]}.name`) : role.name}</option>
                             ))}
                         </select>
                     </div>
 
                     <div className={styles.field}>
-                        <label htmlFor="staff-discount">Descuento de trabajador (%)</label>
+                        <label htmlFor="staff-discount">{t('discountLabel')}</label>
                         <input
                             id="staff-discount"
                             type="number"
@@ -157,9 +162,9 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
 
                 {isGlobal && (
                     <div className={styles.field}>
-                        <label htmlFor="staff-branch">Sucursal</label>
+                        <label htmlFor="staff-branch">{tc('branch')}</label>
                         <select id="staff-branch" className={styles.input} value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                            <option value="">Selecciona una sucursal</option>
+                            <option value="">{t('selectBranch')}</option>
                             {branches.map((branch) => (
                                 <option key={branch.id} value={branch.id}>{branch.name}</option>
                             ))}
@@ -169,10 +174,10 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>
@@ -182,6 +187,9 @@ function StaffFormModal({ member, branches, roles, isGlobal, onClose, onCreate, 
 
 export default function StaffClient() {
     const { isGlobal } = useAdminRole();
+    const t = useTranslations('AdminStaff');
+    const tc = useTranslations('AdminCommon');
+    const tRoles = useTranslations('AdminRoles');
     const { staff, isLoading, error, createStaff, updateStaff } = useStaff();
     const { branches } = useAdminBranches();
     const { roles, isLoading: rolesLoading } = useAssignableRoles();
@@ -194,16 +202,14 @@ export default function StaffClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>{isGlobal ? 'Usuarios / Empleados' : 'Mis Empleados'}</h1>
+                    <h1>{isGlobal ? t('title') : t('titleOwn')}</h1>
                     <p>
-                        {isGlobal
-                            ? 'Crea empleados, asígnales un rol y una sucursal, y define su descuento de trabajador.'
-                            : 'Crea empleados de tu sucursal y configura su descuento de trabajador.'}
+                        {isGlobal ? t('subtitleGlobal') : t('subtitleOwn')}
                     </p>
                 </div>
                 <button type="button" className={styles.button} onClick={() => setEditing(null)} disabled={rolesLoading}>
                     <Plus size={16} />
-                    Nuevo empleado
+                    {t('new')}
                 </button>
             </div>
 
@@ -211,19 +217,19 @@ export default function StaffClient() {
 
             <div className={styles.tableCard}>
                 {isLoading ? (
-                    <div className={styles.loadingState}>Cargando personal...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : staff.length === 0 ? (
-                    <div className={styles.emptyState}>Aún no hay empleados registrados.</div>
+                    <div className={styles.emptyState}>{t('empty')}</div>
                 ) : (
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>Usuario</th>
-                                    <th>Rol</th>
-                                    <th>Sucursal</th>
-                                    <th className={styles.numeric}>Descuento</th>
-                                    <th className={styles.numeric}>Acciones</th>
+                                    <th>{t('user')}</th>
+                                    <th>{t('role')}</th>
+                                    <th>{tc('branch')}</th>
+                                    <th className={styles.numeric}>{t('discount')}</th>
+                                    <th className={styles.numeric}>{tc('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -232,14 +238,14 @@ export default function StaffClient() {
                                         <td>
                                             <div className={styles.cellMain}>
                                                 <span className={styles.cellTitle}>
-                                                    {`${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || 'Sin nombre'}
+                                                    {`${member.firstName ?? ''} ${member.lastName ?? ''}`.trim() || tc('noName')}
                                                 </span>
                                                 <span className={styles.cellSub}>{member.email}</span>
                                             </div>
                                         </td>
                                         <td>
                                             <span className={`${styles.badge} ${member.permissions.length > 0 ? styles.badgeInfo : ''}`}>
-                                                {member.role.name}
+                                                {BASE_ROLE_KEYS[member.role.name] ? tRoles(`baseRoles.${BASE_ROLE_KEYS[member.role.name]}.name`) : member.role.name}
                                             </span>
                                         </td>
                                         <td>{branchName(member.branchId)}</td>
@@ -252,7 +258,7 @@ export default function StaffClient() {
                                                     onClick={() => setEditing(member)}
                                                 >
                                                     <Pencil size={14} />
-                                                    Editar
+                                                    {tc('edit')}
                                                 </button>
                                             </div>
                                         </td>

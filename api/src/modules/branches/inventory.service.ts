@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { i18nMessage } from '../../i18n/i18n-message';
 import { Prisma, Product, ProductInventory } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { InventoryResponseDto } from './dto/branch-response.dto';
 import { DiscountDto } from './dto/discount.dto';
 import { SetInventoryDto } from './dto/set-inventory.dto';
 import { getBranchPrice } from '../../common/utils/pricing';
+import { tenantSchemaSql } from '../../tenancy/tenant-context';
 
 // Descuento agregado de un producto en una sucursal (igual en todas sus tallas, ver setStock)
 export interface InventoryAggregate {
@@ -128,7 +130,7 @@ export class InventoryService {
       this.prisma.product.findUnique({ where: { id: productId } }),
     ]);
     if (!branch) throw new NotFoundException('Branch not found');
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
 
     const invalidSizes = dto.sizes.map((s) => s.size).filter((size) => !product.sizes.includes(size));
     if (invalidSizes.length > 0) {
@@ -165,7 +167,7 @@ export class InventoryService {
   // cuando se cargue su stock.
   async applyDiscountToAllBranches(productId: string, dto: DiscountDto): Promise<{ updatedBranches: number }> {
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product) throw new NotFoundException('Product not found');
+    if (!product) throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
 
     const discountData = this.toDiscountData(dto);
     if (Object.keys(discountData).length === 0) {
@@ -269,10 +271,12 @@ export class InventoryService {
   async syncGlobalStockMany(tx: Prisma.TransactionClient, productIds: string[]): Promise<void> {
     if (productIds.length === 0) return;
 
+    // SQL crudo: Prisma no lo califica con el schema del tenant, hay que hacerlo a mano
+    const t = tenantSchemaSql();
     await tx.$executeRaw`
-      UPDATE "products" p
+      UPDATE ${t}."products" p
       SET "stock" = COALESCE(
-        (SELECT SUM(pi."stock") FROM "product_inventories" pi WHERE pi."productId" = p."id"),
+        (SELECT SUM(pi."stock") FROM ${t}."product_inventories" pi WHERE pi."productId" = p."id"),
         0
       )
       WHERE p."id" IN (${Prisma.join(productIds)})

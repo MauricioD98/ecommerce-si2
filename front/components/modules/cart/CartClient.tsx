@@ -9,12 +9,14 @@ import styles from "./cart.module.scss";
 import CartItemComponent from './CartItem';
 import { ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 
 export default function CartClient() {
     const { items, clearAllCart, totalPrice, totals, syncCartProducts } = useCart();
     const selectedBranchId = useSelectedBranchId();
     const { isAuthenticated } = useAuth();
     const router = useRouter();
+    const t = useTranslations('Cart');
 
     // Las ofertas dependen de la sucursal: al entrar o cambiarla se actualizan los precios del carrito
     useEffect(() => {
@@ -22,7 +24,7 @@ export default function CartClient() {
     }, [selectedBranchId, syncCartProducts]);
 
     const handleClearCart = async () => {
-        if (window.confirm("¿Seguro que quieres vaciar todo tu carrito?")) {
+        if (window.confirm(t('confirmClear'))) {
             await clearAllCart();
         }
     };
@@ -38,10 +40,10 @@ export default function CartClient() {
                 <div className={styles.container}>
                     <div className={styles.empty}>
                         <ShoppingCart className={styles.emptyIcon} size={64} />
-                        <h2>Tu carrito está vacío</h2>
-                        <p>Agrega productos a tu carrito para comenzar</p>
+                        <h2>{t('empty')}</h2>
+                        <p>{t('emptyDescription')}</p>
                         <Link href="/" className={styles.continueButton}>
-                            Continuar comprando
+                            {t('continueShopping')}
                         </Link>
                     </div>
                 </div>
@@ -53,8 +55,8 @@ export default function CartClient() {
         <section className={styles.section}>
             <div className={styles.container}>
                 <div className={styles.header}>
-                    <h1>Carrito de compras</h1>
-                    <button onClick={handleClearCart} className={styles.clearButton}>Vaciar carrito</button>
+                    <h1>{t('title')}</h1>
+                    <button onClick={handleClearCart} className={styles.clearButton}>{t('clear')}</button>
                 </div>
 
                 <div className={styles.content}>
@@ -67,50 +69,50 @@ export default function CartClient() {
                     </div>
 
                     <div className={styles.summary}>
-                        <h2>Resumen del pedido</h2>
+                        <h2>{t('summary')}</h2>
                         <div className={styles.summaryRow}>
-                            <span>Subtotal</span>
+                            <span>{t('subtotal')}</span>
                             <span>Bs {totals.listSubtotal.toFixed(2)}</span>
                         </div>
 
                         {totals.productDiscount > 0 && (
                             <div className={`${styles.summaryRow} ${styles.discountRow}`}>
-                                <span>Descuento en productos</span>
+                                <span>{t('productDiscount')}</span>
                                 <span>-Bs {totals.productDiscount.toFixed(2)}</span>
                             </div>
                         )}
 
                         {totals.employeeDiscount > 0 && (
                             <div className={`${styles.summaryRow} ${styles.discountRow}`}>
-                                <span>Descuento de empleado ({totals.employeeDiscountPercent}%)</span>
+                                <span>{t('employeeDiscount', { percent: totals.employeeDiscountPercent })}</span>
                                 <span>-Bs {totals.employeeDiscount.toFixed(2)}</span>
                             </div>
                         )}
 
                         <div className={styles.summaryRow}>
-                            <span>Envío</span>
-                            <span>Se calcula al finalizar la compra</span>
+                            <span>{t('shipping')}</span>
+                            <span>{t('shippingAtCheckout')}</span>
                         </div>
 
                         <hr className={styles.divider} />
 
                         {totals.employeeDiscountPercent > 0 && (
                             <p className={styles.discountNote}>
-                                Tu descuento de empleado del {totals.employeeDiscountPercent}% se aplica sobre el precio con oferta.
+                                {t('employeeNote', { percent: totals.employeeDiscountPercent })}
                             </p>
                         )}
 
                         <div className={styles.summaryTotal}>
-                            <span>Total</span>
+                            <span>{t('total')}</span>
                             <span>Bs {totalPrice.toFixed(2)}</span>
                         </div>
 
                         <button className={styles.checkoutButton} onClick={handleCheckout}>
-                            Ir a finalizar compra
+                            {t('checkout')}
                         </button>
 
                         <Link className={styles.continueLink} href="/">
-                            Continuar comprando
+                            {t('continueShopping')}
                         </Link>
                     </div>
                 </div>

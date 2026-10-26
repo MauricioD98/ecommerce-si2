@@ -2,16 +2,18 @@
 
 import React, { useMemo, useState } from 'react';
 import { CheckCircle2, PackageCheck, RotateCcw, Search, TriangleAlert } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './returns.module.scss';
+import { formatMoney, intlLocale } from '@/i18n/config';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useOrderSearch, useProcessReturn } from '@/hooks/useReturns';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { round2 } from '@/utils/pricing';
 import {
-    ITEM_CONDITION_LABELS,
+    ITEM_CONDITIONS,
     ItemCondition,
-    RETURN_REASON_LABELS,
+    RETURN_REASONS,
     ReturnableOrder,
     ReturnReason,
     ReturnRecord,
@@ -25,14 +27,14 @@ interface DraftLine {
     condition: ItemCondition;
 }
 
-const REASONS = Object.keys(RETURN_REASON_LABELS) as ReturnReason[];
-const CONDITIONS = Object.keys(ITEM_CONDITION_LABELS) as ItemCondition[];
-
-const money = (value: number) => `Bs ${value.toFixed(2)}`;
-const formatDate = (value: string) => new Date(value).toLocaleString('es-BO');
 
 export default function ReturnsClient() {
     const { isGlobal, branchId: staffBranchId } = useAdminRole();
+    const t = useTranslations('AdminReturns');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
+    const money = (value: number) => formatMoney(value, locale);
+    const formatDate = (value: string) => new Date(value).toLocaleString(intlLocale(locale));
     const { branches } = useAdminBranches();
     const [selectedBranchId, setSelectedBranchId] = useState('');
 
@@ -106,7 +108,7 @@ export default function ReturnsClient() {
     const handleProcess = async () => {
         if (!selectedOrder || summary.lines === 0 || isProcessing) return;
         if (!effectiveBranchId) {
-            setProcessError('Selecciona la sucursal que recibe la mercadería.');
+            setProcessError(t('selectBranchError'));
             return;
         }
 
@@ -131,7 +133,7 @@ export default function ReturnsClient() {
             // Se vuelve a buscar para que los topes por línea (`alreadyReturned`) queden al día
             search(term);
         } catch (error) {
-            setProcessError(getApiErrorMessage(error, 'No se pudo procesar la devolución.'));
+            setProcessError(getApiErrorMessage(error, t('processFailed')));
         }
     };
 
@@ -139,14 +141,11 @@ export default function ReturnsClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Punto de Devolución</h1>
-                    <p>
-                        Busca la venta original, indica qué vuelve y en qué estado. Lo que está en buen estado regresa al
-                        stock vendible; lo defectuoso entra a mermas y no se puede volver a vender.
-                    </p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                     {!isGlobal && branchName && (
                         <p className={styles.branchNotice}>
-                            La mercadería se reingresa al inventario de <strong>{branchName}</strong>.
+                            {t.rich('branchNotice', { branch: branchName, strong: (chunks) => <strong>{chunks}</strong> })}
                         </p>
                     )}
                 </div>
@@ -156,9 +155,9 @@ export default function ReturnsClient() {
                         className={styles.branchSelect}
                         value={selectedBranchId}
                         onChange={(e) => setSelectedBranchId(e.target.value)}
-                        aria-label="Sucursal que recibe la devolución"
+                        aria-label={t('branchLabel')}
                     >
-                        <option value="">Selecciona la sucursal que recibe</option>
+                        <option value="">{t('selectBranch')}</option>
                         {branches.filter((branch) => branch.isActive).map((branch) => (
                             <option key={branch.id} value={branch.id}>{branch.name}</option>
                         ))}
@@ -168,39 +167,37 @@ export default function ReturnsClient() {
 
             {isGlobal && !effectiveBranchId ? (
                 <div className={styles.emptyState}>
-                    Selecciona la sucursal que recibe la mercadería para empezar.
+                    {t('selectBranchFirst')}
                 </div>
             ) : (
                 <div className={styles.layout}>
                     {/* Izquierda: buscador de la venta original */}
                     <section className={styles.panel}>
                         <h2 className={styles.panelTitle}>
-                            <Search size={18} /> Buscar la venta
+                            <Search size={18} /> {t('searchTitle')}
                         </h2>
 
                         <form className={styles.searchForm} onSubmit={handleSearch}>
                             <input
                                 type="text"
                                 className={styles.input}
-                                placeholder="N° de ticket, NIT, correo o nombre del cliente"
+                                placeholder={t('searchPlaceholder')}
                                 value={term}
                                 onChange={(e) => setTerm(e.target.value)}
-                                aria-label="Buscar la venta original"
+                                aria-label={t('searchLabel')}
                             />
                             <button type="submit" className={styles.button} disabled={!term.trim() || isSearching}>
-                                {isSearching ? 'Buscando...' : 'Buscar'}
+                                {isSearching ? t('searching') : tc('search')}
                             </button>
                         </form>
 
                         {searchError && <div className={styles.errorMessage}>{searchError}</div>}
 
                         {isSearching ? (
-                            <div className={styles.emptyState}>Buscando ventas...</div>
+                            <div className={styles.emptyState}>{t('searchingSales')}</div>
                         ) : results.length === 0 ? (
                             <div className={styles.emptyState}>
-                                {hasSearched
-                                    ? 'No se encontró ninguna venta cobrada con ese dato.'
-                                    : 'Escribe el código del ticket o los datos del cliente y presiona Buscar.'}
+                                {hasSearched ? t('noResults') : t('searchHint')}
                             </div>
                         ) : (
                             <ul className={styles.orderList}>
@@ -219,12 +216,12 @@ export default function ReturnsClient() {
                                                 {order.customerName} · {formatDate(order.createdAt)}
                                             </span>
                                             <span className={styles.orderCardMeta}>
-                                                {order.source === 'POS' ? 'Venta en caja' : 'Venta en línea'}
+                                                {order.source === 'POS' ? t('posSale') : t('onlineSale')}
                                                 {order.branchName ? ` · ${order.branchName}` : ''}
-                                                {order.nit ? ` · NIT ${order.nit}` : ''}
+                                                {order.nit ? ` · ${t('nit', { nit: order.nit })}` : ''}
                                             </span>
                                             {order.fullyReturned && (
-                                                <span className={styles.badgeMuted}>Devuelta por completo</span>
+                                                <span className={styles.badgeMuted}>{t('fullyReturned')}</span>
                                             )}
                                         </button>
                                     </li>
@@ -236,20 +233,20 @@ export default function ReturnsClient() {
                     {/* Derecha: armado de la devolución */}
                     <section className={styles.panel}>
                         <h2 className={styles.panelTitle}>
-                            <RotateCcw size={18} /> Procesar devolución
+                            <RotateCcw size={18} /> {t('processTitle')}
                         </h2>
 
                         {receipt && <ReturnSummaryCard record={receipt} onDismiss={() => setReceipt(null)} />}
 
                         {!selectedOrder ? (
                             <div className={styles.emptyState}>
-                                Selecciona una venta de la izquierda para elegir qué prendas vuelven.
+                                {t('selectSale')}
                             </div>
                         ) : (
                             <>
                                 <div className={styles.orderRecap}>
                                     <span>
-                                        Venta <strong>#{selectedOrder.orderNumber}</strong> · {selectedOrder.customerName}
+                                        {t.rich('saleRecap', { number: selectedOrder.orderNumber, customer: selectedOrder.customerName, strong: (chunks) => <strong>{chunks}</strong> })}
                                     </span>
                                     <span className={styles.orderCardMeta}>{formatDate(selectedOrder.createdAt)}</span>
                                 </div>
@@ -274,24 +271,24 @@ export default function ReturnsClient() {
                                                     <span className={styles.itemInfo}>
                                                         <span className={styles.itemName}>
                                                             {item.productName}
-                                                            {item.size && <span className={styles.itemSize}> · Talla {item.size}</span>}
+                                                            {item.size && <span className={styles.itemSize}>{t('sizeTag', { size: item.size })}</span>}
                                                         </span>
                                                         <span className={styles.itemMeta}>
-                                                            {money(item.unitPrice)} c/u · vendidas {item.quantity}
-                                                            {item.alreadyReturned > 0 && ` · ya devueltas ${item.alreadyReturned}`}
+                                                            {t('itemMeta', { price: money(item.unitPrice), sold: item.quantity })}
+                                                            {item.alreadyReturned > 0 && t('alreadyReturned', { count: item.alreadyReturned })}
                                                         </span>
                                                     </span>
                                                     {exhausted ? (
-                                                        <span className={styles.badgeMuted}>Sin saldo</span>
+                                                        <span className={styles.badgeMuted}>{t('noBalance')}</span>
                                                     ) : (
-                                                        <span className={styles.badgeInfo}>Hasta {item.returnableQuantity}</span>
+                                                        <span className={styles.badgeInfo}>{t('upTo', { count: item.returnableQuantity })}</span>
                                                     )}
                                                 </label>
 
                                                 {line && (
                                                     <div className={styles.itemForm}>
                                                         <label className={styles.field}>
-                                                            <span>Cantidad a devolver</span>
+                                                            <span>{t('quantity')}</span>
                                                             <input
                                                                 type="number"
                                                                 className={`${styles.input} ${styles.inputSmall}`}
@@ -311,35 +308,35 @@ export default function ReturnsClient() {
                                                         </label>
 
                                                         <label className={styles.field}>
-                                                            <span>Talla</span>
+                                                            <span>{t('size')}</span>
                                                             {/* Solo lectura: la talla es la que se vendió, el backend la toma de la orden */}
                                                             <input
                                                                 type="text"
                                                                 className={`${styles.input} ${styles.inputSmall}`}
-                                                                value={item.size ?? 'Sin talla'}
+                                                                value={item.size ?? t('noSize')}
                                                                 readOnly
-                                                                aria-label={`Talla devuelta de ${item.productName}`}
+                                                                aria-label={t('sizeLabel', { name: item.productName })}
                                                             />
                                                         </label>
 
                                                         <label className={styles.field}>
-                                                            <span>Motivo</span>
+                                                            <span>{t('reason')}</span>
                                                             <select
                                                                 className={styles.input}
                                                                 value={line.reason}
                                                                 onChange={(e) => updateLine(item.orderItemId, { reason: e.target.value as ReturnReason })}
                                                             >
-                                                                {REASONS.map((reason) => (
+                                                                {RETURN_REASONS.map((reason) => (
                                                                     <option key={reason} value={reason}>
-                                                                        {RETURN_REASON_LABELS[reason]}
+                                                                        {t(`reasons.${reason}`)}
                                                                     </option>
                                                                 ))}
                                                             </select>
                                                         </label>
 
                                                         <fieldset className={styles.conditionGroup}>
-                                                            <legend>Estado de la prenda</legend>
-                                                            {CONDITIONS.map((condition) => (
+                                                            <legend>{t('condition')}</legend>
+                                                            {ITEM_CONDITIONS.map((condition) => (
                                                                 <label key={condition} className={styles.radioOption}>
                                                                     <input
                                                                         type="radio"
@@ -347,15 +344,17 @@ export default function ReturnsClient() {
                                                                         checked={line.condition === condition}
                                                                         onChange={() => updateLine(item.orderItemId, { condition })}
                                                                     />
-                                                                    <span>{ITEM_CONDITION_LABELS[condition]}</span>
+                                                                    <span>{t(`conditions.${condition}`)}</span>
                                                                 </label>
                                                             ))}
                                                         </fieldset>
 
                                                         <p className={styles.conditionHint}>
                                                             {line.condition === 'SELLABLE'
-                                                                ? `Vuelve al stock vendible${branchName ? ` de ${branchName}` : ''} y se puede volver a vender.`
-                                                                : 'Entra a mermas: queda registrada para auditoría y no vuelve al catálogo ni a la caja.'}
+                                                                ? branchName
+                                                                    ? t('sellableHintBranch', { branch: branchName })
+                                                                    : t('sellableHint')
+                                                                : t('damagedHint')}
                                                         </p>
                                                     </div>
                                                 )}
@@ -365,12 +364,12 @@ export default function ReturnsClient() {
                                 </div>
 
                                 <label className={styles.field}>
-                                    <span>Observaciones (opcional)</span>
+                                    <span>{t('notes')}</span>
                                     <textarea
                                         className={styles.textarea}
                                         rows={2}
                                         maxLength={500}
-                                        placeholder="Ej. el cliente trajo la boleta"
+                                        placeholder={t('notesPlaceholder')}
                                         value={notes}
                                         onChange={(e) => setNotes(e.target.value)}
                                     />
@@ -378,12 +377,12 @@ export default function ReturnsClient() {
 
                                 <div className={styles.totals}>
                                     <div className={styles.totalRow}>
-                                        <span>A reembolsar</span>
+                                        <span>{t('toRefund')}</span>
                                         <strong>{money(summary.refund)}</strong>
                                     </div>
                                     <div className={styles.totalMeta}>
-                                        <span><PackageCheck size={14} /> {summary.sellable} al stock vendible</span>
-                                        <span><TriangleAlert size={14} /> {summary.damaged} a mermas</span>
+                                        <span><PackageCheck size={14} /> {t('toSellable', { count: summary.sellable })}</span>
+                                        <span><TriangleAlert size={14} /> {t('toDamaged', { count: summary.damaged })}</span>
                                     </div>
                                 </div>
 
@@ -395,7 +394,7 @@ export default function ReturnsClient() {
                                     disabled={summary.lines === 0 || isProcessing}
                                     onClick={handleProcess}
                                 >
-                                    {isProcessing ? 'Procesando...' : `Procesar reembolso ${money(summary.refund)}`}
+                                    {isProcessing ? t('processing') : t('process', { amount: money(summary.refund) })}
                                 </button>
                             </>
                         )}
@@ -408,28 +407,32 @@ export default function ReturnsClient() {
 
 // Comprobante de lo que acaba de pasar, con el detalle de a qué inventario fue cada prenda
 function ReturnSummaryCard({ record, onDismiss }: { record: ReturnRecord; onDismiss: () => void }) {
+    const t = useTranslations('AdminReturns');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
+
     return (
         <div className={styles.successCard}>
             <div className={styles.successHeader}>
                 <CheckCircle2 size={18} />
-                <span>Devolución #{record.returnNumber} registrada</span>
-                <button type="button" className={styles.linkButton} onClick={onDismiss}>Cerrar</button>
+                <span>{t('registered', { number: record.returnNumber })}</span>
+                <button type="button" className={styles.linkButton} onClick={onDismiss}>{tc('close')}</button>
             </div>
 
-            <p className={styles.successTotal}>Reembolsado: <strong>Bs {record.totalRefunded.toFixed(2)}</strong></p>
+            <p className={styles.successTotal}>{t.rich('refunded', { amount: formatMoney(record.totalRefunded, locale), strong: (chunks) => <strong>{chunks}</strong> })}</p>
 
             <ul className={styles.successList}>
                 {record.items.map((item) => (
                     <li key={item.id}>
                         {item.quantity} × {item.productName}
                         {item.size ? ` (${item.size})` : ''} —{' '}
-                        {item.condition === 'SELLABLE' ? 'volvió al stock vendible' : 'entró a mermas'}
+                        {item.condition === 'SELLABLE' ? t('wentSellable') : t('wentDamaged')}
                     </li>
                 ))}
             </ul>
 
             <p className={styles.successMeta}>
-                {record.sellableUnits} unidad(es) al stock vendible · {record.damagedUnits} a mermas
+                {t('unitsSummary', { sellable: record.sellableUnits, damaged: record.damagedUnits })}
                 {record.branchName ? ` · ${record.branchName}` : ''}
             </p>
         </div>

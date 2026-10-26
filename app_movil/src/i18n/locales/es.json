@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "restore": "Restaurar"
+  },
+  "tabs": {
+    "shop": "Tienda",
+    "cart": "Carrito",
+    "orders": "Pedidos",
+    "profile": "Perfil"
+  },
+  "language": {
+    "title": "Idioma",
+    "subtitle": "Elige el idioma de la aplicación",
+    "deviceHint": "Por defecto se usa el idioma de tu teléfono."
+  },
+  "profile": {
+    "defaultUser": "Usuario",
+    "editProfile": "Editar Perfil",
+    "editProfileDesc": "Nombre, apellido y correo",
+    "security": "Seguridad y Contraseña",
+    "securityDesc": "Actualizar contraseña",
+    "orders": "Mis Pedidos",
+    "ordersDesc": "Historial y seguimiento de compras",
+    "apiServer": "Servidor API",
+    "logout": "Cerrar Sesión",
+    "logoutConfirm": "¿Estás seguro de que deseas salir de tu cuenta?",
+    "apiModalTitle": "Configurar Servidor API",
+    "apiModalDesc": "Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.",
+    "apiUrlLabel": "URL Base de la API",
+    "cloudServer": "Servidor en la Nube (Azure Producción)",
+    "localServer": "Servidor Local (PC): {{address}}",
+    "urlSaved": "URL Guardada",
+    "urlSavedBody": "Conectando con: {{url}}",
+    "urlRestored": "URL Restaurada",
+    "urlRestoredBody": "URL por defecto: {{url}}"
+  }
+}

@@ -10,10 +10,34 @@ export class ProductResponseDto {
   id: string;
 
   @ApiProperty({
-    description: 'Product name',
+    description: 'Nombre en el idioma del request (Accept-Language); si no hay traducción, el texto base',
     example:'Dress'
   })
   name: string;
+
+  @ApiProperty({
+    description: 'Nombre base (español), sin traducir. Es el que debe editar el formulario del admin',
+    example: 'Vestido',
+  })
+  baseName: string;
+
+  @ApiProperty({
+    description: 'Descripción base (español), sin traducir',
+    nullable: true,
+  })
+  baseDescription: string | null;
+
+  @ApiProperty({
+    description: 'Traducciones guardadas: { en: { name, description }, fr: {...}, zh: {...} }',
+    example: { en: { name: 'Dress' } },
+  })
+  translations: Record<string, { name?: string; description?: string | null }>;
+
+  @ApiProperty({
+    description: 'Idioma con el que se resolvieron name/description',
+    example: 'en',
+  })
+  locale: string;
 
   @ApiProperty({
     description: 'Tallas disponibles de la prenda',
@@ -38,7 +62,7 @@ export class ProductResponseDto {
   collections: { id: string; name: string; slug: string }[];
 
   @ApiProperty({
-    description: 'Product description',
+    description: 'Descripción en el idioma del request; si no hay traducción, el texto base',
     example: 'High quality',
   })
   description?: string | null;

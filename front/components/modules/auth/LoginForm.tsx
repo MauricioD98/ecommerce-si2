@@ -3,11 +3,13 @@ import styles from "./auth-form.module.scss"
 import { FormEvent, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff, Info, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginForm() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const t = useTranslations("Auth");
 
     const handleSubmit =async (e: FormEvent) => {
         e.preventDefault();
@@ -30,42 +32,42 @@ export default function LoginForm() {
             <div className={styles.container}>
                 {/*from */}
                 <div className={styles.fromWrapper}>
-                    <h1 className={styles.title}>Bienvenido de nuevo</h1>
-                    <p className={styles.subtitle}>Inicia sesión en tu cuenta</p>
+                    <h1 className={styles.title}>{t("login.title")}</h1>
+                    <p className={styles.subtitle}>{t("login.subtitle")}</p>
 
                     <form className={styles.form} onSubmit={handleSubmit}>
                         {
                             error && (
                                 <div className={styles.error}>
                                     <Info size={20} />
-                                    <span>{error ?? "Ocurrió un error"}</span>
+                                    <span>{error ?? t("genericError")}</span>
 
                                 </div>
                             )}
 
                         <div className={styles.field}>
-                            <label htmlFor="email">Correo electrónico</label>
-                            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" autoComplete="off" required disabled={isLoading} />
+                            <label htmlFor="email">{t("email")}</label>
+                            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("emailPlaceholder")} autoComplete="off" required disabled={isLoading} />
 
                         </div>
 
 
                         <div className={styles.field}>
-                            <label htmlFor="password">Contraseña</label>
+                            <label htmlFor="password">{t("password")}</label>
                             <div className={styles.inputWrapper}>
-                                <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ingresa tu contraseña" autoComplete="new-password" required disabled={isLoading} />
+                                <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("passwordPlaceholder")} autoComplete="new-password" required disabled={isLoading} />
                                 <button
                                     type="button"
                                     className={styles.toggleButton}
                                     onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                                     disabled={isLoading}
                                 >
                                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                 </button>
                             </div>
                             <button type="button" className={styles.forgotLink} onClick={() => router.push("/auth/forgot-password")}>
-                                ¿Olvidaste tu contraseña?
+                                {t("login.forgot")}
                             </button>
 
 
@@ -76,10 +78,10 @@ export default function LoginForm() {
                             {isLoading ? (
                                 <>
                                     <Loader2 className={styles.spinner} />
-                                    Iniciando sesión...
+                                    {t("login.submitting")}
                                 </>
                             ) : (
-                                "Iniciar sesión"
+                                t("login.submit")
                             )
                             }
 
@@ -87,9 +89,9 @@ export default function LoginForm() {
                     </form>
 
                     <p className={styles.footerText}>
-                        ¿No tienes una cuenta?{" "}
+                        {t("login.noAccount")}{" "}
                         <button type="button" className={styles.link} onClick={() => router.push("/auth/register")}>
-                            Crear cuenta
+                            {t("login.createAccount")}
                         </button>
                     </p>
 

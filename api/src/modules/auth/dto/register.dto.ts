@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MinLength, minLength } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from "class-validator";
+import { i18nMessage } from "../../../i18n/i18n-message";
 
 export class RegisterDto {
 
@@ -7,8 +8,8 @@ export class RegisterDto {
             description:'User email address',
             example:'john.doe@example.com',
         })
-    @IsEmail({},{message: "Por favor ingrese un correo electrónico válido"})
-    @IsNotEmpty({message: "El correo electrónico es obligatorio"})
+    @IsEmail()
+    @IsNotEmpty()
     email: string;
 
     @ApiProperty({
@@ -16,9 +17,9 @@ export class RegisterDto {
         example: 'StrongP@ssw0rd!',
     })
     @IsString()
-    @IsNotEmpty({message: "La contraseña es obligatoria"})
-    @MinLength(8, {message: "La contraseña debe tener al menos 8 caracteres"})
-    @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, {message: "La contraseña debe contener al menos una letra mayúscula, una letra minúscula, un número y un carácter especial"})
+    @IsNotEmpty()
+    @MinLength(8)
+    @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, {message: i18nMessage('validation.PASSWORD_STRONG')})
     password: string;
    
     @ApiProperty({

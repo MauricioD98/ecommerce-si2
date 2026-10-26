@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React from 'react';
 import CheckoutClient from '@/components/modules/checkout/CheckoutClient';
 
@@ -7,12 +9,13 @@ export default function Page() {
     return <CheckoutClient />;
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: 'Finalizar Compra',
-        description: 'Completa tu pedido',
+        title: t("checkoutTitle"),
+        description: t("checkoutDescription"),
         icons: {
-            icon: '/favicon.ico',
+            icon: "/favicon.ico",
         },
     };
 }

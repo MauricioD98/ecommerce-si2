@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React from 'react';
 import ForgotPasswordForm from '@/components/modules/auth/ForgotPasswordForm';
 
@@ -7,9 +9,10 @@ export default function page() {
     return <ForgotPasswordForm />;
 };
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Recuperar contraseña",
-        description: "Restablece tu contraseña",
+        title: t("forgotTitle"),
+        description: t("forgotDescription"),
     };
 }

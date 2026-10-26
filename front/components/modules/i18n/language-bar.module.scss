@@ -1,0 +1,9 @@
+// Franja con el selector de idioma para las páginas sin Header de la tienda (auth, checkout).
+// Mismas medidas que .topBar de platform.module.scss
+.bar {
+    display: flex;
+    justify-content: flex-end;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1rem 1.25rem 0;
+}

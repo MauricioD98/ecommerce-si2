@@ -7,12 +7,15 @@ import { useProducts } from '@/hooks/useProducts';
 import styles from './product-detail-client.module.scss'; // 2. Se corrigió a .module.scss
 import SimilarProducts from './SimilarProducts';
 import { useSelectedBranchId } from '@/hooks/useBranches';
+import { LOCALE_CHANGED_EVENT } from '@/i18n/client';
+import { useTranslations } from 'next-intl';
 
 export default function ProductDetailClient({
     productId,
 }: {
     productId: string;
 }) {
+    const t = useTranslations('Product');
     const { getProduct, product, isLoading, error } = useProducts();
     const selectedBranchId = useSelectedBranchId();
 
@@ -30,9 +33,11 @@ export default function ProductDetailClient({
             }
         };
         window.addEventListener('inventory-changed', handleRefresh);
+        window.addEventListener(LOCALE_CHANGED_EVENT, handleRefresh);
         window.addEventListener('focus', handleRefresh);
         return () => {
             window.removeEventListener('inventory-changed', handleRefresh);
+            window.removeEventListener(LOCALE_CHANGED_EVENT, handleRefresh);
             window.removeEventListener('focus', handleRefresh);
         };
     }, [productId, selectedBranchId, getProduct]);
@@ -42,7 +47,7 @@ export default function ProductDetailClient({
             <div className={styles.loading}>
                 <div className={styles.container}>
                     {/* 3. Se corrigió el texto de carga (antes decía "Producto no encontrado") */}
-                    <h2>Cargando producto...</h2>
+                    <h2>{t('loading')}</h2>
                 </div>
             </div>
         );
@@ -55,8 +60,8 @@ export default function ProductDetailClient({
         return (
             <div className={styles.error}>
                 <div className={styles.container}>
-                    <h2>Producto no encontrado</h2>
-                    <p>El producto que buscas no existe</p>
+                    <h2>{t('notFound')}</h2>
+                    <p>{t('notFoundDescription')}</p>
                 </div>
             </div>
         );

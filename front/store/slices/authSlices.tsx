@@ -23,6 +23,12 @@ const authSlice = createSlice({
             state.accessToken = action.payload;
             state.esAutenticado = !!action.payload;
         },
+        // Resultado de /auth/refresh: el backend rota el refresh token, hay que guardar los dos
+        setTokens: (state: AuthState, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
+            state.accessToken = action.payload.accessToken;
+            state.refreshToken = action.payload.refreshToken;
+            state.esAutenticado = true;
+        },
         clearAuth: (state: AuthState) => {
             state.accessToken = null;
             state.refreshToken = null;
@@ -46,5 +52,5 @@ const authSlice = createSlice({
     },
 });
 
-export const { setAccessToken, clearAuth, setAuth, setUser } = authSlice.actions;
+export const { setAccessToken, setTokens, clearAuth, setAuth, setUser } = authSlice.actions;
 export default authSlice.reducer;

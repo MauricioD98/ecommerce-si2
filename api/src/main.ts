@@ -1,11 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationFailedException } from './i18n/i18n-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
   // rawBody: true deja el Buffer crudo en req.rawBody (necesario para validar la firma del webhook de Stripe)
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // Detrás del ingress de Azure Container Apps req.ip sería la IP del ingress: todos los visitantes
+  // compartirían el mismo límite del Throttler (p. ej. 3 mensajes de contacto cada 10 min para TODA
+  // la landing). Se confía en N saltos de proxy para leer la IP real de X-Forwarded-For. No subirlo
+  // de más: con más saltos de los reales, el cliente podría falsificar su IP con ese header.
+  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
   //Project description
 
   app.setGlobalPrefix('api/v1');
@@ -19,6 +27,8 @@ async function bootstrap() {
       transformOptions:{
         enableImplicitConversion:true,
       },
+      // Los errores crudos van a I18nExceptionFilter, que arma los mensajes en el idioma del request
+      exceptionFactory: (errors) => new ValidationFailedException(errors),
     }),
   );
 
@@ -44,7 +54,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With', 'X-Tenant-Id', 'Accept-Language', 'X-Lang', 'X-Platform-Key'],
   });
 
   // Deshabilitar caché del navegador/proxies para respuestas dinámicas (stock, precios, órdenes)

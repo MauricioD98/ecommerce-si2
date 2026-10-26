@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import CollectionFormModal from './CollectionFormModal';
 import { useAdminCollections } from '@/hooks/useAdminCollections';
@@ -9,6 +10,8 @@ import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Collection, CollectionPayload } from '@/types/admin.types';
 
 export default function CollectionsClient() {
+    const t = useTranslations('AdminCollections');
+    const tc = useTranslations('AdminCommon');
     const [page, setPage] = useState(1);
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
@@ -41,11 +44,11 @@ export default function CollectionsClient() {
     const handleDelete = async (collection: Collection) => {
         if (collection.productCount > 0) {
             window.alert(
-                `"${collection.name}" tiene ${collection.productCount} producto${collection.productCount === 1 ? '' : 's'} asociado${collection.productCount === 1 ? '' : 's'}. Quítalos de la colección antes de eliminarla.`,
+                t('hasProducts', { name: collection.name, count: collection.productCount }),
             );
             return;
         }
-        if (!window.confirm(`¿Eliminar la colección "${collection.name}"?`)) return;
+        if (!window.confirm(t('confirmDelete', { name: collection.name }))) return;
 
         setBusyId(collection.id);
         setActionError(null);
@@ -53,7 +56,7 @@ export default function CollectionsClient() {
             await deleteCollection(collection.id);
             if (collections.length === 1 && page > 1) setPage(page - 1);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar la colección.'));
+            setActionError(getApiErrorMessage(error, t('deleteFailed')));
         } finally {
             setBusyId(null);
         }
@@ -63,20 +66,20 @@ export default function CollectionsClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Colecciones</h1>
-                    <p>Agrupa productos por temporada o campaña (ej. Otoño-Invierno, Básicos). Un producto puede estar en varias.</p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                 </div>
                 <div className={styles.toolbar}>
                     <input
                         className={styles.input}
                         value={searchInput}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre"
-                        aria-label="Buscar colección"
+                        placeholder={tc('search')}
+                        aria-label={t('searchLabel')}
                     />
                     <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                         <Plus size={16} />
-                        Nueva colección
+                        {t('new')}
                     </button>
                 </div>
             </div>
@@ -85,10 +88,10 @@ export default function CollectionsClient() {
 
             <div className={styles.tableCard}>
                 {isLoading && collections.length === 0 ? (
-                    <div className={styles.loadingState}>Cargando colecciones...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : collections.length === 0 ? (
                     <div className={styles.emptyState}>
-                        {search ? `No se encontraron colecciones para "${search}".` : 'Aún no hay colecciones.'}
+                        {search ? t('noResults', { search }) : t('empty')}
                     </div>
                 ) : (
                     <>
@@ -96,11 +99,11 @@ export default function CollectionsClient() {
                             <table className={styles.table}>
                                 <thead>
                                     <tr>
-                                        <th>Nombre</th>
-                                        <th>Slug</th>
-                                        <th className={styles.numeric}>Productos</th>
-                                        <th>Estado</th>
-                                        <th className={styles.numeric}>Acciones</th>
+                                        <th>{tc('name')}</th>
+                                        <th>{t('slug')}</th>
+                                        <th className={styles.numeric}>{t('products')}</th>
+                                        <th>{tc('status')}</th>
+                                        <th className={styles.numeric}>{tc('actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -117,14 +120,14 @@ export default function CollectionsClient() {
                                                 <span
                                                     className={`${styles.badge} ${collection.isActive === false ? styles.badgeMuted : styles.badgeSuccess}`}
                                                 >
-                                                    {collection.isActive === false ? 'Inactiva' : 'Activa'}
+                                                    {collection.isActive === false ? t('inactive') : t('active')}
                                                 </span>
                                             </td>
                                             <td>
                                                 <div className={styles.actions}>
                                                     <button type="button" className={styles.buttonSecondary} onClick={() => setEditing(collection)}>
                                                         <Pencil size={14} />
-                                                        Editar
+                                                        {tc('edit')}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -133,7 +136,7 @@ export default function CollectionsClient() {
                                                         onClick={() => handleDelete(collection)}
                                                     >
                                                         <Trash2 size={14} />
-                                                        Eliminar
+                                                        {tc('delete')}
                                                     </button>
                                                 </div>
                                             </td>
@@ -146,11 +149,11 @@ export default function CollectionsClient() {
                         {totalPages > 1 && (
                             <div className={styles.pagination}>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
-                                    Anterior
+                                    {tc('previous')}
                                 </button>
-                                <span>Página {page} de {totalPages} ({total} en total)</span>
+                                <span>{t('pageInfo', { page, totalPages, total })}</span>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p + 1)} disabled={page >= totalPages}>
-                                    Siguiente
+                                    {tc('next')}
                                 </button>
                             </div>
                         )}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -13,6 +14,8 @@ interface CategoryFormModalProps {
 }
 
 export default function CategoryFormModal({ category, onClose, onSubmit }: CategoryFormModalProps) {
+    const t = useTranslations('AdminCategories');
+    const tc = useTranslations('AdminCommon');
     const [name, setName] = useState(category?.name ?? '');
     const [description, setDescription] = useState(category?.description ?? '');
     // Vacío = el backend genera el slug a partir del nombre; solo se manda si la persona lo escribe
@@ -23,11 +26,11 @@ export default function CategoryFormModal({ category, onClose, onSubmit }: Categ
     const [error, setError] = useState<string | null>(null);
 
     const validate = (): string | null => {
-        if (!name.trim()) return 'El nombre es obligatorio.';
+        if (!name.trim()) return t('nameRequired');
         if (slug.trim() && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug.trim())) {
-            return 'El slug solo admite minúsculas, números y guiones (ej. "vestidos-de-fiesta").';
+            return t('slugInvalid');
         }
-        if (imageUrl.trim() && !/^https?:\/\//i.test(imageUrl.trim())) return 'La imagen debe ser una URL que empiece con http:// o https://';
+        if (imageUrl.trim() && !/^https?:\/\//i.test(imageUrl.trim())) return t('imageInvalid');
         return null;
     };
 
@@ -51,75 +54,75 @@ export default function CategoryFormModal({ category, onClose, onSubmit }: Categ
             });
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar la categoría.'));
+            setError(getApiErrorMessage(error, t('saveFailed')));
             setIsSaving(false);
         }
     };
 
     return (
-        <AdminModal title={category ? 'Editar categoría' : 'Nueva categoría'} onClose={onClose}>
+        <AdminModal title={category ? t('editTitle') : t('newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
                 <div className={styles.field}>
-                    <label htmlFor="category-name">Nombre</label>
+                    <label htmlFor="category-name">{tc('name')}</label>
                     <input
                         id="category-name"
                         className={styles.input}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={100}
-                        placeholder="Vestidos"
+                        placeholder={t('namePlaceholder')}
                     />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="category-description">Descripción</label>
+                    <label htmlFor="category-description">{tc('description')}</label>
                     <textarea
                         id="category-description"
                         className={`${styles.input} ${styles.textareaSmall}`}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         maxLength={255}
-                        placeholder="Breve descripción de la categoría"
+                        placeholder={t('descriptionPlaceholder')}
                     />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="category-slug">Slug (opcional)</label>
+                    <label htmlFor="category-slug">{t('slugLabel')}</label>
                     <input
                         id="category-slug"
                         className={styles.input}
                         value={slug}
                         onChange={(e) => setSlug(e.target.value)}
                         maxLength={100}
-                        placeholder="vestidos"
+                        placeholder={t('slugPlaceholder')}
                     />
-                    <small className={styles.cellSub}>Si lo dejas vacío, se genera automáticamente a partir del nombre.</small>
+                    <small className={styles.cellSub}>{t('slugHint')}</small>
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="category-image">Imagen (URL, opcional)</label>
+                    <label htmlFor="category-image">{t('imageLabel')}</label>
                     <input
                         id="category-image"
                         className={styles.input}
                         value={imageUrl}
                         onChange={(e) => setImageUrl(e.target.value)}
-                        placeholder="https://ejemplo.com/imagen.jpg"
+                        placeholder={t('imagePlaceholder')}
                     />
                 </div>
 
                 <label className={styles.checkbox}>
                     <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                    Categoría activa (visible en la tienda)
+                    {t('activeLabel')}
                 </label>
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>

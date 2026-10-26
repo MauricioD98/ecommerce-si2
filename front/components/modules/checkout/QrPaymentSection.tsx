@@ -5,6 +5,8 @@ import { PaymentService, GenerateQrResponse } from '@/service/api/payment.servic
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import styles from './qr-payment.module.scss';
 import { Zap, ExternalLink, RefreshCw } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 
 interface QrPaymentSectionProps {
     orderId?: string;
@@ -21,6 +23,8 @@ export default function QrPaymentSection({
     onSuccess,
     onError,
 }: QrPaymentSectionProps) {
+    const t = useTranslations('Checkout.qr');
+    const storeName = useStoreName();
     const [qrData, setQrData] = useState<GenerateQrResponse['data'] | null>(null);
     const [isLoadingQr, setIsLoadingQr] = useState<boolean>(false);
     const [isConfirming, setIsConfirming] = useState<boolean>(false);
@@ -41,16 +45,16 @@ export default function QrPaymentSection({
             if (response.success && response.data) {
                 setQrData(response.data);
             } else {
-                throw new Error(response.message || 'No se pudo generar el código QR');
+                throw new Error(response.message || t('generateFailed'));
             }
         } catch (err) {
-            const msg = getApiErrorMessage(err, 'Error al generar el código QR de pago.');
+            const msg = getApiErrorMessage(err, t('generateFailed'));
             setError(msg);
             onError?.(msg);
         } finally {
             setIsLoadingQr(false);
         }
-    }, [orderId, onError]);
+    }, [orderId, onError, t]);
 
     useEffect(() => {
         if (orderId && !qrData && !isLoadingQr && !error) {
@@ -97,7 +101,7 @@ export default function QrPaymentSection({
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
             onSuccess(`QR_${orderId}`);
         } catch (err) {
-            const msg = getApiErrorMessage(err, 'Error al simular el pago por QR.');
+            const msg = getApiErrorMessage(err, t('simulateFailed'));
             setError(msg);
             onError?.(msg);
         } finally {
@@ -110,7 +114,7 @@ export default function QrPaymentSection({
             <div className={styles.loadingWrapper}>
                 <div className={styles.spinner} />
                 <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    {isLoadingOrder ? 'Creando orden de compra...' : 'Generando código QR...'}
+                    {isLoadingOrder ? t('creatingOrder') : t('generating')}
                 </p>
             </div>
         );
@@ -122,7 +126,7 @@ export default function QrPaymentSection({
                 <span>{error}</span>
                 <button type="button" onClick={loadQr} className={styles.retryBtn}>
                     <RefreshCw size={14} style={{ display: 'inline', marginRight: 4 }} />
-                    Reintentar generar QR
+                    {t('retry')}
                 </button>
             </div>
         );
@@ -134,28 +138,28 @@ export default function QrPaymentSection({
 
     return (
         <div className={styles.qrContainer}>
-            <h3 className={styles.title}>Escanea el código QR para pagar</h3>
+            <h3 className={styles.title}>{t('scanTitle')}</h3>
             <p className={styles.subtitle}>
-                Abre la cámara de tu teléfono móvil para escanear el código QR o haz clic en simular escaneo para completar el pago.
+                {t('scanSubtitle')}
             </p>
 
             <div className={styles.qrFrame}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                     src={qrData.qrDataUrl}
-                    alt="Código QR de Pago Stella Femme"
+                    alt={t('imageAlt', { store: storeName })}
                     className={styles.qrImage}
                 />
             </div>
 
             <div className={styles.amountBox}>
-                <div className={styles.label}>Monto total a pagar</div>
+                <div className={styles.label}>{t('amountLabel')}</div>
                 <div className={styles.value}>Bs {amount.toFixed(2)}</div>
             </div>
 
             <div className={styles.liveStatus}>
                 <div className={styles.pulseDot} />
-                <span>Esperando escaneo en tiempo real...</span>
+                <span>{t('waiting')}</span>
             </div>
 
             <button
@@ -165,7 +169,7 @@ export default function QrPaymentSection({
                 disabled={isConfirming}
             >
                 <Zap size={18} fill="#ffffff" />
-                <span>{isConfirming ? 'Confirmando pago...' : 'Simular Escaneo y Pago'}</span>
+                <span>{isConfirming ? t('confirming') : t('simulate')}</span>
             </button>
 
             {qrData.confirmUrl && (
@@ -176,7 +180,7 @@ export default function QrPaymentSection({
                     className={styles.scanLinkBtn}
                 >
                     <ExternalLink size={12} style={{ display: 'inline', marginRight: 4 }} />
-                    Abrir enlace directo de escaneo
+                    {t('openLink')}
                 </a>
             )}
         </div>

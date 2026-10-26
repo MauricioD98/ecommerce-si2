@@ -8,12 +8,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { useRouter } from 'next/navigation';
 import { canAccessAdmin } from '@/utils/permissions';
+import { useTranslations } from 'next-intl';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 import BranchSelector from './BranchSelector';
+import LanguageSwitcher from '../i18n/LanguageSwitcher';
 
 export default function Header(){
     const {totalItems} = useCart();
     const {isAuthenticated,isLoading,user,logout,refreshProfile}=useAuth();
     const router = useRouter();
+    const t = useTranslations('Header');
+    const storeName = useStoreName();
 
     // Mantiene actualizado el descuento de trabajador y el rol del usuario
     useEffect(()=>{
@@ -35,7 +40,7 @@ export default function Header(){
             <div className={styles.containers}>
                {/* logo */}
                <Link href="/" className={styles.logo}>
-                STELLA FEMME
+                {storeName}
                </Link>
 
                {/* Branch selector - Solo visible en pantallas grandes */}
@@ -45,18 +50,19 @@ export default function Header(){
 
                {/* Acciones e iconos */}
                <div className={styles.actions}>
-                <Link href="/cart" className={styles.cartButton} aria-label="Carrito de compras" title="Carrito">
+                <LanguageSwitcher />
+                <Link href="/cart" className={styles.cartButton} aria-label={t('cart')} title={t('cart')}>
                     <ShoppingCart size={19} />
                     {totalItems > 0 && <span className={styles.badge}>{totalItems}</span>}
                 </Link>
 
                 {isAuthenticated ? (
                     <>
-                     <Link href="/account" className={styles.cartButton} aria-label="Mi cuenta" title="Mi cuenta">
+                     <Link href="/account" className={styles.cartButton} aria-label={t('account')} title={t('account')}>
                         <UserIcon size={19} />
                      </Link>
                      {showDashboard && (
-                        <Link href="/admin" className={styles.cartButton} aria-label="Panel administrativo" title="Panel administrativo">
+                        <Link href="/admin" className={styles.cartButton} aria-label={t('admin')} title={t('admin')}>
                             <LayoutDashboard size={19} />
                         </Link>
                      )}
@@ -64,16 +70,16 @@ export default function Header(){
                         onClick={handleLogoutClick}
                         className={styles.logoutButton}
                         disabled={isLoading}
-                        title="Cerrar sesión"
-                        aria-label="Cerrar sesión"
+                        title={t('logout')}
+                        aria-label={t('logout')}
                      >
                       <LogOut size={16} className={styles.logoutIcon} />
-                      <span className={styles.logoutText}>{isLoading ? "..." : "Cerrar sesión"}</span>
+                      <span className={styles.logoutText}>{isLoading ? "..." : t('logout')}</span>
                      </button>
                     </>
                 ):(
-                   <button className={styles.loginButton} onClick={handleLoginClick} title="Iniciar sesión">
-                    Iniciar sesión
+                   <button className={styles.loginButton} onClick={handleLoginClick} title={t('login')}>
+                    {t('login')}
                    </button>
                 )}
                </div>

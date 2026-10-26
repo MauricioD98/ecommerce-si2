@@ -1,5 +1,7 @@
 import { InventoryItem, SetInventoryPayload } from "@/types/admin.types";
 import { Product } from "@/types/product.types";
+import { INVENTORY_STORE, isOfflineDbSupported, withOfflineStore } from "./offlineDb";
+import { getCurrentTenantId, tenantScopedKey } from "./tenant";
 
 export interface OfflineInventoryUpdate {
     id: string;
@@ -12,41 +14,16 @@ export interface OfflineInventoryUpdate {
     lastError?: string;
 }
 
-const DB_NAME = "stella-femme-offline";
-const DB_VERSION = 2;
-const STORE_NAME = "inventory_queue";
-const INVENTORY_CACHE_PREFIX = "sf_cached_branch_inv_";
-const PRODUCTS_CACHE_PREFIX = "sf_cached_branch_prod_";
+// Las cachés de localStorage también van por tienda: los branchId son UUID por schema, pero sin
+// prefijo un admin que cambia de tienda vería el inventario cacheado de la anterior al estar offline.
+const inventoryCacheKey = (branchId: string) => tenantScopedKey(`sf_cached_branch_inv_${branchId}`);
+const productsCacheKey = (branchId: string) => tenantScopedKey(`sf_cached_branch_prod_${branchId}`);
 
-const isSupported = () => typeof window !== "undefined" && "indexedDB" in window;
+// La base es por tienda (ver offlineDb.ts): solo se ven y sincronizan los ajustes de la tienda activa
+const isSupported = () => isOfflineDbSupported() && getCurrentTenantId() !== null;
 
-function openDb(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains("orders")) {
-                db.createObjectStore("orders", { keyPath: "id" });
-            }
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: "id" });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function withStore<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, mode);
-        const request = fn(tx.objectStore(STORE_NAME));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => db.close();
-    });
-}
+const withStore = <T,>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>) =>
+    withOfflineStore(INVENTORY_STORE, mode, fn);
 
 // Agrega o reemplaza una actualización de stock para una sucursal y producto
 export async function addOfflineInventoryUpdate(
@@ -55,8 +32,11 @@ export async function addOfflineInventoryUpdate(
     payload: SetInventoryPayload,
     productName?: string
 ): Promise<OfflineInventoryUpdate> {
-    if (!isSupported()) {
+    if (!isOfflineDbSupported()) {
         throw new Error("IndexedDB no disponible en este navegador");
+    }
+    if (!getCurrentTenantId()) {
+        throw new Error("No hay una tienda seleccionada para guardar el ajuste offline");
     }
 
     // Si ya existe una actualización pendiente para este mismo producto en esta sucursal, la actualizamos
@@ -117,14 +97,14 @@ export async function updateOfflineInventoryUpdate(
 export function cacheBranchInventory(branchId: string, items: InventoryItem[]): void {
     if (typeof window === "undefined" || !branchId || !items) return;
     try {
-        localStorage.setItem(`${INVENTORY_CACHE_PREFIX}${branchId}`, JSON.stringify(items));
+        localStorage.setItem(inventoryCacheKey(branchId), JSON.stringify(items));
     } catch {}
 }
 
 export function getCachedBranchInventory(branchId: string): InventoryItem[] | null {
     if (typeof window === "undefined" || !branchId) return null;
     try {
-        const raw = localStorage.getItem(`${INVENTORY_CACHE_PREFIX}${branchId}`);
+        const raw = localStorage.getItem(inventoryCacheKey(branchId));
         return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
@@ -134,14 +114,14 @@ export function getCachedBranchInventory(branchId: string): InventoryItem[] | nu
 export function cacheBranchProducts(branchId: string, products: Product[]): void {
     if (typeof window === "undefined" || !branchId || !products) return;
     try {
-        localStorage.setItem(`${PRODUCTS_CACHE_PREFIX}${branchId}`, JSON.stringify(products));
+        localStorage.setItem(productsCacheKey(branchId), JSON.stringify(products));
     } catch {}
 }
 
 export function getCachedBranchProducts(branchId: string): Product[] | null {
     if (typeof window === "undefined" || !branchId) return null;
     try {
-        const raw = localStorage.getItem(`${PRODUCTS_CACHE_PREFIX}${branchId}`);
+        const raw = localStorage.getItem(productsCacheKey(branchId));
         return raw ? JSON.parse(raw) : null;
     } catch {
         return null;

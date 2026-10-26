@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ReportsService } from "@/service/api/reports.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
+import { useTranslations } from "next-intl";
 import { DynamicReportResult, SalesOverview, TopProduct } from "@/types/admin.types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -11,6 +12,7 @@ export function useSalesReport(branchId: string, days: number) {
     const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
     const [loadedKey, setLoadedKey] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const t = useTranslations("Reports");
 
     const key = `${branchId}|${days}`;
 
@@ -29,7 +31,7 @@ export function useSalesReport(branchId: string, days: number) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar las métricas."));
+                if (active) setError(getApiErrorMessage(error, t("loadFailed")));
             })
             .finally(() => {
                 if (active) setLoadedKey(key);
@@ -38,6 +40,8 @@ export function useSalesReport(branchId: string, days: number) {
         return () => {
             active = false;
         };
+        // t cambia solo con el idioma: no hace falta recargar por eso
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [branchId, days, key]);
 
     return { overview, topProducts, error, isLoading: loadedKey !== key };
@@ -54,6 +58,7 @@ export interface DynamicReportEntry {
 export function useDynamicReport() {
     const [entries, setEntries] = useState<DynamicReportEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const t = useTranslations("Reports.dynamic");
 
     const ask = async (prompt: string) => {
         setIsLoading(true);
@@ -62,7 +67,7 @@ export function useDynamicReport() {
             const result = await ReportsService.runDynamicReport(prompt);
             setEntries((prev) => [{ id, prompt, result }, ...prev].slice(0, 5));
         } catch (error) {
-            setEntries((prev) => [{ id, prompt, error: getApiErrorMessage(error, "No se pudo generar el reporte.") }, ...prev].slice(0, 5));
+            setEntries((prev) => [{ id, prompt, error: getApiErrorMessage(error, t("failed")) }, ...prev].slice(0, 5));
         } finally {
             setIsLoading(false);
         }

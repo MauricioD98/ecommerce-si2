@@ -10,6 +10,9 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InventoryService } from '../branches/inventory.service';
+import { StripeConnectService } from './stripe-connect.service';
+import { SubscriptionsService } from '../platform/subscriptions.service';
+import { requireTenant, runInTenant, withTenantParam } from '../../tenancy/tenant-context';
 
 @Injectable()
 export class PaymentsService {
@@ -22,6 +25,8 @@ export class PaymentsService {
         private mailService: MailService,
         private notificationsService: NotificationsService,
         private inventoryService: InventoryService,
+        private stripeConnect: StripeConnectService,
+        private subscriptions: SubscriptionsService,
     ) {
         this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
     }
@@ -66,14 +71,25 @@ export class PaymentsService {
 
     // El monto SIEMPRE se calcula desde la orden ya guardada en la BD: nunca se confía en un monto enviado por el cliente
     const amount = order.totalAmount.toNumber();
+    const amountInCents = Math.round(amount * 100);
+
+    // Stripe Connect (destination charge): los fondos van a la cuenta conectada de la tienda y la
+    // plataforma retiene solo su comisión. metadata.tenantId es lo que usa el webhook para saber
+    // en qué schema está la orden.
+    const { tenantId } = requireTenant();
+    const payout = await this.stripeConnect.getPayoutAccount(tenantId);
 
     const paymentIntent = await this.stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: amountInCents,
       currency,
-      metadata: { orderId, userId },
+      metadata: { orderId, userId, tenantId },
       automatic_payment_methods: {
         enabled: true,
       },
+      // La tienda figura como comerciante (extracto bancario del cliente, disputas, liquidación)
+      on_behalf_of: payout.accountId,
+      transfer_data: { destination: payout.accountId },
+      application_fee_amount: this.stripeConnect.feeFor(amountInCents, payout.feeBps),
     });
 
     // upsert: reintentar el pago de la misma orden (ej. tarjeta rechazada) reutiliza el registro en vez de chocar
@@ -155,6 +171,17 @@ export class PaymentsService {
 
     if (payment.status !== PaymentStatus.COMPLETADO) {
       let paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+      // Todos los PI viven en la misma cuenta de plataforma: sin este chequeo, un PI pagado en otra
+      // tienda podría usarse para confirmar una orden de esta.
+      const currentTenantId = requireTenant().tenantId;
+      // Excepción transicional: PI de antes del multitenant (sin tenantId ni destino) en la tienda original
+      const isLegacyIntent =
+        !paymentIntent.metadata?.tenantId &&
+        !paymentIntent.transfer_data &&
+        currentTenantId === process.env.LEGACY_TENANT_ID;
+      if (paymentIntent.metadata?.tenantId !== currentTenantId && !isLegacyIntent) {
+        throw new NotFoundException('payment not found');
+      }
       if (
         paymentIntent.status === 'requires_payment_method' &&
         process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
@@ -162,7 +189,7 @@ export class PaymentsService {
         const publicUrl = process.env.FRONTEND_URL || 'https://stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io';
         paymentIntent = await this.stripe.paymentIntents.confirm(paymentIntentId, {
           payment_method: 'pm_card_visa',
-          return_url: `${publicUrl}/checkout/success?orderId=${orderId}`,
+          return_url: withTenantParam(`${publicUrl}/checkout/success?orderId=${orderId}`),
         });
       }
       if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'processing') {
@@ -188,26 +215,69 @@ export class PaymentsService {
       throw new BadRequestException('Webhook not configured');
     }
 
-    let event: Stripe.Event;
-    try {
-      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
-    } catch (error) {
-      this.logger.error(`Firma de webhook inválida: ${(error as Error).message}`);
+    // Stripe firma distinto según el endpoint: el de la cuenta (payment_intent.*) usa
+    // STRIPE_WEBHOOK_SECRET y el de Connect (account.updated) STRIPE_CONNECT_WEBHOOK_SECRET.
+    // Ambos pueden apuntar a esta misma URL; se acepta la firma de cualquiera de los dos.
+    const secrets = [webhookSecret, process.env.STRIPE_CONNECT_WEBHOOK_SECRET].filter(Boolean) as string[];
+    let event: Stripe.Event | undefined;
+    for (const secret of secrets) {
+      try {
+        event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
+        break;
+      } catch {
+        // probar el siguiente secreto
+      }
+    }
+    if (!event) {
+      this.logger.error('Firma de webhook inválida para todos los secretos configurados');
       throw new BadRequestException('Invalid Stripe signature');
     }
 
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await this.markPaymentSucceeded(event.data.object as Stripe.PaymentIntent);
+        await this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markPaymentSucceeded(pi));
         break;
       case 'payment_intent.payment_failed':
-        await this.markPaymentFailed(event.data.object as Stripe.PaymentIntent);
+        await this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markPaymentFailed(pi));
+        break;
+      // Onboarding de Connect: solo toca public.tenants, no necesita schema de tienda
+      case 'account.updated':
+        await this.stripeConnect.syncAccount(event.data.object as Stripe.Account);
+        break;
+      // Alta self-service de tiendas (suscripción al SaaS): plano de control, sin schema de tienda.
+      // Las sesiones de otros Checkout se ignoran adentro (metadata.kind !== 'tenant_signup').
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded':
+        await this.subscriptions.handleCheckoutPaid(event.data.object as Stripe.Checkout.Session);
+        break;
+      case 'checkout.session.expired':
+        await this.subscriptions.handleCheckoutExpired(event.data.object as Stripe.Checkout.Session);
+        break;
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+        await this.subscriptions.handleSubscriptionChange(event.data.object as Stripe.Subscription);
         break;
       default:
         break;
     }
 
     return { received: true };
+  }
+
+  // El webhook no pasa por TenantMiddleware (Stripe no manda x-tenant-id): la tienda se saca del
+  // PaymentIntent y se abre su contexto para que this.prisma apunte a su schema.
+  private async inPaymentIntentTenant(
+    pi: Stripe.PaymentIntent,
+    fn: (pi: Stripe.PaymentIntent) => Promise<void>,
+  ): Promise<void> {
+    const tenant = await this.stripeConnect.resolveTenantForPaymentIntent(pi);
+    if (!tenant) {
+      // Se responde 200 igual: con error Stripe reintentaría el evento por días sin que cambie nada.
+      // Los PI previos a la migración multitenant caen acá (no tienen metadata.tenantId).
+      this.logger.warn(`Webhook ${pi.id} ignorado: no se pudo resolver la tienda`);
+      return;
+    }
+    await runInTenant(tenant, () => fn(pi));
   }
 
   // Idempotente: llamado tanto por /confirm como por el webhook, cualquiera que llegue primero
@@ -426,7 +496,9 @@ export class PaymentsService {
 
     // La URL codificada en el QR dirige a la confirmación de pago
     const publicUrl = origin || process.env.FRONTEND_URL || 'https://stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io';
-    const confirmUrl = `${publicUrl}/checkout/qr-confirm?orderId=${orderId}`;
+    // El QR lo escanea OTRO dispositivo (el celular del cliente), que no tiene la tienda guardada:
+    // sin ?tenant= la página de confirmación recibiría 401 TENANT_REQUIRED de la API.
+    const confirmUrl = withTenantParam(`${publicUrl}/checkout/qr-confirm?orderId=${orderId}`);
 
     const qrDataUrl = await QRCode.toDataURL(confirmUrl, {
       margin: 2,

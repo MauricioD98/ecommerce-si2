@@ -5,6 +5,12 @@ import createWebStorage from "redux-persist/es/storage/createWebStorage"
 import authReducer from './slices/authSlices'
 import cartReducer from './slices/cartSlice';
 import branchReducer from './slices/branchSlice';
+import { tenantScopedKey } from '@/utils/tenant';
+import { migrateLegacyLocalStorage } from '@/utils/legacyStorageMigration';
+
+// Antes de crear el persistReducer: mueve "persist:root" (pre-multitenant) a la clave de la tienda
+// original, para que el carrito y la sesión se rehidraten en el primer render.
+migrateLegacyLocalStorage();
 
 const createNoopStorage = () => {
     return {
@@ -26,8 +32,10 @@ const storage =
 
 
 
+// Una clave por tienda ("persist:root:<tenantId>"): el carrito, la sesión y la sucursal de una
+// tienda no se rehidratan en otra en el mismo navegador. El tenant queda fijo por carga de página.
 const persistConfig = {
-    key: 'root',
+    key: tenantScopedKey('root'),
     storage,
     whitelist: ["cart", "auth", "branch"],
 }

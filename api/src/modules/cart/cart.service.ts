@@ -6,6 +6,7 @@ import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { BranchesService } from '../branches/branches.service';
 import { InventoryService } from '../branches/inventory.service';
 import { calculateTotals, getBranchPrice, getEmployeeDiscountPercent } from '../../common/utils/pricing';
+import { currentLanguage, localizeProductRow } from '../products/product-translations';
 
 @Injectable()
 export class CartService {
@@ -53,8 +54,12 @@ export class CartService {
       ? await this.inventoryService.getInventoryMap(cart.cartItems.map((item) => item.productId), branchId)
       : {};
 
+    // El producto sale con name/description en el idioma del request (Accept-Language); el precio
+    // se calcula con la fila original, que es la misma salvo esos textos
+    const language = currentLanguage();
     const cartItems = cart.cartItems.map((item) => ({
       ...item,
+      product: localizeProductRow(item.product, language),
       unitPrice: getBranchPrice(item.product, inventoryMap[item.productId]),
     }));
 

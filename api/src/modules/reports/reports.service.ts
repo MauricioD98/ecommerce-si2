@@ -14,6 +14,7 @@ import { DynamicReportResultDto, SalesOverviewDto, TopProductDto } from './dto/r
 import { validateGeneratedSql } from './sql-guard';
 import { buildSystemPrompt } from './report-prompt';
 import { hasAllBranches } from '../../common/utils/permission.util';
+import { reportingRoleOf, reportingSchemaOf, requireTenant, tenantSchemaSql } from '../../tenancy/tenant-context';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 
 // Pedidos cuyo pago ya se confirmó
@@ -58,7 +59,7 @@ export class ReportsService {
         SELECT to_char(date_trunc('day', "createdAt"), 'YYYY-MM-DD') AS date,
                COALESCE(SUM("totalAmount"), 0)::float AS revenue,
                COUNT(*)::int AS orders
-        FROM orders
+        FROM ${tenantSchemaSql()}.orders
         WHERE "status"::text IN (${Prisma.join(PAID_STATUSES)})
           AND "createdAt" >= ${from} AND "createdAt" <= ${to}
           ${branchId ? Prisma.sql`AND "branchId" = ${branchId}` : Prisma.empty}
@@ -98,9 +99,9 @@ export class ReportsService {
       SELECT p."id" AS "productId", p."name", p."sku",
              SUM(oi."quantity")::int AS units,
              COALESCE(SUM(oi."quantity" * oi."price"), 0)::float AS revenue
-      FROM order_items oi
-      JOIN orders o ON o."id" = oi."orderId"
-      JOIN products p ON p."id" = oi."productId"
+      FROM ${tenantSchemaSql()}.order_items oi
+      JOIN ${tenantSchemaSql()}.orders o ON o."id" = oi."orderId"
+      JOIN ${tenantSchemaSql()}.products p ON p."id" = oi."productId"
       WHERE o."status"::text IN (${Prisma.join(PAID_STATUSES)})
         AND o."createdAt" >= ${from} AND o."createdAt" <= ${to}
         ${branchId ? Prisma.sql`AND o."branchId" = ${branchId}` : Prisma.empty}
@@ -174,16 +175,22 @@ export class ReportsService {
     }
   }
 
-  // Ejecuta el SQL ya validado con un rol que SOLO puede leer las vistas del esquema "reporting".
-  // Las vistas filtran por sucursal según app.branch_id ('*' = todas), que se fija aquí y no puede cambiarse
-  // desde la consulta (set_config no está permitido por el validador).
+  // Ejecuta el SQL ya validado con el rol de reportes DE ESTA TIENDA, que SOLO puede leer las vistas
+  // de "<schema_tienda>_reporting" (ver migración 20261024120000_tenant_scoped_reporting). Así el
+  // aislamiento entre tiendas no depende del validador: si la IA nombrara las vistas de otra tienda,
+  // PostgreSQL responde "permission denied". Las vistas filtran por sucursal según app.branch_id
+  // ('*' = todas), que se fija aquí y no puede cambiarse desde la consulta (set_config está bloqueado).
+  // Todo es SET LOCAL dentro de la transacción: con el pooler de Neon nada sobrevive al COMMIT.
   private async executeReadOnly(scope: string, safeSql: string): Promise<Record<string, unknown>[]> {
+    const { schemaName } = requireTenant();
+    const reportingSchema = `"${reportingSchemaOf(schemaName)}"`;
+    const reportingRole = `"${reportingRoleOf(schemaName)}"`;
     try {
       const rows = await this.prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
         await tx.$queryRaw`SELECT set_config('app.branch_id', ${scope}, true)`;
-        await tx.$executeRawUnsafe('SET LOCAL ROLE storefront_reports');
-        await tx.$executeRawUnsafe('SET LOCAL search_path = reporting');
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ${reportingRole}`);
+        await tx.$executeRawUnsafe(`SET LOCAL search_path = ${reportingSchema}`);
         await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = '${DYNAMIC_TIMEOUT}'`);
 
         // La consulta va como subconsulta para limitar siempre el número de filas

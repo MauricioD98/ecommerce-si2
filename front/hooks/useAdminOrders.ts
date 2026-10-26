@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { OrderService } from "@/service/api/order.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { AdminOrder, OrderStatus } from "@/types/admin.types";
@@ -7,6 +8,7 @@ const PAGE_SIZE = 10;
 
 // Pedidos del panel admin, paginados (el backend filtra por sucursal para ADMIN_SUCURSAL)
 export function useAdminOrders(page: number) {
+    const t = useTranslations("AdminErrors");
     const [orders, setOrders] = useState<AdminOrder[]>([]);
     const [total, setTotal] = useState(0);
     const [loadedPage, setLoadedPage] = useState<number | null>(null);
@@ -23,7 +25,7 @@ export function useAdminOrders(page: number) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar los pedidos."));
+                if (active) setError(getApiErrorMessage(error, t("orders")));
             })
             .finally(() => {
                 if (active) setLoadedPage(page);

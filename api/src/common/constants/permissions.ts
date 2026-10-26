@@ -23,3 +23,29 @@ export const ALL_PERMISSIONS: PermissionValue[] = Object.values(Permission);
 export const SUPER_ADMIN_ROLE = 'Super Admin';
 export const DEFAULT_ROLE = 'Cliente';
 export const BASE_ROLE_NAMES = [SUPER_ADMIN_ROLE, 'Admin Sucursal', 'Empleado', DEFAULT_ROLE];
+
+// Roles base con sus permisos: los crea TenantProvisioningService en cada tienda nueva.
+// prisma/seed.mjs (JS plano, no puede importar este archivo) tiene una copia: mantener ambas iguales.
+export const BASE_ROLES: { name: string; description: string; permissions: PermissionValue[] }[] = [
+  { name: SUPER_ADMIN_ROLE, description: 'Acceso total al sistema', permissions: ALL_PERMISSIONS },
+  {
+    name: 'Admin Sucursal',
+    description: 'Gestiona empleados, inventario y pedidos de su sucursal',
+    permissions: [
+      Permission.MANAGE_USERS,
+      Permission.MANAGE_INVENTORY,
+      Permission.MANAGE_PRODUCTS,
+      Permission.VIEW_ORDERS,
+      Permission.SEND_MARKETING,
+      Permission.VIEW_REPORTS,
+      Permission.USE_POS,
+      Permission.PROCESS_RETURNS,
+    ],
+  },
+  {
+    name: 'Empleado',
+    description: 'Personal de una sucursal (puede cobrar en caja y recibir devoluciones)',
+    permissions: [Permission.USE_POS, Permission.PROCESS_RETURNS],
+  },
+  { name: DEFAULT_ROLE, description: 'Cliente de la tienda', permissions: [] },
+];

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useTranslations } from "next-intl";
 
 // La Web Speech API no viene en los tipos de TypeScript: se declara solo lo que se usa
 interface SpeechRecognitionAlternativeLike {
@@ -41,19 +42,15 @@ const getRecognitionConstructor = (): SpeechRecognitionConstructor | null => {
     return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 };
 
-// Mensajes en español para los códigos de error de la API
-const ERROR_MESSAGES: Record<string, string> = {
-    "not-allowed": "Permiso de micrófono denegado. Actívalo en la configuración del navegador.",
-    "service-not-allowed": "El navegador no permite el reconocimiento de voz en este sitio.",
-    "audio-capture": "No se encontró ningún micrófono.",
-    "no-speech": "No se escuchó nada. Inténtalo de nuevo.",
-    network: "No se pudo conectar con el servicio de reconocimiento de voz.",
-};
+// Códigos de error de la API con mensaje propio (Reports.speech.<código>); el resto usa "generic"
+const KNOWN_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture", "no-speech", "network"] as const;
+type KnownError = (typeof KNOWN_ERRORS)[number];
+const isKnownError = (code: string): code is KnownError => (KNOWN_ERRORS as readonly string[]).includes(code);
 
 const subscribeNoop = () => () => {};
 
 interface UseSpeechRecognitionOptions {
-    // es-BO: español de Bolivia (si el navegador no lo reconoce usa el español general)
+    // Etiqueta BCP 47 (es-BO, en-US…); si el navegador no reconoce la región usa el idioma general
     lang?: string;
     // Se llama con el texto completo (lo que ya había + lo dictado) cada vez que llega una transcripción
     onText: (text: string) => void;
@@ -70,6 +67,7 @@ export function useSpeechRecognition({ lang = "es-BO", onText }: UseSpeechRecogn
     );
 
     const [isListening, setIsListening] = useState(false);
+    const t = useTranslations("Reports.speech");
     const [error, setError] = useState<string | null>(null);
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
     const onTextRef = useRef(onText);
@@ -94,7 +92,7 @@ export function useSpeechRecognition({ lang = "es-BO", onText }: UseSpeechRecogn
         (baseText: string) => {
             const Recognition = getRecognitionConstructor();
             if (!Recognition) {
-                setError("Tu navegador no permite el dictado por voz. Usa Chrome, Edge o Safari.");
+                setError(t("unsupported"));
                 return;
             }
 
@@ -117,7 +115,7 @@ export function useSpeechRecognition({ lang = "es-BO", onText }: UseSpeechRecogn
             recognition.onerror = (event) => {
                 // "aborted" ocurre al cortar a propósito: no es un error para el usuario
                 if (event.error !== "aborted") {
-                    setError(ERROR_MESSAGES[event.error] ?? "No se pudo usar el micrófono.");
+                    setError(isKnownError(event.error) ? t(event.error) : t("generic"));
                 }
             };
 
@@ -134,10 +132,10 @@ export function useSpeechRecognition({ lang = "es-BO", onText }: UseSpeechRecogn
                 setIsListening(true);
             } catch {
                 // start() lanza si ya había una sesión activa
-                setError("No se pudo iniciar el micrófono. Inténtalo de nuevo.");
+                setError(t("startFailed"));
             }
         },
-        [lang]
+        [lang, t]
     );
 
     const toggle = useCallback(

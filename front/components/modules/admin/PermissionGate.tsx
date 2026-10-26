@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { PermissionValue } from '@/utils/permissions';
@@ -15,12 +16,13 @@ export default function PermissionGate({
     children: React.ReactNode;
 }) {
     const { can } = useAdminRole();
+    const t = useTranslations('AdminShell');
 
     if (!can(permission)) {
         return (
             <div className={styles.page}>
                 <div className={styles.errorMessage}>
-                    No tienes permiso para ver esta sección. <Link href="/admin">Volver al panel</Link>
+                    {t('noPermission')} <Link href="/admin">{t('backToPanel')}</Link>
                 </div>
             </div>
         );

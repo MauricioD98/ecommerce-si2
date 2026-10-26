@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useOfflineOrderSync } from '@/hooks/useOfflineOrderSync';
 import { useRegisterServiceWorker } from '@/hooks/useRegisterServiceWorker';
 import styles from './offline-sync.module.scss';
@@ -13,6 +14,7 @@ import styles from './offline-sync.module.scss';
 export default function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
     useRegisterServiceWorker();
     const { pendingCount, isSyncing, lastSyncError, syncNow } = useOfflineOrderSync();
+    const t = useTranslations('Offline');
 
     return (
         <>
@@ -30,12 +32,12 @@ export default function OfflineSyncProvider({ children }: { children: React.Reac
                         {lastSyncError
                             ? lastSyncError
                             : isSyncing
-                                ? 'Enviando pedidos guardados...'
-                                : `${pendingCount} pedido${pendingCount === 1 ? '' : 's'} guardado${pendingCount === 1 ? '' : 's'} en este dispositivo, pendiente${pendingCount === 1 ? '' : 's'} de enviar.`}
+                                ? t('sending')
+                                : t('pendingOrders', { count: pendingCount })}
                     </span>
                     {!isSyncing && (
                         <button type="button" onClick={() => syncNow()}>
-                            Reintentar
+                            {t('retry')}
                         </button>
                     )}
                 </div>

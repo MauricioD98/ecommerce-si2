@@ -1,0 +1,41 @@
+{
+  "status": {
+    "400": "请求无效",
+    "401": "未授权",
+    "403": "你没有执行此操作的权限",
+    "404": "未找到资源",
+    "409": "与资源当前状态冲突",
+    "429": "请求过于频繁，请几分钟后再试",
+    "500": "服务器内部错误",
+    "502": "与外部服务通信时出错",
+    "503": "服务暂不可用，请稍后再试"
+  },
+  "EMAIL_TAKEN": "该邮箱已被注册",
+  "REGISTER_FAILED": "注册过程中发生错误",
+  "USER_NOT_FOUND": "未找到用户",
+  "INVALID_CREDENTIALS": "邮箱或密码无效",
+  "TOO_MANY_ATTEMPTS": {
+    "other": "失败次数过多，请在 {count} 分钟后重试"
+  },
+  "ACCOUNT_LOCKED": "失败次数过多，你的账户已被锁定 5 分钟",
+  "PRODUCT_NOT_FOUND": "未找到商品",
+  "SKU_TAKEN": "SKU 为 {sku} 的商品已存在",
+  "CATEGORY_NOT_FOUND": "分类“{id}”不存在",
+  "USER_WITHOUT_BRANCH": "该用户未分配到任何门店",
+  "PLAN_UNAVAILABLE": "该套餐目前不可用",
+  "OWNER_EMAIL_TAKEN": "该邮箱已在管理一家店铺。请使用其他邮箱或联系我们。",
+  "DOMAIN_TAKEN": "该域名已关联到其他店铺",
+  "PAYMENT_URL_MISSING": "Stripe 未返回付款链接",
+  "CHECKOUT_NOT_FOUND": "未找到该笔付款",
+  "SIGNUP_NOT_FOUND": "未找到该申请",
+  "SIGNUP_NOT_PAID": "该申请尚未付款",
+  "SIGNUP_IN_PROGRESS": "店铺已创建或正在创建中",
+  "CONTACT_SEND_FAILED": "无法发送你的留言，请稍后再试。",
+  "TENANT_NOT_FOUND": "未找到店铺",
+  "SUBSCRIPTION_ALREADY_ACTIVE": "您的店铺已有有效订阅。请使用“管理订阅”更换套餐或取消。",
+  "NO_BILLING_ACCOUNT": "您的店铺尚未在 Stripe 上订阅",
+  "BILLING_OWNER_ONLY": "只有店铺的超级管理员可以管理订阅",
+  "CONNECT_NOT_ENABLED": "你的 Stripe 账户尚未启用 Connect。请在 Stripe 控制台（Connect → 开始使用）中启用后重试。",
+  "ROLE_PERMISSIONS_EXCEED": "你不能授予自己角色没有的权限：{permissions}",
+  "ROLE_TOO_POWERFUL": "你不能编辑权限比你更多的角色"
+}

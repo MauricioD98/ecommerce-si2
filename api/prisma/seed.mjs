@@ -1,12 +1,23 @@
-// Datos iniciales de desarrollo: administrador, categorías y ropa femenina de prueba.
-// Es idempotente (usa upsert), se puede ejecutar varias veces:  npm run seed
+// Datos iniciales de DESARROLLO: administradores demo (contraseñas fijas de abajo), categorías y
+// ropa femenina de prueba. Es idempotente (usa upsert), se puede ejecutar varias veces.
+//
+// Multitenant: siembra UN schema de tienda, nunca "public" (es el plano de control):
+//   TENANT_SCHEMA=tenant_legacy npm run seed
+// Las tiendas creadas desde la plataforma ya nacen con roles y Super Admin (TenantProvisioningService);
+// este seed solo agrega datos demo. No correrlo contra tiendas reales en producción.
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
 
+const TENANT_SCHEMA = process.env.TENANT_SCHEMA;
+if (!TENANT_SCHEMA || !/^tenant_(?:[a-f0-9]{32}|legacy)$/.test(TENANT_SCHEMA)) {
+  console.error('Definí TENANT_SCHEMA (p. ej. TENANT_SCHEMA=tenant_legacy npm run seed)');
+  process.exit(1);
+}
+
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }, { schema: TENANT_SCHEMA }),
 });
 
 const img = (id) => `https://images.unsplash.com/photo-${id}?w=800&q=80`;
@@ -47,7 +58,7 @@ const BRANCHES = [
   },
 ];
 
-// Roles base con sus permisos (espejo de api/src/common/constants/permissions.ts).
+// Roles base con sus permisos (espejo de BASE_ROLES en api/src/common/constants/permissions.ts).
 // Se sincronizan en cada ejecución; los roles creados desde el panel no se tocan.
 const ALL_PERMISSIONS = [
   'MANAGE_BRANCHES',

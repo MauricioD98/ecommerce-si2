@@ -2,12 +2,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, MapPin } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './branch-selector.module.scss';
 import { useBranches } from '@/hooks/useBranches';
 
 export default function BranchSelector() {
     const { branches, selectedBranch, selectedBranchId, selectBranch, isLoading, error } = useBranches();
     const [open, setOpen] = useState(false);
+    const t = useTranslations('Store.branch');
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Cierra el menú al hacer clic fuera o con Escape
@@ -45,19 +47,19 @@ export default function BranchSelector() {
             >
                 <MapPin size={16} />
                 <span className={styles.triggerLabel}>
-                    {selectedBranch ? selectedBranch.name : 'Elegir sucursal'}
+                    {selectedBranch ? selectedBranch.name : t('choose')}
                 </span>
                 <ChevronDown size={16} className={open ? styles.chevronOpen : ''} />
             </button>
 
             {open && (
-                <div className={styles.menu} role="listbox" aria-label="Sucursales">
-                    <p className={styles.menuTitle}>¿En qué sucursal vas a comprar?</p>
+                <div className={styles.menu} role="listbox" aria-label={t('menuLabel')}>
+                    <p className={styles.menuTitle}>{t('question')}</p>
 
-                    {isLoading && <p className={styles.message}>Cargando sucursales...</p>}
+                    {isLoading && <p className={styles.message}>{t('loading')}</p>}
                     {error && <p className={styles.messageError}>{error}</p>}
                     {!isLoading && !error && branches.length === 0 && (
-                        <p className={styles.message}>No hay sucursales disponibles.</p>
+                        <p className={styles.message}>{t('empty')}</p>
                     )}
 
                     {(branches || []).map((branch) => (

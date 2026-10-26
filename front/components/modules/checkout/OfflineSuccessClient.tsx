@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { CloudOff } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import styles from './checkout.module.scss';
 
@@ -10,6 +11,7 @@ import styles from './checkout.module.scss';
 // useOfflineOrderSync (montado en OfflineSyncProvider) apenas vuelva la conexión.
 export default function OfflineSuccessClient() {
     const router = useRouter();
+    const t = useTranslations('Checkout');
     const [countdown, setCountdown] = useState<number>(4);
 
     useEffect(() => {
@@ -35,16 +37,15 @@ export default function OfflineSuccessClient() {
                         <div className={styles.successIcon}>
                             <CloudOff size={56} strokeWidth={2.5} />
                         </div>
-                        <h2>¡Pedido guardado en tu dispositivo!</h2>
+                        <h2>{t('offlineSuccess.title')}</h2>
                         <p className={styles.orderId}>
-                            Se enviará automáticamente cuando recuperes la conexión a Internet. No hace falta que
-                            hagas nada más: podés cerrar la app tranquilo.
+                            {t('offlineSuccess.description')}
                         </p>
                         <p style={{ marginTop: '0.75rem', marginBottom: '1.25rem', color: '#6b7280', fontSize: '0.95rem' }}>
-                            Redirigiendo a la tienda en {countdown} segundos...
+                            {t('success.redirecting', { seconds: countdown })}
                         </p>
                         <button type="button" className={styles.continueButton} onClick={() => router.push('/')}>
-                            Volver a la tienda
+                            {t('success.backToStore')}
                         </button>
                     </div>
                 </div>

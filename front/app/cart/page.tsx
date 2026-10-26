@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import CartClient from "@/components/modules/cart/CartClient";
 import Footer from "@/components/modules/landing/Footer";
 import Header from "@/components/modules/landing/Header";
@@ -15,12 +17,10 @@ export default function pago() {
     )
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Carrito de compras",
-        description: "Revisa los productos de tu carrito",
-        icons: {
-            icon: '/path to asset file',
-        }
-    }
+        title: t("cartTitle"),
+        description: t("cartDescription"),
+    };
 }

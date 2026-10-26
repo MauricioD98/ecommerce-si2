@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PLACEHOLDER_IMAGE } from '@/service/api/product.service';
 import { CategoryOption, ProductPayload } from '@/types/admin.types';
-import { Product } from '@/types/product.types';
+import { Product, ProductTranslationLanguage, ProductTranslations } from '@/types/product.types';
 import { Branch } from '@/types/branch.types';
 import { CollectionOption } from '@/types/collection.types';
 
 // Mismas tallas que acepta el backend (enum WomenSize)
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+// Idiomas a los que se traduce el catálogo (etiqueta: AdminProducts.form.languages.<código>).
+// El español es el Nombre/Descripción de arriba.
+const TRANSLATION_LANGUAGES: ProductTranslationLanguage[] = ['en', 'fr', 'zh'];
 
 interface ProductFormModalProps {
     product?: Product;
@@ -28,8 +33,14 @@ interface ProductFormModalProps {
 }
 
 export default function ProductFormModal({ product, categories, collections, isGlobal, ownBranchName, branches, onClose, onSubmit }: ProductFormModalProps) {
-    const [name, setName] = useState(product?.name ?? '');
-    const [description, setDescription] = useState(product?.description ?? '');
+    const t = useTranslations('AdminProducts');
+    const tc = useTranslations('AdminCommon');
+    // base*: el texto en español sin traducir. product.name ya viene en el idioma de quien navega y,
+    // si se usara acá, guardar pisaría el español con ese idioma.
+    const [name, setName] = useState(product?.baseName ?? product?.name ?? '');
+    const [description, setDescription] = useState(product?.baseDescription ?? product?.description ?? '');
+    const [translations, setTranslations] = useState<ProductTranslations>(product?.translations ?? {});
+    const [translationLanguage, setTranslationLanguage] = useState<ProductTranslationLanguage>('en');
     const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
     const [sku, setSku] = useState(product?.sku ?? '');
     const [price, setPrice] = useState(product ? String(product.price) : '');
@@ -49,19 +60,29 @@ export default function ProductFormModal({ product, categories, collections, isG
         setSizes((prev) => (prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size]));
     };
 
+    const updateTranslation = (field: 'name' | 'description', value: string) => {
+        setTranslations((prev) => ({
+            ...prev,
+            [translationLanguage]: { ...prev[translationLanguage], [field]: value },
+        }));
+    };
+
+    // Un idioma "traducido" para el indicador de las pestañas: con al menos el nombre cargado
+    const isTranslated = (code: ProductTranslationLanguage) => !!translations[code]?.name?.trim();
+
     const toggleCollection = (collectionId: string) => {
         setCollectionIds((prev) => (prev.includes(collectionId) ? prev.filter((id) => id !== collectionId) : [...prev, collectionId]));
     };
 
     const validate = (): string | null => {
-        if (!name.trim()) return 'El nombre es obligatorio.';
-        if (!categoryId) return 'Selecciona una categoría.';
-        if (!sku.trim()) return 'El SKU es obligatorio.';
+        if (!name.trim()) return t('form.errors.name');
+        if (!categoryId) return t('form.errors.category');
+        if (!sku.trim()) return t('form.errors.sku');
         const priceValue = Number(price);
-        if (price.trim() === '' || Number.isNaN(priceValue) || priceValue < 0) return 'Ingresa un precio válido.';
-        if (!/^\d+(\.\d{1,2})?$/.test(price.trim())) return 'El precio admite hasta 2 decimales.';
-        if (sizes.length === 0) return 'Selecciona al menos una talla.';
-        if (imageUrl.trim() && !/^https?:\/\//i.test(imageUrl.trim())) return 'La imagen debe ser una URL que empiece con http:// o https://';
+        if (price.trim() === '' || Number.isNaN(priceValue) || priceValue < 0) return t('form.errors.price');
+        if (!/^\d+(\.\d{1,2})?$/.test(price.trim())) return t('form.errors.priceDecimals');
+        if (sizes.length === 0) return t('form.errors.sizes');
+        if (imageUrl.trim() && !/^https?:\/\//i.test(imageUrl.trim())) return t('form.errors.imageUrl');
         return null;
     };
 
@@ -86,13 +107,15 @@ export default function ProductFormModal({ product, categories, collections, isG
                 imageUrl: imageUrl.trim(),
                 isActive,
                 collectionIds,
+                // El backend recorta espacios y descarta los idiomas vacíos
+                translations,
                 // Sin alcance global no se manda: el backend fuerza la sucursal propia igual, pero
                 // así el payload no sugiere una opción que la UI ni siquiera mostró
                 ...(isGlobal ? { branchId: branchId || null } : {}),
             });
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar el producto.'));
+            setError(getApiErrorMessage(error, t('form.saveFailed')));
             setIsSaving(false);
         }
     };
@@ -100,20 +123,18 @@ export default function ProductFormModal({ product, categories, collections, isG
     const showPreview = imageUrl.trim() && /^https?:\/\//i.test(imageUrl.trim()) && !previewFailed;
 
     return (
-        <AdminModal title={product ? 'Editar producto' : 'Nuevo producto'} onClose={onClose}>
+        <AdminModal title={product ? t('form.editTitle') : t('form.newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
                 {!product && (
                     <p className={styles.cellSub}>
-                        {isGlobal
-                            ? 'El producto nace con stock 0 en la(s) sucursal(es) donde quede disponible. Asígnale stock desde Inventario.'
-                            : 'Este producto quedará disponible solo en tu sucursal. Nace con stock 0: asígnale stock desde Inventario.'}
+                        {isGlobal ? t('form.newGlobalHint') : t('form.newBranchHint')}
                     </p>
                 )}
 
                 <div className={styles.field}>
-                    <label htmlFor="product-branch">Sucursal</label>
+                    <label htmlFor="product-branch">{tc('branch')}</label>
                     {isGlobal ? (
                         <select
                             id="product-branch"
@@ -121,39 +142,79 @@ export default function ProductFormModal({ product, categories, collections, isG
                             value={branchId}
                             onChange={(e) => setBranchId(e.target.value)}
                         >
-                            <option value="">Global (disponible en todas las sucursales)</option>
+                            <option value="">{t('form.global')}</option>
                             {branches.map((branch) => (
                                 <option key={branch.id} value={branch.id}>{branch.name}</option>
                             ))}
                         </select>
                     ) : (
                         <p className={styles.cellSub}>
-                            Creando producto para: <strong>{ownBranchName ?? 'tu sucursal'}</strong>
+                            {t.rich('form.creatingFor', { branch: ownBranchName ?? t('yourBranch'), strong: (chunks) => <strong>{chunks}</strong> })}
                         </p>
                     )}
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="product-name">Nombre</label>
-                    <input id="product-name" className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} placeholder="Vestido largo rojo de fiesta" />
+                    <label htmlFor="product-name">{tc('name')}</label>
+                    <input id="product-name" className={styles.input} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} placeholder={t('form.namePlaceholder')} />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="product-description">Descripción</label>
+                    <label htmlFor="product-description">{tc('description')}</label>
                     <textarea
                         id="product-description"
                         className={`${styles.input} ${styles.textareaSmall}`}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Material, corte, ocasión de uso..."
+                        placeholder={t('form.descriptionPlaceholder')}
                     />
                 </div>
 
+                <fieldset className={styles.field}>
+                    <legend>{t('form.translations')}</legend>
+                    <small className={styles.cellSub}>{t('form.translationsHint')}</small>
+                    <div className={styles.badgeList} role="tablist" aria-label={t('form.translationLanguage')}>
+                        {TRANSLATION_LANGUAGES.map((code) => (
+                            <button
+                                key={code}
+                                type="button"
+                                role="tab"
+                                aria-selected={translationLanguage === code}
+                                className={`${styles.sizeChip} ${translationLanguage === code ? styles.sizeChipActive : ''}`}
+                                onClick={() => setTranslationLanguage(code)}
+                            >
+                                {t(`form.languages.${code}`)}
+                                {isTranslated(code) ? ' ✓' : ''}
+                            </button>
+                        ))}
+                    </div>
+                    <label htmlFor="product-translation-name">{t('form.translatedName', { lang: translationLanguage.toUpperCase() })}</label>
+                    <input
+                        id="product-translation-name"
+                        className={styles.input}
+                        lang={translationLanguage}
+                        value={translations[translationLanguage]?.name ?? ''}
+                        onChange={(e) => updateTranslation('name', e.target.value)}
+                        maxLength={200}
+                        placeholder={name || t('form.translatedNamePlaceholder')}
+                    />
+                    <label htmlFor="product-translation-description">{t('form.translatedDescription', { lang: translationLanguage.toUpperCase() })}</label>
+                    <textarea
+                        id="product-translation-description"
+                        className={`${styles.input} ${styles.textareaSmall}`}
+                        lang={translationLanguage}
+                        value={translations[translationLanguage]?.description ?? ''}
+                        onChange={(e) => updateTranslation('description', e.target.value)}
+                        maxLength={5000}
+                        placeholder={description || t('form.translatedDescriptionPlaceholder')}
+                    />
+                </fieldset>
+
                 <div className={styles.formRow}>
                     <div className={styles.field}>
-                        <label htmlFor="product-category">Categoría</label>
+                        <label htmlFor="product-category">{t('category')}</label>
                         <select id="product-category" className={styles.input} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-                            <option value="">Selecciona una categoría</option>
+                            <option value="">{t('form.selectCategory')}</option>
                             {categories.map((category) => (
                                 <option key={category.id} value={category.id}>{category.name}</option>
                             ))}
@@ -167,13 +228,13 @@ export default function ProductFormModal({ product, categories, collections, isG
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="product-price">Precio</label>
+                    <label htmlFor="product-price">{t('price')}</label>
                     <input id="product-price" type="number" min={0} step="0.01" className={styles.input} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="129.90" />
                 </div>
 
                 <div className={styles.field}>
-                    <label>Tallas</label>
-                    <div className={styles.badgeList} role="group" aria-label="Tallas disponibles">
+                    <label>{t('sizes')}</label>
+                    <div className={styles.badgeList} role="group" aria-label={t('form.sizesLabel')}>
                         {SIZE_OPTIONS.map((size) => (
                             <button
                                 key={size}
@@ -189,13 +250,11 @@ export default function ProductFormModal({ product, categories, collections, isG
                 </div>
 
                 <div className={styles.field}>
-                    <label>Colecciones (opcional)</label>
+                    <label>{t('form.collections')}</label>
                     {collections.length === 0 ? (
-                        <small className={styles.cellSub}>
-                            Todavía no hay colecciones creadas. Andá a Colecciones para crear la primera.
-                        </small>
+                        <small className={styles.cellSub}>{t('form.noCollections')}</small>
                     ) : (
-                        <div className={styles.badgeList} role="group" aria-label="Colecciones del producto">
+                        <div className={styles.badgeList} role="group" aria-label={t('form.collectionsLabel')}>
                             {collections.map((collection) => (
                                 <button
                                     key={collection.id}
@@ -212,7 +271,7 @@ export default function ProductFormModal({ product, categories, collections, isG
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="product-image">Imagen (URL)</label>
+                    <label htmlFor="product-image">{t('form.image')}</label>
                     <input
                         id="product-image"
                         className={styles.input}
@@ -221,31 +280,31 @@ export default function ProductFormModal({ product, categories, collections, isG
                             setImageUrl(e.target.value);
                             setPreviewFailed(false);
                         }}
-                        placeholder="https://ejemplo.com/imagen.jpg"
+                        placeholder={t('form.imagePlaceholder')}
                     />
                     {showPreview && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                             src={imageUrl.trim()}
-                            alt="Vista previa"
+                            alt={t('form.preview')}
                             className={styles.imagePreview}
                             onError={() => setPreviewFailed(true)}
                         />
                     )}
-                    {previewFailed && <small>No se pudo cargar la imagen. Revisa la URL.</small>}
+                    {previewFailed && <small>{t('form.previewFailed')}</small>}
                 </div>
 
                 <label className={styles.checkbox}>
                     <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                    Producto activo (visible en la tienda)
+                    {t('form.active')}
                 </label>
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import AccountClient from "@/components/modules/account/AccountClient";
 import Footer from "@/components/modules/landing/Footer";
 import Header from "@/components/modules/landing/Header";
@@ -15,9 +17,10 @@ export default function page() {
     );
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Mi cuenta | Stella Femme",
-        description: "Gestiona tus datos personales, tu sucursal favorita y tus direcciones de entrega",
+        title: t("accountTitle"),
+        description: t("accountDescription"),
     };
 }

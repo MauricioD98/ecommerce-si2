@@ -9,7 +9,9 @@
 // nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
 // (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
 
-const CACHE_VERSION = 'v7';
+// v8: las respuestas de la API se cachean por tienda (apiCacheKey). Subir la versión hace que el
+// activate borre sf-api-v7, cuyas entradas no tenían tienda y podían servirse en otra.
+const CACHE_VERSION = 'v8';
 const API_CACHE = `sf-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;
@@ -66,18 +68,36 @@ function controlledFailureResponse() {
   });
 }
 
+// La Cache API indexa solo por URL (y ignoreVary descarta Vary), así que dos tiendas que piden la
+// misma URL de la API (/api/v1/products) compartirían la entrada. La clave real de caché agrega la
+// tienda del header x-tenant-id como query param ficticio; nunca se envía a la red.
+// Lo mismo con el idioma (Accept-Language): la API devuelve el catálogo traducido, y sin esto, offline
+// se serviría la versión del último idioma usado aunque el usuario haya cambiado a otro.
+// Sin tienda → null → la respuesta no se cachea ni se sirve desde caché.
+function apiCacheKey(request) {
+  const tenantId = request.headers.get('x-tenant-id');
+  if (!tenantId) return null;
+  const url = new URL(request.url);
+  url.searchParams.set('__sf_tenant', tenantId.toLowerCase());
+  const lang = (request.headers.get('accept-language') || '').split(',')[0].trim().toLowerCase();
+  if (lang) url.searchParams.set('__sf_lang', lang);
+  return url.toString();
+}
+
 // NetworkFirst: intenta la red primero (datos frescos de stock/precios); si falla la red (offline),
 // cae a la última copia en caché para mantener la app utilizable sin conexión.
-async function networkFirst(request, cacheName, onMiss) {
+// cacheKey: clave alternativa para la caché (ver apiCacheKey); undefined = la propia request,
+// null = no cachear.
+async function networkFirst(request, cacheName, onMiss, cacheKey = request) {
   const cache = await caches.open(cacheName);
   try {
     const response = await fetch(request, { cache: 'no-cache' });
-    if (response && (response.ok || response.type === 'opaque')) {
-      cache.put(request, response.clone());
+    if (cacheKey && response && (response.ok || response.type === 'opaque')) {
+      cache.put(cacheKey, response.clone());
     }
     return response;
   } catch {
-    const cached = await cache.match(request, { ignoreVary: true });
+    const cached = cacheKey ? await cache.match(cacheKey, { ignoreVary: true }) : undefined;
     if (cached) return cached;
     return onMiss ? onMiss() : Response.error();
   }
@@ -141,7 +161,7 @@ self.addEventListener('fetch', (event) => {
 
   // Toda la API (catálogo, perfil, pedidos, sucursales...): puede ser cross-origin
   if (url.pathname.startsWith('/api/v1/')) {
-    event.respondWith(networkFirst(request, API_CACHE));
+    event.respondWith(networkFirst(request, API_CACHE, undefined, apiCacheKey(request)));
     return;
   }
 

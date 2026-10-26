@@ -137,6 +137,11 @@
     white-space: nowrap;
 }
 
+// Selector de idioma en el pie del sidebar: ancho de su contenido, no de toda la columna
+.languageSwitcher {
+    align-self: flex-start;
+}
+
 .footerButton {
     display: flex;
     align-items: center;

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MapPin, Package, UserRound } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './account.module.scss';
 import { useAuth } from '@/hooks/useAuth';
 import ProfileTab from './ProfileTab';
@@ -13,10 +14,11 @@ import PushNotificationsCard from './PushNotificationsCard';
 
 type TabId = 'profile' | 'addresses' | 'orders';
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: 'profile', label: 'Mi perfil', icon: <UserRound size={18} /> },
-    { id: 'orders', label: 'Mis pedidos', icon: <Package size={18} /> },
-    { id: 'addresses', label: 'Mis direcciones', icon: <MapPin size={18} /> },
+// La etiqueta es la clave Account.tabs.<id> en messages/<idioma>.json
+const TABS: { id: TabId; icon: React.ReactNode }[] = [
+    { id: 'profile', icon: <UserRound size={18} /> },
+    { id: 'orders', icon: <Package size={18} /> },
+    { id: 'addresses', icon: <MapPin size={18} /> },
 ];
 
 // "Mi cuenta": panel del cliente con menú lateral (pestañas arriba en móvil)
@@ -24,6 +26,7 @@ export default function AccountClient() {
     const { isAuthenticated, user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const t = useTranslations('Account');
     const initialTab = (searchParams.get('tab') as TabId | null);
     const [tab, setTab] = useState<TabId>(initialTab && TABS.some((t) => t.id === initialTab) ? initialTab : 'profile');
 
@@ -51,7 +54,7 @@ export default function AccountClient() {
                         </div>
                     </div>
 
-                    <nav className={styles.tabs} role="tablist" aria-label="Secciones de mi cuenta">
+                    <nav className={styles.tabs} role="tablist" aria-label={t('tabsLabel')}>
                         {TABS.map((item) => (
                             <button
                                 key={item.id}
@@ -62,7 +65,7 @@ export default function AccountClient() {
                                 onClick={() => setTab(item.id)}
                             >
                                 {item.icon}
-                                {item.label}
+                                {t(`tabs.${item.id}`)}
                             </button>
                         ))}
                     </nav>

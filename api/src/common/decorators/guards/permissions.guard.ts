@@ -18,8 +18,14 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const { user, tenant } = context.switchToHttp().getRequest();
     if (!user?.role) {
+      return false;
+    }
+    // JwtStrategy ya lo exige; se repite acá porque este guard es el que habilita los permisos
+    // físicos (USE_POS, PROCESS_RETURNS): ninguno se concede fuera del schema de su tienda,
+    // ni siquiera al Super Admin de otra tienda.
+    if (!tenant || user.tenantId !== tenant.tenantId) {
       return false;
     }
     // Super Admin tiene acceso a todo

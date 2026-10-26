@@ -13,6 +13,18 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
     return output;
 }
 
+// Cada tienda firma sus push con su propio par VAPID, y una suscripción queda atada a la llave
+// pública con la que se creó. En un origen compartido (el host de la plataforma) el navegador tiene
+// UNA sola suscripción: si se creó con la llave de otra tienda (o la tienda regeneró su par), hay que
+// rehacerla, o los push de esta tienda fallarían en silencio (el push service rechaza la firma).
+function isSubscriptionForKey(subscription: PushSubscription, publicKey: string): boolean {
+    const current = subscription.options.applicationServerKey;
+    if (!current) return false;
+    const expected = urlBase64ToUint8Array(publicKey);
+    const actual = new Uint8Array(current);
+    return actual.length === expected.length && actual.every((byte, i) => byte === expected[i]);
+}
+
 // Suscripción del navegador a notificaciones push: pide permiso, registra el Service Worker
 // y envía la suscripción al backend. `isSupported` cubre navegadores/iOS sin Push API
 export function usePushNotifications() {
@@ -31,7 +43,10 @@ export function usePushNotifications() {
 
         navigator.serviceWorker.getRegistration('/sw.js').then(async (registration) => {
             const subscription = await registration?.pushManager.getSubscription();
-            setIsSubscribed(Boolean(subscription));
+            if (!subscription) return setIsSubscribed(false);
+            // Suscrito sí, pero ¿con la llave de ESTA tienda?
+            const publicKey = await pushService.getVapidPublicKey().catch(() => null);
+            setIsSubscribed(Boolean(publicKey && isSubscriptionForKey(subscription, publicKey)));
         });
     }, []);
 
@@ -54,12 +69,15 @@ export function usePushNotifications() {
             const registration = await navigator.serviceWorker.register('/sw.js');
             await navigator.serviceWorker.ready;
 
-            const subscription =
-                (await registration.pushManager.getSubscription()) ??
-                (await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicKey),
-                }));
+            let subscription = await registration.pushManager.getSubscription();
+            if (subscription && !isSubscriptionForKey(subscription, publicKey)) {
+                await subscription.unsubscribe();
+                subscription = null;
+            }
+            subscription ??= await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicKey),
+            });
 
             await pushService.subscribe(subscription.toJSON() as PushSubscriptionJSON);
             setIsSubscribed(true);

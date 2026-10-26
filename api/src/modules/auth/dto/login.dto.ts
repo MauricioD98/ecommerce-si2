@@ -6,8 +6,8 @@ export class LoginDto{
         description:'User email address',
         example:'john.doe@example.com',
     })
-    @IsEmail({},{message:'Por favor ingrese un email valido'})
-    @IsNotEmpty({message:'El Email es un dato requerido'})
+    @IsEmail()
+    @IsNotEmpty()
     email: string;
 
 
@@ -16,6 +16,6 @@ export class LoginDto{
         example: 'StrongP@ssw0rd!',
     })
     @IsString()
-    @IsNotEmpty({message:'La contraseña es un dato requerido'})
+    @IsNotEmpty()
     password: string;
 }

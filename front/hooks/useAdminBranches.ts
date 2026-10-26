@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { BranchService } from "@/service/api/branch.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Branch } from "@/types/branch.types";
@@ -6,6 +7,7 @@ import { BranchPayload } from "@/types/admin.types";
 
 // Sucursales del panel admin (incluye inactivas; ADMIN_SUCURSAL solo recibe la suya)
 export function useAdminBranches() {
+    const t = useTranslations("AdminErrors");
     const [branches, setBranches] = useState<Branch[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export function useAdminBranches() {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar las sucursales."));
+                if (active) setError(getApiErrorMessage(error, t("branches")));
             })
             .finally(() => {
                 if (active) setIsLoading(false);

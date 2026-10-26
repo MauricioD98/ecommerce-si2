@@ -1,0 +1,42 @@
+{
+  "status": {
+    "400": "Invalid request",
+    "401": "Unauthorized",
+    "403": "You don't have permission to perform this action",
+    "404": "Resource not found",
+    "409": "Conflict with the current state of the resource",
+    "429": "Too many requests. Please try again in a few minutes",
+    "500": "Internal server error",
+    "502": "Error communicating with an external service",
+    "503": "Service unavailable. Please try again later"
+  },
+  "EMAIL_TAKEN": "This email is already registered",
+  "REGISTER_FAILED": "An error occurred during registration",
+  "USER_NOT_FOUND": "User not found",
+  "INVALID_CREDENTIALS": "Invalid email or password",
+  "TOO_MANY_ATTEMPTS": {
+    "one": "Too many failed attempts. Please try again in {count} minute",
+    "other": "Too many failed attempts. Please try again in {count} minutes"
+  },
+  "ACCOUNT_LOCKED": "Too many failed attempts. Your account has been locked for 5 minutes",
+  "PRODUCT_NOT_FOUND": "Product not found",
+  "SKU_TAKEN": "A product with SKU {sku} already exists",
+  "CATEGORY_NOT_FOUND": "Category '{id}' does not exist",
+  "USER_WITHOUT_BRANCH": "The user is not assigned to any branch",
+  "PLAN_UNAVAILABLE": "This plan is not available right now",
+  "OWNER_EMAIL_TAKEN": "That email already manages a store. Use another one or contact us.",
+  "DOMAIN_TAKEN": "That domain is already linked to another store",
+  "PAYMENT_URL_MISSING": "Stripe did not return the payment URL",
+  "CHECKOUT_NOT_FOUND": "We couldn't find that payment",
+  "SIGNUP_NOT_FOUND": "Request not found",
+  "SIGNUP_NOT_PAID": "That request has not been paid",
+  "SIGNUP_IN_PROGRESS": "The store has already been created or is being created right now",
+  "CONTACT_SEND_FAILED": "We couldn't send your message. Please try again later.",
+  "TENANT_NOT_FOUND": "Store not found",
+  "SUBSCRIPTION_ALREADY_ACTIVE": "Your store already has an active subscription. Use \"Manage subscription\" to change plans or cancel.",
+  "NO_BILLING_ACCOUNT": "Your store does not have a Stripe subscription yet",
+  "BILLING_OWNER_ONLY": "Only the store Super Admin can manage the subscription",
+  "CONNECT_NOT_ENABLED": "Your Stripe account doesn’t have Connect enabled yet. Enable it in the Stripe Dashboard (Connect → Get started) and try again.",
+  "ROLE_PERMISSIONS_EXCEED": "You can’t grant permissions your role doesn’t have: {permissions}",
+  "ROLE_TOO_POWERFUL": "You can’t edit a role with more permissions than yours"
+}

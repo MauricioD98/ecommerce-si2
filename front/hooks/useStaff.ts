@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { StaffService } from "@/service/api/staff.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { CreateStaffPayload, StaffUser, UpdateStaffPayload } from "@/types/admin.types";
 
 // Empleados y admins de sucursal (el backend filtra por sucursal para ADMIN_SUCURSAL)
 export function useStaff() {
+    const t = useTranslations("AdminErrors");
     const [staff, setStaff] = useState<StaffUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export function useStaff() {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudo cargar el personal."));
+                if (active) setError(getApiErrorMessage(error, t("staff")));
             })
             .finally(() => {
                 if (active) setIsLoading(false);

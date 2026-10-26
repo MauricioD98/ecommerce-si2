@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { OrderService } from "@/service/api/order.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
+import { useTranslations } from "next-intl";
 import { getOfflineOrders, removeOfflineOrder, updateOfflineOrder } from "@/utils/offlineOrderQueue";
 
 // Cola y sincronización de pedidos guardados offline (checkout web del cliente final).
 // Se dispara: al montar (por si se cerró la app con pedidos pendientes y ya hay conexión),
 // y cada vez que el navegador emite el evento "online". Nunca se ejecuta si no hay red.
 export function useOfflineOrderSync() {
+    const t = useTranslations("Offline");
     const [pendingCount, setPendingCount] = useState(0);
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSyncError, setLastSyncError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function useOfflineOrderSync() {
                     await removeOfflineOrder(offlineOrder.id);
                     anySuccess = true;
                 } catch (error) {
-                    const message = getApiErrorMessage(error, "No se pudo enviar un pedido guardado en este dispositivo.");
+                    const message = getApiErrorMessage(error, t("orderSendFailed"));
                     await updateOfflineOrder(offlineOrder.id, { status: "failed", lastError: message });
                     failureMessage = message;
                 }

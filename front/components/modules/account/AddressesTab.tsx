@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Info, MapPin, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './account.module.scss';
 import { useAddresses } from '@/hooks/useAddresses';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -12,6 +13,7 @@ import AddressModal from './AddressModal';
 export default function AddressesTab() {
     const { addresses, isLoading, error, createAddress, updateAddress, setDefaultAddress, removeAddress } = useAddresses();
     // null = modal cerrado; { address: undefined } = nueva; { address } = editar
+    const t = useTranslations('Account.addresses');
     const [modal, setModal] = useState<{ address?: UserAddress } | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -29,8 +31,8 @@ export default function AddressesTab() {
     };
 
     const handleDelete = (address: UserAddress) => {
-        if (!window.confirm(`¿Eliminar la dirección "${address.title}"?`)) return;
-        runAction(address.id, () => removeAddress(address.id), 'No se pudo eliminar la dirección.');
+        if (!window.confirm(t('confirmDelete', { title: address.title }))) return;
+        runAction(address.id, () => removeAddress(address.id), t('deleteFailed'));
     };
 
     const handleSave = async (payload: CreateAddressPayload) => {
@@ -50,12 +52,12 @@ export default function AddressesTab() {
         <div className={styles.card}>
             <div className={styles.headingRow}>
                 <div>
-                    <h1 className={styles.heading}>Mis direcciones</h1>
-                    <p className={styles.subheading}>Guarda tus direcciones con su ubicación en el mapa para pedir más rápido.</p>
+                    <h1 className={styles.heading}>{t('title')}</h1>
+                    <p className={styles.subheading}>{t('subtitle')}</p>
                 </div>
                 <button type="button" className={styles.primaryButton} onClick={() => setModal({})}>
                     <Plus size={18} />
-                    Nueva dirección
+                    {t('new')}
                 </button>
             </div>
 
@@ -67,11 +69,11 @@ export default function AddressesTab() {
             )}
 
             {isLoading ? (
-                <p className={styles.empty}>Cargando direcciones...</p>
+                <p className={styles.empty}>{t('loading')}</p>
             ) : addresses.length === 0 ? (
                 <div className={styles.empty}>
                     <MapPin size={32} />
-                    <p>Aún no tienes direcciones guardadas.</p>
+                    <p>{t('empty')}</p>
                 </div>
             ) : (
                 <ul className={styles.addressGrid}>
@@ -81,7 +83,7 @@ export default function AddressesTab() {
                                 <h2 className={styles.addressTitle}>{address.title}</h2>
                                 {address.isDefault && (
                                     <span className={styles.badge}>
-                                        <Star size={12} /> Predeterminada
+                                        <Star size={12} /> {t('default')}
                                     </span>
                                 )}
                             </div>
@@ -98,16 +100,16 @@ export default function AddressesTab() {
                                         type="button"
                                         className={styles.linkButton}
                                         disabled={busyId === address.id}
-                                        onClick={() => runAction(address.id, () => setDefaultAddress(address.id), 'No se pudo marcar como predeterminada.')}
+                                        onClick={() => runAction(address.id, () => setDefaultAddress(address.id), t('makeDefaultFailed'))}
                                     >
-                                        <Star size={14} /> Marcar como predeterminada
+                                        <Star size={14} /> {t('makeDefault')}
                                     </button>
                                 )}
                                 <button type="button" className={styles.linkButton} disabled={busyId === address.id} onClick={() => setModal({ address })}>
-                                    <Pencil size={14} /> Editar
+                                    <Pencil size={14} /> {t('editAction')}
                                 </button>
                                 <button type="button" className={`${styles.linkButton} ${styles.linkDanger}`} disabled={busyId === address.id} onClick={() => handleDelete(address)}>
-                                    <Trash2 size={14} /> Eliminar
+                                    <Trash2 size={14} /> {t('delete')}
                                 </button>
                             </div>
                         </li>

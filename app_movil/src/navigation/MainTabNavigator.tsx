@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { MainTabParamList } from './types';
 import { ProductsScreen } from '../screens/shop/ProductsScreen';
 import { CartScreen } from '../screens/cart/CartScreen';
@@ -13,6 +14,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export const MainTabNavigator: React.FC = () => {
   const { itemCount } = useCart();
+  const { t } = useTranslation();
 
   return (
     <Tab.Navigator
@@ -39,7 +41,7 @@ export const MainTabNavigator: React.FC = () => {
         name="ShopTab"
         component={ProductsScreen}
         options={{
-          tabBarLabel: 'Tienda',
+          tabBarLabel: t('tabs.shop'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'bag-handle' : 'bag-handle-outline'}
@@ -54,7 +56,7 @@ export const MainTabNavigator: React.FC = () => {
         name="CartTab"
         component={CartScreen}
         options={{
-          tabBarLabel: 'Carrito',
+          tabBarLabel: t('tabs.cart'),
           tabBarBadge: itemCount > 0 ? itemCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: Colors.primary,
@@ -75,7 +77,7 @@ export const MainTabNavigator: React.FC = () => {
         name="OrdersTab"
         component={OrdersScreen}
         options={{
-          tabBarLabel: 'Pedidos',
+          tabBarLabel: t('tabs.orders'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'receipt' : 'receipt-outline'}
@@ -90,7 +92,7 @@ export const MainTabNavigator: React.FC = () => {
         name="ProfileTab"
         component={ProfileScreen}
         options={{
-          tabBarLabel: 'Perfil',
+          tabBarLabel: t('tabs.profile'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}

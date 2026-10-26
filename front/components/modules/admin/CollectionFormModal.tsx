@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -13,6 +14,8 @@ interface CollectionFormModalProps {
 }
 
 export default function CollectionFormModal({ collection, onClose, onSubmit }: CollectionFormModalProps) {
+    const t = useTranslations('AdminCollections');
+    const tc = useTranslations('AdminCommon');
     const [name, setName] = useState(collection?.name ?? '');
     const [description, setDescription] = useState(collection?.description ?? '');
     // Vacío = el backend genera el slug a partir del nombre; solo se manda si la persona lo escribe
@@ -23,12 +26,12 @@ export default function CollectionFormModal({ collection, onClose, onSubmit }: C
     const [error, setError] = useState<string | null>(null);
 
     const validate = (): string | null => {
-        if (!name.trim()) return 'El nombre es obligatorio.';
+        if (!name.trim()) return t('nameRequired');
         if (slug.trim() && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug.trim())) {
-            return 'El slug solo admite minúsculas, números y guiones (ej. "otono-invierno").';
+            return t('slugInvalid');
         }
         if (bannerImageUrl.trim() && !/^https?:\/\//i.test(bannerImageUrl.trim())) {
-            return 'El banner debe ser una URL que empiece con http:// o https://';
+            return t('imageInvalid');
         }
         return null;
     };
@@ -53,75 +56,75 @@ export default function CollectionFormModal({ collection, onClose, onSubmit }: C
             });
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar la colección.'));
+            setError(getApiErrorMessage(error, t('saveFailed')));
             setIsSaving(false);
         }
     };
 
     return (
-        <AdminModal title={collection ? 'Editar colección' : 'Nueva colección'} onClose={onClose}>
+        <AdminModal title={collection ? t('editTitle') : t('newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
                 <div className={styles.field}>
-                    <label htmlFor="collection-name">Nombre</label>
+                    <label htmlFor="collection-name">{tc('name')}</label>
                     <input
                         id="collection-name"
                         className={styles.input}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={100}
-                        placeholder="Otoño-Invierno"
+                        placeholder={t('namePlaceholder')}
                     />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="collection-description">Descripción</label>
+                    <label htmlFor="collection-description">{tc('description')}</label>
                     <textarea
                         id="collection-description"
                         className={`${styles.input} ${styles.textareaSmall}`}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         maxLength={255}
-                        placeholder="Breve descripción de la colección"
+                        placeholder={t('descriptionPlaceholder')}
                     />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="collection-slug">Slug (opcional)</label>
+                    <label htmlFor="collection-slug">{t('slugLabel')}</label>
                     <input
                         id="collection-slug"
                         className={styles.input}
                         value={slug}
                         onChange={(e) => setSlug(e.target.value)}
                         maxLength={100}
-                        placeholder="otono-invierno"
+                        placeholder={t('slugPlaceholder')}
                     />
-                    <small className={styles.cellSub}>Si lo dejas vacío, se genera automáticamente a partir del nombre.</small>
+                    <small className={styles.cellSub}>{t('slugHint')}</small>
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="collection-banner">Banner (URL, opcional)</label>
+                    <label htmlFor="collection-banner">{t('imageLabel')}</label>
                     <input
                         id="collection-banner"
                         className={styles.input}
                         value={bannerImageUrl}
                         onChange={(e) => setBannerImageUrl(e.target.value)}
-                        placeholder="https://ejemplo.com/banner.jpg"
+                        placeholder={t('imagePlaceholder')}
                     />
                 </div>
 
                 <label className={styles.checkbox}>
                     <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                    Colección activa (visible en la tienda)
+                    {t('activeLabel')}
                 </label>
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>

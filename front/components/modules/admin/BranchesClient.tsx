@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
@@ -16,7 +17,7 @@ import { MapPosition, SANTA_CRUZ_CENTER } from '@/types/address.types';
 // Reutiliza el mismo mapa del checkout de clientes (components/modules/checkout/AddressMap.tsx).
 const AddressMap = dynamic(() => import('../checkout/AddressMap'), {
     ssr: false,
-    loading: () => <div className={styles.mapPlaceholder}>Cargando mapa...</div>,
+    loading: () => <MapLoading />,
 });
 
 interface BranchFormModalProps {
@@ -27,7 +28,15 @@ interface BranchFormModalProps {
     onSubmit: (payload: BranchPayload) => Promise<void>;
 }
 
+// Componente aparte: el loading de dynamic() no puede usar hooks inline
+function MapLoading() {
+    const t = useTranslations('AdminBranches');
+    return <div className={styles.mapPlaceholder}>{t('loadingMap')}</div>;
+}
+
 function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchFormModalProps) {
+    const t = useTranslations('AdminBranches');
+    const tc = useTranslations('AdminCommon');
     const [name, setName] = useState(branch?.name ?? '');
     const [address, setAddress] = useState(branch?.address ?? '');
     // Solo se manda lat/lng si el usuario realmente tocó el mapa (edición) o eligió una ubicación
@@ -64,7 +73,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) {
-            setError('El nombre es obligatorio.');
+            setError(t('nameRequired'));
             return;
         }
 
@@ -80,30 +89,30 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
             });
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar la sucursal.'));
+            setError(getApiErrorMessage(error, t('saveFailed')));
             setIsSaving(false);
         }
     };
 
     return (
-        <AdminModal title={branch ? 'Editar sucursal' : 'Nueva sucursal'} onClose={onClose}>
+        <AdminModal title={branch ? t('editTitle') : t('newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
                 <div className={styles.field}>
-                    <label htmlFor="branch-name">Nombre</label>
+                    <label htmlFor="branch-name">{tc('name')}</label>
                     <input
                         id="branch-name"
                         className={styles.input}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={100}
-                        placeholder="Sucursal Centro"
+                        placeholder={t('namePlaceholder')}
                     />
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="branch-address">Dirección</label>
+                    <label htmlFor="branch-address">{t('address')}</label>
                     <div className={styles.addressRow}>
                         <input
                             id="branch-address"
@@ -111,7 +120,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
                             value={address}
                             onChange={(e) => setAddress(e.target.value)}
                             maxLength={255}
-                            placeholder="Calle, número y zona"
+                            placeholder={t('addressPlaceholder')}
                         />
                         <button
                             type="button"
@@ -120,7 +129,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
                             aria-expanded={showMap}
                         >
                             <MapPin size={16} />
-                            Ubicar en mapa
+                            {t('locateOnMap')}
                         </button>
                     </div>
 
@@ -132,7 +141,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
                             <div className={styles.mapFooter}>
                                 <button type="button" className={styles.linkButton} onClick={handleLocate}>
                                     <MapPin size={14} />
-                                    Usar mi ubicación
+                                    {t('useMyLocation')}
                                 </button>
                                 <span className={styles.coords}>
                                     Lat {position.lat.toFixed(5)}, Lng {position.lng.toFixed(5)}
@@ -143,7 +152,7 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="branch-phone">Teléfono</label>
+                    <label htmlFor="branch-phone">{t('phone')}</label>
                     <input
                         id="branch-phone"
                         className={styles.input}
@@ -157,16 +166,16 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
                 {canToggleActive && (
                     <label className={styles.checkbox}>
                         <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-                        Sucursal activa (visible para los clientes)
+                        {t('activeLabel')}
                     </label>
                 )}
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>
@@ -176,6 +185,8 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
 
 export default function BranchesClient() {
     const { isGlobal } = useAdminRole();
+    const t = useTranslations('AdminBranches');
+    const tc = useTranslations('AdminCommon');
     const { branches, isLoading, error, createBranch, updateBranch, deleteBranch } = useAdminBranches();
     // undefined = cerrado, null = crear, Branch = editar
     const [editing, setEditing] = useState<Branch | null | undefined>(undefined);
@@ -191,14 +202,14 @@ export default function BranchesClient() {
     };
 
     const handleDelete = async (branch: Branch) => {
-        if (!window.confirm(`¿Eliminar la sucursal "${branch.name}"?`)) return;
+        if (!window.confirm(t('confirmDelete', { name: branch.name }))) return;
 
         setBusyId(branch.id);
         setActionError(null);
         try {
             await deleteBranch(branch.id);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar la sucursal.'));
+            setActionError(getApiErrorMessage(error, t('deleteFailed')));
         } finally {
             setBusyId(null);
         }
@@ -208,14 +219,14 @@ export default function BranchesClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Sucursales</h1>
-                    <p>{isGlobal ? 'Crea y edita las sucursales físicas. Las inactivas no aparecen para los clientes.' : 'Edita los datos de tu sucursal.'}</p>
+                    <h1>{t('title')}</h1>
+                    <p>{isGlobal ? t('subtitleGlobal') : t('subtitleOwn')}</p>
                 </div>
                 {/* Crear sucursales requiere el permiso ALL_BRANCHES */}
                 {isGlobal && (
                     <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                         <Plus size={16} />
-                        Nueva sucursal
+                        {t('new')}
                     </button>
                 )}
             </div>
@@ -224,19 +235,19 @@ export default function BranchesClient() {
 
             <div className={styles.tableCard}>
                 {isLoading ? (
-                    <div className={styles.loadingState}>Cargando sucursales...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : branches.length === 0 ? (
-                    <div className={styles.emptyState}>Aún no hay sucursales.</div>
+                    <div className={styles.emptyState}>{t('empty')}</div>
                 ) : (
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>Nombre</th>
-                                    <th>Dirección</th>
-                                    <th>Teléfono</th>
-                                    <th>Estado</th>
-                                    <th className={styles.numeric}>Acciones</th>
+                                    <th>{tc('name')}</th>
+                                    <th>{t('address')}</th>
+                                    <th>{t('phone')}</th>
+                                    <th>{tc('status')}</th>
+                                    <th className={styles.numeric}>{tc('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -247,7 +258,7 @@ export default function BranchesClient() {
                                         <td>{branch.phone ?? '—'}</td>
                                         <td>
                                             <span className={`${styles.badge} ${branch.isActive ? styles.badgeSuccess : styles.badgeMuted}`}>
-                                                {branch.isActive ? 'Activa' : 'Inactiva'}
+                                                {branch.isActive ? t('active') : t('inactive')}
                                             </span>
                                         </td>
                                         <td>
@@ -258,7 +269,7 @@ export default function BranchesClient() {
                                                     onClick={() => setEditing(branch)}
                                                 >
                                                     <Pencil size={14} />
-                                                    Editar
+                                                    {tc('edit')}
                                                 </button>
                                                 {/* Eliminar sucursales requiere el permiso ALL_BRANCHES */}
                                                 {isGlobal && (
@@ -269,7 +280,7 @@ export default function BranchesClient() {
                                                         onClick={() => handleDelete(branch)}
                                                     >
                                                         <Trash2 size={14} />
-                                                        Eliminar
+                                                        {tc('delete')}
                                                     </button>
                                                 )}
                                             </div>

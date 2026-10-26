@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './product-filters.module.scss';
 import { CategoryService } from '@/service/api/category.service';
 import { CollectionService } from '@/service/api/collection.service';
@@ -20,6 +21,7 @@ export default function ProductFilters() {
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
+    const t = useTranslations('Store.filters');
 
     const [categories, setCategories] = useState<CategoryOption[]>([]);
     const [collections, setCollections] = useState<CollectionOption[]>([]);
@@ -116,9 +118,9 @@ export default function ProductFilters() {
                 className={styles.dropdown}
                 value={category}
                 onChange={(e) => setSingleParam('category', e.target.value)}
-                aria-label="Filtrar por categoría"
+                aria-label={t('categoryLabel')}
             >
-                <option value="">Categoría</option>
+                <option value="">{t('category')}</option>
                 {categoryOptions}
             </select>
 
@@ -126,9 +128,9 @@ export default function ProductFilters() {
                 className={styles.dropdown}
                 value={collectionSlug}
                 onChange={(e) => setSingleParam('collection', e.target.value)}
-                aria-label="Filtrar por colección"
+                aria-label={t('collectionLabel')}
             >
-                <option value="">Colección</option>
+                <option value="">{t('collection')}</option>
                 {collectionOptions}
             </select>
 
@@ -150,26 +152,26 @@ export default function ProductFilters() {
                 <input
                     type="number"
                     min={0}
-                    placeholder="Precio mín."
+                    placeholder={t('minPrice')}
                     value={minInput}
                     onChange={(e) => handleMinPriceChange(e.target.value)}
-                    aria-label="Precio mínimo"
+                    aria-label={t('minPriceLabel')}
                 />
                 <span>—</span>
                 <input
                     type="number"
                     min={0}
-                    placeholder="Precio máx."
+                    placeholder={t('maxPrice')}
                     value={maxInput}
                     onChange={(e) => handleMaxPriceChange(e.target.value)}
-                    aria-label="Precio máximo"
+                    aria-label={t('maxPriceLabel')}
                 />
             </div>
 
             {activeCount > 0 && (
                 <button type="button" className={styles.clearPill} onClick={clearAll}>
                     <X size={13} />
-                    Limpiar ({activeCount})
+                    {t('clear', { count: activeCount })}
                 </button>
             )}
         </div>

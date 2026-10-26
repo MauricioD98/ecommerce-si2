@@ -5,10 +5,14 @@ import { useSearchParams } from 'next/navigation';
 import { PaymentService } from '@/service/api/payment.service';
 import { CheckCircle2, AlertCircle, ShoppingBag } from 'lucide-react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 
 export default function QrConfirmClient() {
     const searchParams = useSearchParams();
     const orderId = searchParams.get('orderId');
+    const t = useTranslations('Checkout.qrConfirm');
+    const storeName = useStoreName();
 
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [orderInfo, setOrderInfo] = useState<{ orderNumber?: string; totalAmount?: number } | null>(null);
@@ -17,7 +21,7 @@ export default function QrConfirmClient() {
     useEffect(() => {
         if (!orderId) {
             setStatus('error');
-            setErrorMsg('No se especificó un número de pedido válido en el código QR.');
+            setErrorMsg(t('missingOrder'));
             return;
         }
 
@@ -29,7 +33,7 @@ export default function QrConfirmClient() {
                     setOrderInfo(res.data);
                 } else {
                     setStatus('error');
-                    setErrorMsg(res.message || 'No se pudo confirmar el pago.');
+                    setErrorMsg(res.message || t('confirmFailed'));
                 }
             } catch (err: any) {
                 // Si ya estaba confirmado, obtenemos el estado
@@ -47,7 +51,7 @@ export default function QrConfirmClient() {
                     // Ignorar
                 }
                 setStatus('error');
-                setErrorMsg(err?.response?.data?.message || err.message || 'Error al procesar el pago.');
+                setErrorMsg(err?.response?.data?.message || err.message || t('processFailed'));
             }
         };
 
@@ -88,10 +92,10 @@ export default function QrConfirmClient() {
                             animation: 'spin 1s linear infinite',
                         }} />
                         <h2 style={{ fontSize: '18px', color: '#f8fafc', margin: '0 0 8px' }}>
-                            Procesando Pago con QR...
+                            {t('processing')}
                         </h2>
                         <p style={{ fontSize: '14px', color: '#94a3b8', margin: 0 }}>
-                            Conectando con la base de datos de Stella Femme...
+                            {t('connecting')}
                         </p>
                     </div>
                 )}
@@ -113,7 +117,7 @@ export default function QrConfirmClient() {
                         </div>
 
                         <h1 style={{ fontSize: '22px', color: '#f8fafc', margin: '0 0 6px', fontWeight: 700 }}>
-                            ¡Pago QR Confirmado!
+                            {t('title')}
                         </h1>
 
                         <div style={{
@@ -127,11 +131,11 @@ export default function QrConfirmClient() {
                             fontSize: '12px',
                             marginBottom: '16px',
                         }}>
-                            Pago Verificado • Stella Femme
+                            {t('verified', { store: storeName })}
                         </div>
 
                         <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.5, margin: '0 0 20px' }}>
-                            El pago de este pedido fue procesado y registrado con éxito en la base de datos de la tienda.
+                            {t('description')}
                         </p>
 
                         <div style={{
@@ -144,17 +148,17 @@ export default function QrConfirmClient() {
                         }}>
                             {orderInfo?.orderNumber && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#94a3b8' }}>
-                                    <span>N° Pedido:</span>
+                                    <span>{t('orderNumber')}</span>
                                     <span style={{ color: '#f8fafc', fontWeight: 600 }}>#{orderInfo.orderNumber}</span>
                                 </div>
                             )}
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#94a3b8' }}>
-                                <span>Método de Pago:</span>
-                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>QR Simple</span>
+                                <span>{t('method')}</span>
+                                <span style={{ color: '#f8fafc', fontWeight: 600 }}>{t('methodValue')}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: '#94a3b8' }}>
-                                <span>Estado en BD:</span>
-                                <span style={{ color: '#34d399', fontWeight: 700 }}>COMPLETADO (PROCESANDO)</span>
+                                <span>{t('status')}</span>
+                                <span style={{ color: '#34d399', fontWeight: 700 }}>{t('statusValue')}</span>
                             </div>
                             {orderInfo?.totalAmount && (
                                 <div style={{
@@ -166,14 +170,14 @@ export default function QrConfirmClient() {
                                     paddingTop: '8px',
                                     borderTop: '1px solid #1e293b',
                                 }}>
-                                    <span>Total:</span>
+                                    <span>{t('total')}</span>
                                     <span style={{ color: '#38bdf8' }}>Bs {Number(orderInfo.totalAmount).toFixed(2)}</span>
                                 </div>
                             )}
                         </div>
 
                         <p style={{ fontSize: '12px', color: '#64748b', margin: '0 0 20px' }}>
-                            La pantalla web del cliente se actualizará automáticamente en unos segundos.
+                            {t('autoUpdate')}
                         </p>
 
                         <Link
@@ -195,7 +199,7 @@ export default function QrConfirmClient() {
                             }}
                         >
                             <ShoppingBag size={16} />
-                            <span>Ir a la tienda</span>
+                            <span>{t('goToStore')}</span>
                         </Link>
                     </div>
                 )}
@@ -216,7 +220,7 @@ export default function QrConfirmClient() {
                             <AlertCircle size={40} />
                         </div>
                         <h2 style={{ fontSize: '18px', color: '#f8fafc', margin: '0 0 8px' }}>
-                            Error al procesar el pago
+                            {t('errorTitle')}
                         </h2>
                         <p style={{ fontSize: '14px', color: '#94a3b8', margin: '0 0 20px' }}>
                             {errorMsg}
@@ -233,7 +237,7 @@ export default function QrConfirmClient() {
                                 fontSize: '14px',
                             }}
                         >
-                            Volver al inicio
+                            {t('backHome')}
                         </Link>
                     </div>
                 )}

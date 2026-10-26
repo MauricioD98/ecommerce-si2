@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ProductService } from "@/service/api/product.service";
 import { CategoryService } from "@/service/api/category.service";
 import { CollectionService } from "@/service/api/collection.service";
@@ -21,6 +22,7 @@ export function useAdminProducts(
     branchId?: string | null,
     includeArchived = false,
 ) {
+    const t = useTranslations("AdminErrors");
     const [products, setProducts] = useState<Product[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
     const [refreshKey, setRefreshKey] = useState(0);
@@ -48,7 +50,7 @@ export function useAdminProducts(
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar los productos."));
+                if (active) setError(getApiErrorMessage(error, t("products")));
             })
             .finally(() => {
                 if (active) setLoadedKey(key);

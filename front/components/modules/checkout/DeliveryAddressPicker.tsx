@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './delivery-step.module.scss';
 import NewAddressForm from './NewAddressForm';
 import { useAddresses } from '@/hooks/useAddresses';
@@ -18,6 +19,7 @@ interface DeliveryAddressPickerProps {
 // "Mis Direcciones" (guardadas) o "Nueva Dirección" (mapa) para el envío a domicilio
 export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange }: DeliveryAddressPickerProps) {
     const { addresses, isLoading, error, createAddress, removeAddress } = useAddresses();
+    const t = useTranslations('Checkout.addresses');
     const [chosenTab, setChosenTab] = useState<Tab | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
     const preselected = useRef(false);
@@ -36,19 +38,19 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
     }, [isLoading, addresses, deliveryAddress, onAddressChange]);
 
     const handleRemove = async (id: string, title: string) => {
-        if (!window.confirm(`¿Eliminar la dirección "${title}"?`)) return;
+        if (!window.confirm(t('confirmDelete', { title }))) return;
         setActionError(null);
         try {
             await removeAddress(id);
             if (deliveryAddress?.id === id) onAddressChange(null);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar la dirección.'));
+            setActionError(getApiErrorMessage(error, t('deleteFailed')));
         }
     };
 
     return (
         <div className={styles.addressPicker}>
-            <div className={styles.tabs} role="tablist" aria-label="Dirección de envío">
+            <div className={styles.tabs} role="tablist" aria-label={t('tabsLabel')}>
                 <button
                     type="button"
                     role="tab"
@@ -56,7 +58,7 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
                     className={`${styles.tab} ${tab === 'saved' ? styles.tabActive : ''}`}
                     onClick={() => setChosenTab('saved')}
                 >
-                    Mis Direcciones
+                    {t('saved')}
                 </button>
                 <button
                     type="button"
@@ -65,16 +67,16 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
                     className={`${styles.tab} ${tab === 'new' ? styles.tabActive : ''}`}
                     onClick={() => setChosenTab('new')}
                 >
-                    Nueva Dirección
+                    {t('new')}
                 </button>
             </div>
 
             {tab === 'saved' && (
                 <div className={styles.savedList}>
-                    {isLoading && <p className={styles.hint}>Cargando tus direcciones...</p>}
+                    {isLoading && <p className={styles.hint}>{t('loading')}</p>}
                     {(error || actionError) && <p className={styles.error}>{error ?? actionError}</p>}
                     {!isLoading && addresses.length === 0 && (
-                        <p className={styles.hint}>Aún no tienes direcciones guardadas. Agrega una nueva.</p>
+                        <p className={styles.hint}>{t('empty')}</p>
                     )}
 
                     {addresses.map((address) => {
@@ -95,7 +97,7 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
                                     <span className={styles.optionText}>
                                         <span className={styles.branchName}>
                                             {address.title}
-                                            {address.isDefault && <span className={styles.defaultBadge}>Predeterminada</span>}
+                                            {address.isDefault && <span className={styles.defaultBadge}>{t('default')}</span>}
                                         </span>
                                         <span className={styles.branchAddress}>{address.address}</span>
                                         {address.reference && <span className={styles.branchAddress}>{address.reference}</span>}
@@ -105,7 +107,7 @@ export default function DeliveryAddressPicker({ deliveryAddress, onAddressChange
                                     type="button"
                                     className={styles.iconButton}
                                     onClick={() => handleRemove(address.id, address.title)}
-                                    aria-label={`Eliminar la dirección ${address.title}`}
+                                    aria-label={t('deleteLabel', { title: address.title })}
                                 >
                                     <Trash2 size={16} />
                                 </button>

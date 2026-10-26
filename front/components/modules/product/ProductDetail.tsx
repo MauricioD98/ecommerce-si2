@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { ScanFace } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Product } from '@/types/product.types';
 import styles from './product-detail.module.scss'
 import VirtualTryOnModal from './VirtualTryOnModal';
@@ -14,6 +15,7 @@ export default function ProductDetail({ product }: { product: Product }) {
 
     const { addProductToCart, items } = useCart();
     const { isAuthenticated } = useAuth();
+    const t = useTranslations('Product');
     const router = useRouter();
     const pathname = usePathname();
     const hasDiscount = hasProductDiscount(product);
@@ -115,12 +117,12 @@ export default function ProductDetail({ product }: { product: Product }) {
     const handleAddToCart = () => {
         if (isInStock && quantity > 0) {
             if (hasSizes && !selectedSize) {
-                alert("Por favor, selecciona una talla");
+                alert(t('selectSize'));
                 return;
             }
             const qtyToAdd = Math.min(quantity, relevantStock);
             addProductToCart(product, hasSizes ? selectedSize : undefined, qtyToAdd);
-            alert(`Se agregaron ${qtyToAdd} ${product.name} al carrito`);
+            alert(t('addedAlert', { count: qtyToAdd, name: product.name }));
         }
     };
 
@@ -142,11 +144,11 @@ export default function ProductDetail({ product }: { product: Product }) {
                         <p className={styles.price}>
                             Bs {getEffectivePrice(product).toFixed(2)}
                             {hasDiscount && <span className={styles.oldPrice}>Bs {product.price.toFixed(2)}</span>}
-                            {hasDiscount && <span className={styles.discountBadge}>Oferta</span>}
+                            {hasDiscount && <span className={styles.discountBadge}>{t('sale')}</span>}
                         </p>
                         {/* Reactivo a la talla elegida y a lo ya puesto en el carrito */}
                         <span className={`${styles.stock} ${!isInStock ? styles.outOfStock : ""}`}>
-                            {isInStock ? `${relevantStock} disponibles en stock` : "Agotado"}
+                            {isInStock ? t('available', { count: relevantStock }) : t('soldOut')}
                         </span>
                         <hr className={styles.divider} />
                         <p className={styles.description}>{product.description}</p>
@@ -155,7 +157,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                         {
                             hasSizes && (
                                 <div className={styles.sizeSection}>
-                                    <span className={styles.label}>Talla</span>
+                                    <span className={styles.label}>{t('size')}</span>
                                     <div className={styles.sizeOptions}>
                                         {product.sizes!.map((size) => {
                                             const sizeStock = getAvailableStockForSize(size);
@@ -173,7 +175,7 @@ export default function ProductDetail({ product }: { product: Product }) {
                                                     disabled={sizeOutOfStock}
                                                     aria-pressed={selectedSize === size}
                                                     aria-disabled={sizeOutOfStock}
-                                                    title={sizeOutOfStock ? `Talla ${size} agotada (o en tu carrito)` : undefined}
+                                                    title={sizeOutOfStock ? t('sizeSoldOut', { size }) : undefined}
                                                 >
                                                     {size}
                                                 </button>
@@ -187,19 +189,19 @@ export default function ProductDetail({ product }: { product: Product }) {
                         {
                             isInStock && (
                                 <div className={styles.quantitySection}>
-                                    <label htmlFor="quantity" className={styles.label}>Cantidad</label>
+                                    <label htmlFor="quantity" className={styles.label}>{t('quantity')}</label>
                                     <div className={styles.quantityControls}>
                                         <button className={styles.quantityButton}
                                             onClick={handleDecrement}
                                             disabled={quantity <= 1}
-                                            aria-label="Disminuir cantidad">-
+                                            aria-label={t('decrease')}>-
 
                                         </button>
                                         <span className={styles.quantityValue}>{quantity}</span>
                                         <button className={styles.quantityButton}
                                             onClick={handleIncrement}
                                             disabled={quantity >= relevantStock}
-                                            aria-label="Aumentar cantidad">
+                                            aria-label={t('increase')}>
                                             +
                                         </button>
                                     </div>
@@ -207,11 +209,11 @@ export default function ProductDetail({ product }: { product: Product }) {
                             )
                         }
                         <button className={styles.addToCartButton} onClick={handleAddToCart} disabled={!isInStock}>
-                            {isInStock ? "Agregar al carrito" : "Agotado"}
+                            {isInStock ? t('addToCart') : t('soldOut')}
                         </button>
                         <button type="button" className={styles.tryOnButton} onClick={handleTryOn}>
                             <ScanFace size={20} />
-                            Probarme virtualmente
+                            {t('tryOn')}
                             <span className={styles.tryOnBadge}>15s</span>
                         </button>
                         <p className={styles.sku}>SKU: {product.sku}</p>

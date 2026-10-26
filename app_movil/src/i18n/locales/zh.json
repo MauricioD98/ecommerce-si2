@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "取消",
+    "save": "保存",
+    "close": "关闭",
+    "restore": "恢复"
+  },
+  "tabs": {
+    "shop": "商店",
+    "cart": "购物车",
+    "orders": "订单",
+    "profile": "我的"
+  },
+  "language": {
+    "title": "语言",
+    "subtitle": "选择应用语言",
+    "deviceHint": "默认使用手机的系统语言。"
+  },
+  "profile": {
+    "defaultUser": "用户",
+    "editProfile": "编辑资料",
+    "editProfileDesc": "名字、姓氏和邮箱",
+    "security": "安全与密码",
+    "securityDesc": "修改密码",
+    "orders": "我的订单",
+    "ordersDesc": "购买记录与物流跟踪",
+    "apiServer": "API 服务器",
+    "logout": "退出登录",
+    "logoutConfirm": "确定要退出你的账户吗？",
+    "apiModalTitle": "配置 API 服务器",
+    "apiModalDesc": "连接云端 API（Azure），或为本地开发设置 URL。",
+    "apiUrlLabel": "API 基础 URL",
+    "cloudServer": "云端服务器（Azure 生产环境）",
+    "localServer": "本地服务器（电脑）：{{address}}",
+    "urlSaved": "URL 已保存",
+    "urlSavedBody": "正在连接：{{url}}",
+    "urlRestored": "URL 已恢复",
+    "urlRestoredBody": "默认 URL：{{url}}"
+  }
+}

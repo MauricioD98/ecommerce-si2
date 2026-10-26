@@ -2,33 +2,36 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import styles from './admin-layout.module.scss';
 import tableStyles from './admin-table.module.scss';
 import { getAdminLinks } from './adminNav';
 import { useAdminRole } from '@/hooks/useAdminAccess';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 
 export default function AdminHome() {
-    const { user, isGlobal, can } = useAdminRole();
+    const { user, isGlobal, isSuperAdmin, can } = useAdminRole();
+    const t = useTranslations('AdminShell');
+    const storeName = useStoreName();
+    const tNav = useTranslations('AdminNav');
 
     return (
         <div className={tableStyles.page}>
             <div className={tableStyles.pageHeader}>
                 <div>
-                    <h1>Panel administrativo</h1>
+                    <h1>{t('homeTitle')}</h1>
                     <p>
-                        Hola{user?.firstName ? `, ${user.firstName}` : ''}.{' '}
-                        {isGlobal
-                            ? 'Gestiona todas las sucursales de STELLA FEMME.'
-                            : 'Gestiona tu sucursal.'}
+                        {user?.firstName ? t('greetingName', { name: user.firstName }) : t('greeting')}{' '}
+                        {isGlobal ? t('manageAll', { store: storeName }) : t('manageOwn')}
                     </p>
                 </div>
             </div>
 
             <div className={styles.homeGrid}>
-                {getAdminLinks(can, isGlobal).map(({ href, label, icon: Icon }) => (
+                {getAdminLinks(can, isGlobal, isSuperAdmin).map(({ href, label, icon: Icon }) => (
                     <Link key={href} href={href} className={styles.homeCard}>
                         <Icon size={24} />
-                        {label}
+                        {tNav(label)}
                     </Link>
                 ))}
             </div>

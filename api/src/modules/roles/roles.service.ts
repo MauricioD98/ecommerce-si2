@@ -5,6 +5,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RoleResponseDto } from './dto/role-response.dto';
 import { BASE_ROLE_NAMES, SUPER_ADMIN_ROLE } from '../../common/constants/permissions';
+import { i18nMessage } from '../../i18n/i18n-message';
 import { canAssignRole } from '../../common/utils/permission.util';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 
@@ -39,7 +40,8 @@ export class RolesService {
     return this.toResponse(role);
   }
 
-  async create(dto: CreateRoleDto): Promise<RoleResponseDto> {
+  async create(dto: CreateRoleDto, actor: AuthUser): Promise<RoleResponseDto> {
+    this.assertCanGrant(actor, dto.permissions);
     await this.assertNameAvailable(dto.name);
 
     const role = await this.prisma.role.create({
@@ -49,11 +51,17 @@ export class RolesService {
     return this.toResponse(role);
   }
 
-  async update(id: string, dto: UpdateRoleDto): Promise<RoleResponseDto> {
+  async update(id: string, dto: UpdateRoleDto, actor: AuthUser): Promise<RoleResponseDto> {
     const existing = await this.prisma.role.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Role not found');
     }
+    // Sin escalar privilegios: no se edita un rol con permisos que el actor no tiene (incluido el
+    // propio para sumarse permisos), ni se le agregan permisos ajenos
+    if (!canAssignRole(actor, existing)) {
+      throw new ForbiddenException(i18nMessage('errors.ROLE_TOO_POWERFUL'));
+    }
+    if (dto.permissions) this.assertCanGrant(actor, dto.permissions);
 
     // Super Admin es inmutable: si no, el sistema podría quedarse sin quien gestione roles
     if (existing.name === SUPER_ADMIN_ROLE) {
@@ -102,6 +110,15 @@ export class RolesService {
     const taken = await this.prisma.role.findUnique({ where: { name } });
     if (taken) {
       throw new ConflictException(`A role named "${name}" already exists`);
+    }
+  }
+
+  // El Super Admin otorga cualquier permiso del catálogo; el resto, solo los que tiene su propio rol
+  private assertCanGrant(actor: AuthUser, permissions: string[]): void {
+    if (actor.role.name === SUPER_ADMIN_ROLE) return;
+    const missing = permissions.filter((permission) => !actor.role.permissions.includes(permission));
+    if (missing.length > 0) {
+      throw new ForbiddenException(i18nMessage('errors.ROLE_PERMISSIONS_EXCEED', { permissions: missing.join(', ') }));
     }
   }
 

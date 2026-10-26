@@ -2,29 +2,23 @@
 
 import React, { useState } from 'react';
 import { FileDown, FileSpreadsheet, FileText, Loader2, Mic, MicOff, Send, Sparkles } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
+import { intlLocale } from '@/i18n/config';
 import { DynamicReportEntry, useDynamicReport } from '@/hooks/useReports';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { DynamicReportResult } from '@/types/admin.types';
 
-const EXAMPLES = [
-    '¿Cuál fue el ingreso total por sucursal esta semana?',
-    'Los 10 productos con menor stock en almacén',
-    'Rendimiento de ventas por cajero este mes',
-    'Comparativa de cantidad de ventas Web vs POS físico',
-    'Clientes con más compras registradas',
-];
-
 // Las columnas cambian según la pregunta: se muestran tal cual las devuelve la consulta
-const formatCell = (value: unknown): string => {
+const formatCell = (value: unknown, locale: string): string => {
     if (value === null || value === undefined) return '—';
-    if (typeof value === 'number') return value.toLocaleString('es-BO', { maximumFractionDigits: 2 });
+    if (typeof value === 'number') return value.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 });
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
 };
 
 // Nombre de archivo a partir de la pregunta (sin tildes/símbolos, acotado)
-function buildExportFilename(prompt: string): string {
+function buildExportFilename(prompt: string, fallback: string): string {
     const slug = prompt
         .toLowerCase()
         .normalize('NFD')
@@ -32,7 +26,7 @@ function buildExportFilename(prompt: string): string {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-+|-+$)/g, '')
         .slice(0, 60);
-    return `stella-femme-${slug || 'reporte'}`;
+    return `stella-femme-${slug || fallback}`;
 }
 
 // Filas con encabezados legibles (sin guiones bajos), en el orden que devolvió la consulta
@@ -46,23 +40,23 @@ function toPrettyRows(result: DynamicReportResult): Record<string, unknown>[] {
     });
 }
 
-async function exportToExcel(result: DynamicReportResult, filename: string) {
+async function exportToExcel(result: DynamicReportResult, filename: string, sheetName: string) {
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     XLSX.writeFile(workbook, `${filename}.xlsx`);
 }
 
-async function exportToCsv(result: DynamicReportResult, filename: string) {
+async function exportToCsv(result: DynamicReportResult, filename: string, sheetName: string) {
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Reporte');
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     XLSX.writeFile(workbook, `${filename}.csv`, { bookType: 'csv' });
 }
 
-async function exportToPdf(result: DynamicReportResult, filename: string, title: string) {
+async function exportToPdf(result: DynamicReportResult, filename: string, title: string, locale: string) {
     const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
     const doc = new jsPDF();
 
@@ -72,7 +66,7 @@ async function exportToPdf(result: DynamicReportResult, filename: string, title:
     autoTable(doc, {
         startY: 20,
         head: [result.columns.map((column) => column.replace(/_/g, ' '))],
-        body: result.rows.map((row) => result.columns.map((column) => formatCell(row[column]))),
+        body: result.rows.map((row) => result.columns.map((column) => formatCell(row[column], locale))),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [0, 0, 0] },
     });
@@ -83,7 +77,9 @@ async function exportToPdf(result: DynamicReportResult, filename: string, title:
 function ExportBar({ entry }: { entry: DynamicReportEntry }) {
     const result = entry.result;
     const disabled = !result || result.rows.length === 0;
-    const filename = buildExportFilename(entry.prompt);
+    const t = useTranslations('Reports.dynamic');
+    const locale = useLocale();
+    const filename = buildExportFilename(entry.prompt, t('fileFallback'));
 
     return (
         <div className={styles.exportBar}>
@@ -91,8 +87,8 @@ function ExportBar({ entry }: { entry: DynamicReportEntry }) {
                 type="button"
                 className={styles.exportButton}
                 disabled={disabled}
-                onClick={() => result && exportToPdf(result, filename, entry.prompt)}
-                title="Exportar a PDF"
+                onClick={() => result && exportToPdf(result, filename, entry.prompt, locale)}
+                title={t('exportPdf')}
             >
                 <FileText size={14} />
                 PDF
@@ -101,8 +97,8 @@ function ExportBar({ entry }: { entry: DynamicReportEntry }) {
                 type="button"
                 className={styles.exportButton}
                 disabled={disabled}
-                onClick={() => result && exportToExcel(result, filename)}
-                title="Exportar a Excel"
+                onClick={() => result && exportToExcel(result, filename, t('sheetName'))}
+                title={t('exportExcel')}
             >
                 <FileSpreadsheet size={14} />
                 Excel
@@ -111,8 +107,8 @@ function ExportBar({ entry }: { entry: DynamicReportEntry }) {
                 type="button"
                 className={styles.exportButton}
                 disabled={disabled}
-                onClick={() => result && exportToCsv(result, filename)}
-                title="Exportar a CSV"
+                onClick={() => result && exportToCsv(result, filename, t('sheetName'))}
+                title={t('exportCsv')}
             >
                 <FileDown size={14} />
                 CSV
@@ -122,8 +118,11 @@ function ExportBar({ entry }: { entry: DynamicReportEntry }) {
 }
 
 function ResultTable({ result }: { result: DynamicReportResult }) {
+    const t = useTranslations('Reports.dynamic');
+    const locale = useLocale();
+
     if (result.rows.length === 0) {
-        return <div className={styles.emptyState}>La consulta no devolvió resultados.</div>;
+        return <div className={styles.emptyState}>{t('noResults')}</div>;
     }
 
     return (
@@ -140,7 +139,7 @@ function ResultTable({ result }: { result: DynamicReportResult }) {
                     {result.rows.map((row, rowIndex) => (
                         <tr key={rowIndex}>
                             {Object.values(row).map((value, cellIndex) => (
-                                <td key={cellIndex}>{formatCell(value)}</td>
+                                <td key={cellIndex}>{formatCell(value, locale)}</td>
                             ))}
                         </tr>
                     ))}
@@ -151,6 +150,8 @@ function ResultTable({ result }: { result: DynamicReportResult }) {
 }
 
 function EntryCard({ entry }: { entry: DynamicReportEntry }) {
+    const t = useTranslations('Reports.dynamic');
+
     return (
         <div className={styles.tableCard}>
             <div className={styles.chatQuestion}>
@@ -168,7 +169,7 @@ function EntryCard({ entry }: { entry: DynamicReportEntry }) {
                     <ResultTable result={entry.result} />
                     {/* El SQL generado ya no se muestra al usuario final; queda solo en el log del backend (reports.service.ts) */}
                     <div className={styles.sqlDetails}>
-                        {entry.result.rowCount} {entry.result.rowCount === 1 ? 'fila' : 'filas'}
+                        {t('rows', { count: entry.result.rowCount })}
                     </div>
                 </>
             )}
@@ -178,9 +179,13 @@ function EntryCard({ entry }: { entry: DynamicReportEntry }) {
 
 export default function DynamicReportPanel() {
     const { entries, isLoading, ask } = useDynamicReport();
+    const t = useTranslations('Reports.dynamic');
+    const locale = useLocale();
+    const examples = t.raw('examples') as string[];
     const [prompt, setPrompt] = useState('');
     // Lo dictado va actualizando el mismo estado que el input; el usuario revisa y pulsa "Preguntar"
-    const { isSupported, isListening, error: voiceError, toggle: toggleVoice } = useSpeechRecognition({ onText: setPrompt });
+    // Dicta en el idioma elegido: el reconocimiento de voz del navegador necesita la etiqueta completa (es-BO, fr-FR…)
+    const { isSupported, isListening, error: voiceError, toggle: toggleVoice } = useSpeechRecognition({ lang: intlLocale(locale), onText: setPrompt });
 
     const submit = async (question: string) => {
         const text = question.trim();
@@ -200,7 +205,7 @@ export default function DynamicReportPanel() {
                     }}
                 >
                     <div className={styles.field}>
-                        <label htmlFor="ai-prompt">Pregunta en lenguaje natural</label>
+                        <label htmlFor="ai-prompt">{t('promptLabel')}</label>
                         <div className={styles.chatInput}>
                             <input
                                 id="ai-prompt"
@@ -208,7 +213,7 @@ export default function DynamicReportPanel() {
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                                 maxLength={500}
-                                placeholder="Ej. ¿Cuánto vendimos por sucursal este mes?"
+                                placeholder={t('promptPlaceholder')}
                                 disabled={isLoading}
                                 // Mientras se dicta, el texto lo controla el micrófono
                                 readOnly={isListening}
@@ -219,13 +224,13 @@ export default function DynamicReportPanel() {
                                 onClick={() => toggleVoice(prompt)}
                                 disabled={!isSupported || isLoading}
                                 aria-pressed={isListening}
-                                aria-label={isListening ? 'Detener dictado' : 'Dictar la pregunta por voz'}
+                                aria-label={isListening ? t('stopDictation') : t('dictate')}
                                 title={
                                     !isSupported
-                                        ? 'Tu navegador no permite el dictado por voz'
+                                        ? t('dictationUnsupported')
                                         : isListening
-                                          ? 'Detener dictado'
-                                          : 'Dictar por voz'
+                                          ? t('stopDictation')
+                                          : t('dictateShort')
                                 }
                             >
                                 {isSupported ? <Mic size={18} /> : <MicOff size={18} />}
@@ -239,29 +244,26 @@ export default function DynamicReportPanel() {
                                 {isLoading ? (
                                     <>
                                         <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                                        Procesando...
+                                        {t('processing')}
                                     </>
                                 ) : (
                                     <>
                                         <Send size={16} />
-                                        Preguntar
+                                        {t('ask')}
                                     </>
                                 )}
                             </button>
                         </div>
-                        {isListening && <small className={styles.voiceListening}>Escuchando... habla ahora y pulsa el micrófono para terminar.</small>}
+                        {isListening && <small className={styles.voiceListening}>{t('listening')}</small>}
                         {voiceError && <small className={styles.voiceError}>{voiceError}</small>}
                         {!isSupported && (
-                            <small>El dictado por voz no está disponible en este navegador (usa Chrome, Edge o Safari).</small>
+                            <small>{t('unsupportedHint')}</small>
                         )}
-                        <small>
-                            Usa tu voz o escribe para generar consultas analíticas en tiempo real sobre las ventas, inventario y
-                            rendimiento de la tienda.
-                        </small>
+                        <small>{t('help')}</small>
                     </div>
 
                     <div className={styles.badgeList}>
-                        {EXAMPLES.map((example) => (
+                        {examples.map((example) => (
                             <button
                                 key={example}
                                 type="button"
@@ -279,7 +281,7 @@ export default function DynamicReportPanel() {
             {isLoading && (
                 <div className={styles.aiLoadingState} role="status" aria-live="polite">
                     <Loader2 size={18} className={styles.spinner} aria-hidden="true" />
-                    <span>Analizando datos y generando reporte...</span>
+                    <span>{t('analyzing')}</span>
                 </div>
             )}
 

@@ -3,12 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import accountStyles from './account.module.scss';
 import styles from './orders.module.scss';
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { useBranches } from '@/hooks/useBranches';
 import OrderTimeline from './OrderTimeline';
-import { ORDER_STATUS_BADGE_CLASS, ORDER_STATUS_LABELS, OrderStatusValue, PAYMENT_STATUS_LABELS, formatOrderDate } from './orderStatus';
+import { ORDER_STATUS_BADGE_CLASS, OrderStatusValue, formatOrderDate, isOrderStatus, isPaymentStatus } from './orderStatus';
 
 interface OrderDetailClientProps {
     orderId: string;
@@ -19,30 +20,32 @@ interface OrderDetailClientProps {
 export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     const { order, isLoading, error } = useOrderDetail(orderId);
     const { branches } = useBranches();
+    const t = useTranslations('Account');
+    const locale = useLocale();
 
     return (
         <section className={accountStyles.page}>
             <div className={styles.orderGrid} style={{ maxWidth: 720, margin: '0 auto' }}>
                 <Link href="/account?tab=orders" className={styles.backLink}>
                     <ArrowLeft size={16} />
-                    Volver a mis pedidos
+                    {t('orders.back')}
                 </Link>
 
                 <div className={accountStyles.card}>
-                    {isLoading && <p className={accountStyles.subheading}>Cargando pedido...</p>}
+                    {isLoading && <p className={accountStyles.subheading}>{t('orders.loadingOne')}</p>}
                     {error && <div className={accountStyles.alertError}>{error}</div>}
 
                     {order && (
                         <>
                             <div className={styles.detailHeader}>
                                 <div>
-                                    <h1 className={styles.detailTitle}>Pedido #{order.id.slice(0, 8).toUpperCase()}</h1>
-                                    <p className={styles.detailSubtitle}>Realizado el {formatOrderDate(order.createdAt)}</p>
+                                    <h1 className={styles.detailTitle}>{t('orders.number', { id: order.id.slice(0, 8).toUpperCase() })}</h1>
+                                    <p className={styles.detailSubtitle}>{t('orders.placedOn', { date: formatOrderDate(order.createdAt, locale) })}</p>
                                 </div>
                                 <span
                                     className={`${styles.badge} ${styles[ORDER_STATUS_BADGE_CLASS[order.status as OrderStatusValue]]}`}
                                 >
-                                    {ORDER_STATUS_LABELS[order.status as OrderStatusValue] ?? order.status}
+                                    {isOrderStatus(order.status) ? t(`status.${order.status}`) : order.status}
                                 </span>
                             </div>
 
@@ -50,16 +53,18 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
 
                             <div className={styles.infoGrid}>
                                 <div className={styles.infoBlock}>
-                                    <span className={styles.infoLabel}>Método de entrega</span>
+                                    <span className={styles.infoLabel}>{t('orders.fulfillment')}</span>
                                     <span className={styles.infoValue}>
                                         {order.fulfillmentType === 'PICKUP'
-                                            ? `Retiro en sucursal${order.branchId ? `: ${branches.find((b) => b.id === order.branchId)?.name ?? ''}` : ''}`
-                                            : 'Envío a domicilio'}
+                                            ? order.branchId
+                                                ? t('orders.pickupAt', { branch: branches.find((b) => b.id === order.branchId)?.name ?? '' })
+                                                : t('orders.pickup')
+                                            : t('orders.delivery')}
                                     </span>
                                 </div>
                                 <div className={styles.infoBlock}>
                                     <span className={styles.infoLabel}>
-                                        {order.fulfillmentType === 'PICKUP' ? 'Sucursal' : 'Dirección de envío'}
+                                        {order.fulfillmentType === 'PICKUP' ? t('orders.branch') : t('orders.shippingAddress')}
                                     </span>
                                     <span className={styles.infoValue}>
                                         {order.fulfillmentType === 'PICKUP'
@@ -68,15 +73,15 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                                     </span>
                                 </div>
                                 <div className={styles.infoBlock}>
-                                    <span className={styles.infoLabel}>Estado del pago</span>
+                                    <span className={styles.infoLabel}>{t('orders.paymentStatus')}</span>
                                     <span className={styles.infoValue}>
-                                        {PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
+                                        {isPaymentStatus(order.paymentStatus) ? t(`payment.${order.paymentStatus}`) : order.paymentStatus}
                                     </span>
                                 </div>
                             </div>
 
                             <h2 className={accountStyles.heading} style={{ fontSize: '1.0625rem', marginBottom: '0.75rem' }}>
-                                Artículos
+                                {t('orders.items')}
                             </h2>
                             <ul className={styles.itemsList}>
                                 {order.items.map((item) => (
@@ -84,7 +89,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                                         <div className={styles.itemInfo}>
                                             <span className={styles.itemName}>{item.productName}</span>
                                             <span className={styles.itemMeta}>
-                                                {item.size ? `Talla: ${item.size} · ` : ''}Cantidad: {item.quantity}
+                                                {item.size ? t('orders.itemSize', { size: item.size }) : ''}{t('orders.itemQuantity', { quantity: item.quantity })}
                                             </span>
                                         </div>
                                         <span className={styles.itemSubtotal}>Bs {item.subtotal.toFixed(2)}</span>
@@ -95,18 +100,18 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                             <div className={styles.totalsBlock}>
                                 {order.discountApplied > 0 && (
                                     <div className={styles.totalsRow}>
-                                        <span>Descuento de empleado</span>
+                                        <span>{t('orders.employeeDiscount')}</span>
                                         <span>-Bs {Number(order.discountApplied).toFixed(2)}</span>
                                     </div>
                                 )}
                                 {order.fulfillmentType === 'DELIVERY' && (
                                     <div className={styles.totalsRow}>
-                                        <span>Costo de envío</span>
+                                        <span>{t('orders.shippingCost')}</span>
                                         <span>Bs {Number(order.shippingCost).toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className={styles.totalsRowFinal}>
-                                    <span>Total</span>
+                                    <span>{t('orders.total')}</span>
                                     <span>Bs {Number(order.total).toFixed(2)}</span>
                                 </div>
                             </div>

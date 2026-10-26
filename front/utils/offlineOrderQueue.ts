@@ -1,4 +1,6 @@
 import { CreateOrderRequest } from "@/types/orders.types";
+import { ORDERS_STORE, isOfflineDbSupported, withOfflineStore } from "./offlineDb";
+import { getCurrentTenantId } from "./tenant";
 
 export interface OfflineOrder {
     id: string;
@@ -8,43 +10,16 @@ export interface OfflineOrder {
     lastError?: string;
 }
 
-const DB_NAME = "stella-femme-offline";
-const DB_VERSION = 2;
-const STORE_NAME = "orders";
+// La base es por tienda (ver offlineDb.ts): solo se ven y sincronizan los pedidos de la tienda activa
+const isSupported = () => isOfflineDbSupported() && getCurrentTenantId() !== null;
 
-const isSupported = () => typeof window !== "undefined" && "indexedDB" in window;
-
-function openDb(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: "id" });
-            }
-            if (!db.objectStoreNames.contains("inventory_queue")) {
-                db.createObjectStore("inventory_queue", { keyPath: "id" });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function withStore<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(STORE_NAME, mode);
-        const request = fn(tx.objectStore(STORE_NAME));
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        tx.oncomplete = () => db.close();
-    });
-}
+const withStore = <T,>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>) =>
+    withOfflineStore(ORDERS_STORE, mode, fn);
 
 // Guarda un pedido armado offline (mismo shape que POST /orders) para reintentarlo al volver la conexión
 export async function addOfflineOrder(payload: CreateOrderRequest): Promise<OfflineOrder> {
-    if (!isSupported()) throw new Error("IndexedDB no disponible en este navegador");
+    if (!isOfflineDbSupported()) throw new Error("IndexedDB no disponible en este navegador");
+    if (!getCurrentTenantId()) throw new Error("No hay una tienda seleccionada para guardar el pedido offline");
 
     const order: OfflineOrder = {
         id:

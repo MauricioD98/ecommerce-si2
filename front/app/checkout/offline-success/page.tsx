@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React from 'react';
 import OfflineSuccessClient from '@/components/modules/checkout/OfflineSuccessClient';
 
@@ -7,12 +9,13 @@ export default function Page() {
     return <OfflineSuccessClient />;
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: 'Pedido guardado',
-        description: 'Tu pedido se guardó en tu dispositivo y se enviará al recuperar la conexión',
+        title: t("offlineSuccessTitle"),
+        description: t("offlineSuccessDescription"),
         icons: {
-            icon: '/favicon.ico',
+            icon: "/favicon.ico",
         },
     };
 }

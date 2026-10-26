@@ -1,6 +1,12 @@
 import { apiClient } from "./axios.config";
 import { RoleItem, RolePayload } from "@/types/admin.types";
 
+// Un permiso del catálogo de la plataforma y si el usuario actual puede otorgarlo
+export interface PermissionCatalogItem {
+    permission: string;
+    grantable: boolean;
+}
+
 export class RolesService {
     private static readonly ENDPOINT = "/roles";
 
@@ -13,6 +19,12 @@ export class RolesService {
     // Roles que el usuario actual puede asignar a un empleado (nunca más permisos de los propios)
     static async getAssignableRoles(): Promise<RoleItem[]> {
         const response = await apiClient.get<RoleItem[]>(`${this.ENDPOINT}/assignable`);
+        return response.data;
+    }
+
+    // Catálogo definido por la plataforma (GET /roles/permissions): la tienda no lo puede ampliar
+    static async getPermissionCatalog(): Promise<PermissionCatalogItem[]> {
+        const response = await apiClient.get<PermissionCatalogItem[]>(`${this.ENDPOINT}/permissions`);
         return response.data;
     }
 

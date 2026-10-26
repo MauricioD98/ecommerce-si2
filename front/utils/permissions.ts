@@ -17,24 +17,33 @@ export const Permission = {
 
 export type PermissionValue = (typeof Permission)[keyof typeof Permission];
 
-// Opciones del formulario de roles (checkboxes)
-export const PERMISSION_OPTIONS: { value: PermissionValue; label: string; description: string }[] = [
-    { value: "MANAGE_INVENTORY", label: "Inventario", description: "Stock y ofertas de la sucursal" },
-    { value: "VIEW_ORDERS", label: "Pedidos", description: "Ver y gestionar pedidos" },
-    { value: "MANAGE_USERS", label: "Usuarios", description: "Crear y editar empleados" },
-    { value: "MANAGE_BRANCHES", label: "Sucursales", description: "Crear y editar sucursales" },
-    { value: "MANAGE_ROLES", label: "Roles", description: "Crear y editar roles" },
-    { value: "SEND_MARKETING", label: "Marketing", description: "Enviar correos promocionales a clientes" },
-    { value: "VIEW_REPORTS", label: "Reportes", description: "Ver métricas y consultar datos con IA" },
-    { value: "MANAGE_PRODUCTS", label: "Productos", description: "Catálogo de productos y categorías" },
-    { value: "ALL_BRANCHES", label: "Todas las sucursales", description: "Actuar sobre cualquier sucursal, no solo la propia" },
-    { value: "USE_POS", label: "Punto de venta", description: "Cobrar ventas físicas en la caja de la sucursal" },
-    { value: "PROCESS_RETURNS", label: "Devoluciones", description: "Recibir devoluciones y reingresarlas al stock o a mermas" },
+// Orden de los checkboxes del formulario de roles. Etiqueta y descripción de cada permiso:
+// messages/<idioma>.json → AdminRoles.perms.<PERMISO>
+export const PERMISSION_OPTIONS: PermissionValue[] = [
+    "MANAGE_INVENTORY",
+    "VIEW_ORDERS",
+    "MANAGE_USERS",
+    "MANAGE_BRANCHES",
+    "MANAGE_ROLES",
+    "SEND_MARKETING",
+    "VIEW_REPORTS",
+    "MANAGE_PRODUCTS",
+    "ALL_BRANCHES",
+    "USE_POS",
+    "PROCESS_RETURNS",
 ];
 
-export const PERMISSION_LABELS: Record<string, string> = Object.fromEntries(
-    PERMISSION_OPTIONS.map((option) => [option.value, option.label])
-);
+export const isPermission = (value: string): value is PermissionValue =>
+    (PERMISSION_OPTIONS as string[]).includes(value);
+
+// Roles base: el backend los crea con estos nombres fijos en cada tienda. Se traducen al mostrarlos
+// (AdminRoles.baseRoles.<clave>); los roles creados por el usuario se muestran tal cual.
+export const BASE_ROLE_KEYS: Record<string, "superAdmin" | "branchAdmin" | "employee" | "customer"> = {
+    "Super Admin": "superAdmin",
+    "Admin Sucursal": "branchAdmin",
+    "Empleado": "employee",
+    "Cliente": "customer",
+};
 
 // Permisos que dan acceso al panel /admin
 const PANEL_PERMISSIONS: PermissionValue[] = [

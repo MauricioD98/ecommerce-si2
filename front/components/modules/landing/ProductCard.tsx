@@ -4,6 +4,7 @@ import { Product } from '@/types/product.types';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ShoppingBag, Check } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from "./product-card.module.scss";
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 import { useCart } from '@/hooks/useCart';
@@ -11,6 +12,7 @@ import { useCart } from '@/hooks/useCart';
 export default function ProductCard({ product }: { product: Product }) {
     const { items, addProductToCart } = useCart();
     const [added, setAdded] = useState(false);
+    const t = useTranslations('Store.card');
     const id = product.id;
 
     const inCartQty = useMemo(() => {
@@ -67,7 +69,7 @@ export default function ProductCard({ product }: { product: Product }) {
                     <span
                         className={`${styles.stock} ${!isInStock ? styles.outOfStock : ""}`}
                     >
-                        {isInStock ? `${availableStock} en stock` : "Agotado"}
+                        {isInStock ? t('inStock', { count: availableStock }) : t('soldOut')}
                     </span>
                 </div>
 
@@ -76,17 +78,17 @@ export default function ProductCard({ product }: { product: Product }) {
                     className={`${styles.addBtn} ${added ? styles.added : ""}`}
                     disabled={!isInStock}
                     onClick={handleQuickAdd}
-                    aria-label={`Agregar ${product.name} al carrito`}
+                    aria-label={t('addLabel', { name: product.name })}
                 >
                     {added ? (
                         <>
                             <Check size={15} />
-                            <span>¡Agregado al carrito!</span>
+                            <span>{t('added')}</span>
                         </>
                     ) : (
                         <>
                             <ShoppingBag size={15} />
-                            <span>{isInStock ? 'Añadir al carrito' : 'Sin stock'}</span>
+                            <span>{isInStock ? t('add') : t('noStock')}</span>
                         </>
                     )}
                 </button>

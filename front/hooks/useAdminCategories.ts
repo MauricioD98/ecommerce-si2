@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { CategoryService } from "@/service/api/category.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { Category, CategoryPayload } from "@/types/admin.types";
@@ -7,6 +8,7 @@ const PAGE_SIZE = 10;
 
 // Categorías paginadas (incluye inactivas) con búsqueda por nombre/descripción, para el panel admin
 export function useAdminCategories(page: number, search: string) {
+    const t = useTranslations("AdminErrors");
     const [categories, setCategories] = useState<Category[]>([]);
     const [total, setTotal] = useState(0);
     const [refreshKey, setRefreshKey] = useState(0);
@@ -26,7 +28,7 @@ export function useAdminCategories(page: number, search: string) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar las categorías."));
+                if (active) setError(getApiErrorMessage(error, t("categories")));
             })
             .finally(() => {
                 if (active) setLoadedKey(key);

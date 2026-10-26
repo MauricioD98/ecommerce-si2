@@ -1,0 +1,42 @@
+{
+  "status": {
+    "400": "Solicitud inválida",
+    "401": "No autorizado",
+    "403": "No tienes permiso para realizar esta acción",
+    "404": "Recurso no encontrado",
+    "409": "Conflicto con el estado actual del recurso",
+    "429": "Demasiadas solicitudes. Inténtalo de nuevo en unos minutos",
+    "500": "Error interno del servidor",
+    "502": "Error al comunicarse con un servicio externo",
+    "503": "Servicio no disponible. Inténtalo de nuevo más tarde"
+  },
+  "EMAIL_TAKEN": "El correo electrónico ya está registrado",
+  "REGISTER_FAILED": "Ocurrió un error durante el registro",
+  "USER_NOT_FOUND": "Usuario no encontrado",
+  "INVALID_CREDENTIALS": "Email o contraseña inválidos",
+  "TOO_MANY_ATTEMPTS": {
+    "one": "Demasiados intentos fallidos. Inténtalo de nuevo en {count} minuto",
+    "other": "Demasiados intentos fallidos. Inténtalo de nuevo en {count} minutos"
+  },
+  "ACCOUNT_LOCKED": "Demasiados intentos fallidos. Tu cuenta quedó bloqueada por 5 minutos",
+  "PRODUCT_NOT_FOUND": "Producto no encontrado",
+  "SKU_TAKEN": "Ya existe un producto con el SKU {sku}",
+  "CATEGORY_NOT_FOUND": "La categoría '{id}' no existe",
+  "USER_WITHOUT_BRANCH": "El usuario no está asignado a ninguna sucursal",
+  "PLAN_UNAVAILABLE": "Este plan no está disponible en este momento",
+  "OWNER_EMAIL_TAKEN": "Ese email ya administra una tienda. Usa otro o escríbenos.",
+  "DOMAIN_TAKEN": "Ese dominio ya está asociado a otra tienda",
+  "PAYMENT_URL_MISSING": "Stripe no devolvió la URL de pago",
+  "CHECKOUT_NOT_FOUND": "No encontramos ese pago",
+  "SIGNUP_NOT_FOUND": "Solicitud no encontrada",
+  "SIGNUP_NOT_PAID": "Esa solicitud no fue pagada",
+  "SIGNUP_IN_PROGRESS": "La tienda ya está creada o se está creando en este momento",
+  "CONTACT_SEND_FAILED": "No pudimos enviar tu mensaje. Inténtalo de nuevo más tarde.",
+  "TENANT_NOT_FOUND": "Tienda no encontrada",
+  "SUBSCRIPTION_ALREADY_ACTIVE": "Tu tienda ya tiene una suscripción activa. Usa \"Gestionar suscripción\" para cambiar de plan o cancelar.",
+  "NO_BILLING_ACCOUNT": "Tu tienda todavía no tiene una suscripción en Stripe",
+  "BILLING_OWNER_ONLY": "Solo el Super Admin de la tienda puede gestionar la suscripción",
+  "CONNECT_NOT_ENABLED": "Tu cuenta de Stripe todavía no tiene Connect activado. Actívalo en el Dashboard de Stripe (Connect → Empezar) y vuelve a intentarlo.",
+  "ROLE_PERMISSIONS_EXCEED": "No puedes otorgar permisos que tu rol no tiene: {permissions}",
+  "ROLE_TOO_POWERFUL": "No puedes editar un rol con más permisos que el tuyo"
+}

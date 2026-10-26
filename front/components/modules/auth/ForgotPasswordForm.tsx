@@ -3,22 +3,25 @@ import styles from "./auth-form.module.scss"
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle, Eye, EyeOff, Info } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { authService } from "@/service/api/auth.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 
 const OTP_LENGTH = 6;
 
+// key: Auth.requirements.<key> en messages/<idioma>.json
 const PASSWORD_REQUIREMENTS = [
-    { label: "Al menos 8 caracteres", test: (p: string) => p.length >= 8 },
-    { label: "Una letra mayúscula", test: (p: string) => /[A-Z]/.test(p) },
-    { label: "Una letra minúscula", test: (p: string) => /[a-z]/.test(p) },
-    { label: "Un número", test: (p: string) => /\d/.test(p) },
-    { label: "Un carácter especial (@$!%*?&)", test: (p: string) => /[@$!%*?&]/.test(p) },
-];
+    { key: "minLength", test: (p: string) => p.length >= 8 },
+    { key: "uppercase", test: (p: string) => /[A-Z]/.test(p) },
+    { key: "lowercase", test: (p: string) => /[a-z]/.test(p) },
+    { key: "number", test: (p: string) => /\d/.test(p) },
+    { key: "special", test: (p: string) => /[@$!%*?&]/.test(p) },
+] as const;
 
 // Recuperación de contraseña en 3 pasos: 1) correo -> 2) código de 6 dígitos -> 3) nueva contraseña
 export default function ForgotPasswordForm() {
     const router = useRouter();
+    const t = useTranslations("Auth");
 
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [email, setEmail] = useState("");
@@ -48,7 +51,7 @@ export default function ForgotPasswordForm() {
             await authService.forgotPassword(email);
             return true;
         } catch (err) {
-            setError(getApiErrorMessage(err, "No se pudo enviar el código. Inténtalo de nuevo."));
+            setError(getApiErrorMessage(err, t("forgot.sendFailed")));
             return false;
         } finally {
             setIsLoading(false);
@@ -67,7 +70,7 @@ export default function ForgotPasswordForm() {
     const handleResend = async () => {
         if (await requestCode()) {
             setOtp("");
-            setInfo("Te enviamos un nuevo código.");
+            setInfo(t("forgot.codeResent"));
         }
     };
 
@@ -84,7 +87,7 @@ export default function ForgotPasswordForm() {
             await authService.verifyOtp(email, otp);
             setStep(3);
         } catch (err) {
-            setOtpError(getApiErrorMessage(err, "Código incorrecto o vencido"));
+            setOtpError(getApiErrorMessage(err, t("forgot.invalidCode")));
         } finally {
             setIsLoading(false);
         }
@@ -103,11 +106,11 @@ export default function ForgotPasswordForm() {
             // Se deja ver el aviso un momento y se sale del formulario hacia el login
             setTimeout(() => router.push("/auth/login"), 1800);
         } catch (err) {
-            const message = getApiErrorMessage(err, "No se pudo actualizar la contraseña. Inténtalo de nuevo.");
+            const message = getApiErrorMessage(err, t("forgot.updateFailed"));
             if (/código no es válido|venció/i.test(message)) {
                 // El código expiró o se anuló mientras se escribía la contraseña: hay que ingresarlo de nuevo
                 setOtp("");
-                setOtpError("El código venció o ya no es válido. Solicita uno nuevo.");
+                setOtpError(t("forgot.codeExpired"));
                 setStep(2);
             } else {
                 // Contraseña débil u otro error: se queda en el paso 3 mostrando el mensaje de la API
@@ -125,13 +128,13 @@ export default function ForgotPasswordForm() {
         </div>
     );
 
-    const title = done || step === 1 ? "Recuperar contraseña" : step === 2 ? "Ingresa tu código" : "Nueva contraseña";
+    const title = done || step === 1 ? t("forgot.titleEmail") : step === 2 ? t("forgot.titleCode") : t("forgot.titlePassword");
 
     return (
         <section className={styles.section}>
             {done && (
                 <div className={styles.toast} role="status">
-                    <Check size={18} strokeWidth={3} /> Contraseña actualizada correctamente
+                    <Check size={18} strokeWidth={3} /> {t("forgot.updatedToast")}
                 </div>
             )}
 
@@ -142,38 +145,38 @@ export default function ForgotPasswordForm() {
                     {done ? (
                         <>
                             <div className={styles.successMessage}>
-                                Tu contraseña se actualizó correctamente. Te llevaremos a iniciar sesión...
+                                {t("forgot.updatedMessage")}
                             </div>
                             <button type="button" className={styles.submitButton} onClick={() => router.push("/auth/login")}>
-                                Ir a iniciar sesión
+                                {t("forgot.goToLogin")}
                             </button>
                         </>
                     ) : step === 1 ? (
                         <>
                             <p className={styles.description}>
-                                Ingresa tu correo electrónico y te enviaremos un código de 6 dígitos.
+                                {t("forgot.emailIntro")}
                             </p>
                             <form className={styles.form} onSubmit={handleEmailSubmit}>
                                 {errorBox}
                                 <div className={styles.field}>
-                                    <label htmlFor="email">Correo electrónico</label>
-                                    <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@ejemplo.com" required autoComplete="email" />
+                                    <label htmlFor="email">{t("email")}</label>
+                                    <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("emailPlaceholder")} required autoComplete="email" />
                                 </div>
                                 <button type="submit" className={styles.submitButton} disabled={isLoading}>
-                                    {isLoading ? "Enviando..." : "Enviar código"}
+                                    {isLoading ? t("forgot.sending") : t("forgot.sendCode")}
                                 </button>
                             </form>
                         </>
                     ) : step === 2 ? (
                         <>
                             <p className={styles.description}>
-                                Hemos enviado un código de 6 dígitos a <strong>{email}</strong>. Vence en 10 minutos.
+                                {t.rich("forgot.codeIntro", { email, strong: (chunks) => <strong>{chunks}</strong> })}
                             </p>
                             <form className={styles.form} onSubmit={handleOtpSubmit}>
                                 {errorBox}
                                 {info && <div className={styles.successMessage}>{info}</div>}
                                 <div className={styles.field}>
-                                    <label htmlFor="otp">Código de verificación</label>
+                                    <label htmlFor="otp">{t("forgot.codeLabel")}</label>
                                     <input
                                         id="otp"
                                         className={styles.otpInput}
@@ -193,31 +196,31 @@ export default function ForgotPasswordForm() {
                                     {otpError && <span className={styles.fieldError} role="alert">{otpError}</span>}
                                 </div>
                                 <button type="submit" className={styles.submitButton} disabled={otp.length !== OTP_LENGTH || isLoading}>
-                                    {isLoading ? "Validando..." : "Validar código"}
+                                    {isLoading ? t("forgot.validating") : t("forgot.validate")}
                                 </button>
                                 <button type="button" className={styles.linkButton} onClick={handleResend} disabled={isLoading}>
-                                    ¿No recibiste el código? Volver a enviar
+                                    {t("forgot.resend")}
                                 </button>
                                 <button type="button" className={styles.linkButton} onClick={() => { setError(null); setInfo(null); setOtpError(null); setStep(1); }}>
-                                    Cambiar correo
+                                    {t("forgot.changeEmail")}
                                 </button>
                             </form>
                         </>
                     ) : (
                         <>
-                            <p className={styles.description}>Elige una contraseña nueva para tu cuenta.</p>
+                            <p className={styles.description}>{t("forgot.passwordIntro")}</p>
                             <form className={styles.form} onSubmit={handleResetSubmit} noValidate>
                                 {errorBox}
 
                                 <div className={styles.field}>
-                                    <label htmlFor="password">Nueva contraseña</label>
+                                    <label htmlFor="password">{t("forgot.newPassword")}</label>
                                     <div className={styles.inputWrapper}>
-                                        <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Ingresa tu nueva contraseña" required autoComplete="new-password" onFocus={() => setIsPasswordFocused(true)} onBlur={() => setIsPasswordFocused(false)} />
+                                        <input type={showPassword ? "text" : "password"} id="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t("forgot.newPasswordPlaceholder")} required autoComplete="new-password" onFocus={() => setIsPasswordFocused(true)} onBlur={() => setIsPasswordFocused(false)} />
                                         <button
                                             type="button"
                                             className={styles.toggleButton}
                                             onClick={() => setShowPassword(!showPassword)}
-                                            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                            aria-label={showPassword ? t("hidePassword") : t("showPassword")}
                                         >
                                             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                         </button>
@@ -226,9 +229,9 @@ export default function ForgotPasswordForm() {
                                                 {PASSWORD_REQUIREMENTS.map((req) => {
                                                     const met = req.test(password);
                                                     return (
-                                                        <li key={req.label} className={`${styles.checkItem} ${met ? styles.checkItemMet : ""}`}>
+                                                        <li key={req.key} className={`${styles.checkItem} ${met ? styles.checkItemMet : ""}`}>
                                                             {met ? <Check size={14} strokeWidth={3} /> : <Circle size={10} />}
-                                                            {req.label}
+                                                            {t(`requirements.${req.key}`)}
                                                         </li>
                                                     );
                                                 })}
@@ -238,23 +241,23 @@ export default function ForgotPasswordForm() {
                                 </div>
 
                                 <div className={styles.field}>
-                                    <label htmlFor="confirmPassword">Confirmar contraseña</label>
+                                    <label htmlFor="confirmPassword">{t("confirmPassword")}</label>
                                     <div className={styles.inputWrapper}>
-                                        <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repite tu contraseña" required autoComplete="new-password" aria-invalid={confirmMismatch} />
+                                        <input type={showConfirmPassword ? "text" : "password"} id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t("confirmPasswordPlaceholder")} required autoComplete="new-password" aria-invalid={confirmMismatch} />
                                         <button
                                             type="button"
                                             className={styles.toggleButton}
                                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                            aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                            aria-label={showConfirmPassword ? t("hidePassword") : t("showPassword")}
                                         >
                                             {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                         </button>
                                     </div>
-                                    {confirmMismatch && <span className={styles.fieldError}>Las contraseñas no coinciden</span>}
+                                    {confirmMismatch && <span className={styles.fieldError}>{t("passwordsDontMatch")}</span>}
                                 </div>
 
                                 <button type="submit" className={styles.submitButton} disabled={!canSubmitPassword || isLoading}>
-                                    {isLoading ? "Guardando..." : "Actualizar contraseña"}
+                                    {isLoading ? t("forgot.saving") : t("forgot.update")}
                                 </button>
                             </form>
                         </>
@@ -262,7 +265,7 @@ export default function ForgotPasswordForm() {
 
                     {!done && (
                         <button type="button" className={styles.linkButton} onClick={() => router.push("/auth/login")}>
-                            Volver a iniciar sesión
+                            {t("backToLogin")}
                         </button>
                     )}
                 </div>

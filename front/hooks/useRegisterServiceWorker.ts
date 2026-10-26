@@ -12,7 +12,23 @@ export function useRegisterServiceWorker(): void {
         // CacheFirst de sw.js para _next/static/ seguiría sirviendo chunks viejos para siempre y
         // rompería con "module factory is not available" en cada reinicio. Solo tiene sentido en
         // producción, donde los chunks son realmente inmutables entre builds.
-        if (process.env.NODE_ENV !== "production") return;
+        // No registrarlo no alcanza: un SW que quedó de antes en el mismo origen (un build de producción
+        // en localhost:3000, o haber activado push) sigue controlando la página y sirve payloads RSC
+        // viejos → "chunk.reason.enqueueModel is not a function". En dev se elimina junto con sus cachés.
+        if (process.env.NODE_ENV !== "production") {
+            navigator.serviceWorker
+                .getRegistrations()
+                .then(async (registrations) => {
+                    if (registrations.length === 0) return;
+                    await Promise.all(registrations.map((registration) => registration.unregister()));
+                    const keys = await caches.keys();
+                    await Promise.all(keys.filter((key) => key.startsWith("sf-")).map((key) => caches.delete(key)));
+                    // La página actual todavía la controla el SW viejo: recargar una vez ya sin él
+                    window.location.reload();
+                })
+                .catch(() => undefined);
+            return;
+        }
 
         navigator.serviceWorker.register("/sw.js").catch(() => {
             // Best-effort: si falla (ej. navegador sin soporte real), la app sigue funcionando online

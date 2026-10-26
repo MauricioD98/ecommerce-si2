@@ -3,6 +3,7 @@ import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-
 import { loadStripe, StripeElementsOptions } from "@stripe/stripe-js";
 import styles from "./stripe-payment-form.module.scss"; // Ajusta ruta si es necesario
 import { Loader2 } from "lucide-react"; // Importando Loader2 correctamente
+import { useLocale, useTranslations } from "next-intl";
 
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 if (!publishableKey) {
@@ -24,12 +25,16 @@ export function StripePaymentProvider({
     onSuccess: (paymentIntent: string) => void;
     onError: (error: string) => void;
 }) {
+    const t = useTranslations("Checkout.stripe");
+    // es, en, fr y zh son locales válidos de Stripe Elements: el formulario de tarjeta sale en el mismo idioma
+    const locale = useLocale();
+
     // Sin llave pública no hay nada que hacer: se avisa al padre en vez de fallar en silencio
     useEffect(() => {
         if (!stripePromise) {
-            onError('No se pudo inicializar Stripe: falta configurar NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.');
+            onError(t("missingKey"));
         }
-    }, [onError]);
+    }, [onError, t]);
 
     // Nunca se monta <Elements>/<PaymentElement> sin un clientSecret válido ni sin la llave pública
     if (!clientSecret || !stripePromise) return null;
@@ -50,7 +55,8 @@ export function StripePaymentProvider({
 
     const options: StripeElementsOptions = {
         clientSecret,
-        appearance
+        appearance,
+        locale,
     };
 
     return (
@@ -76,6 +82,7 @@ export function StripePaymentForm({
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isReady, setIsReady] = useState(false);
+    const t = useTranslations("Checkout.stripe");
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -97,12 +104,12 @@ export function StripePaymentForm({
             if (error) {
                 // Error de validación/tarjeta (ej. incompleta, rechazada): se queda local, junto al botón.
                 // No se propaga con onError() para no duplicar el mismo texto en el panel del padre.
-                setErrorMessage(error.message || "Algo salió mal al procesar el pago");
+                setErrorMessage(error.message || t("genericError"));
             } else if (paymentIntent?.status === "succeeded" || paymentIntent?.status === "processing") {
                 onSuccess(paymentIntent.id);
             }
         } catch {
-            setErrorMessage("Ocurrió un error inesperado al procesar el pago. Inténtalo de nuevo.");
+            setErrorMessage(t("unexpectedError"));
         } finally {
             setIsProcessing(false);
         }
@@ -113,14 +120,14 @@ export function StripePaymentForm({
             {!isReady && (
                 <div className={styles.loadingSkeleton}>
                     <Loader2 className={styles.spinner} />
-                    <span>Cargando formulario de pago seguro de Stripe...</span>
+                    <span>{t("loadingForm")}</span>
                 </div>
             )}
 
             <PaymentElement
                 onReady={() => setIsReady(true)}
                 onLoadError={(event) => {
-                    onError(event.error?.message || 'No se pudo cargar el formulario de pago. Verifica la configuración de Stripe.');
+                    onError(event.error?.message || t("loadFailed"));
                 }}
             />
 
@@ -134,10 +141,10 @@ export function StripePaymentForm({
                 >
                     {isProcessing ? (
                         <>
-                            <Loader2 className={styles.spinner} /> Procesando pago...
+                            <Loader2 className={styles.spinner} /> {t("processing")}
                         </>
                     ) : (
-                        `Pagar Bs ${amount.toFixed(2)}`
+                        t("pay", { amount: amount.toFixed(2) })
                     )}
                 </button>
             </div>
@@ -155,27 +162,30 @@ export function StripePaymentPlaceholder({
     isLoading: boolean;
     onRetry?: () => void;
 }) {
+    const t = useTranslations("Checkout.stripe");
+    const tPayment = useTranslations("Checkout.payment");
+
     return (
         <div className={styles.form}>
             {isLoading && (
                 <div className={styles.loadingSkeleton}>
                     <Loader2 className={styles.spinner} />
-                    <span>Iniciando pasarela de pago segura con Stripe...</span>
+                    <span>{t("starting")}</span>
                 </div>
             )}
             <div className={styles.submitContainer}>
                 {onRetry ? (
                     <button type="button" onClick={onRetry} className={styles.retryButton}>
-                        Reintentar preparar pago
+                        {tPayment("retryPrepare")}
                     </button>
                 ) : (
                     <button type="button" disabled className={styles.submitButton}>
                         {isLoading ? (
                             <>
-                                <Loader2 className={styles.spinner} /> Preparando pago...
+                                <Loader2 className={styles.spinner} /> {t("preparing")}
                             </>
                         ) : (
-                            `Pagar Bs ${amount.toFixed(2)}`
+                            t("pay", { amount: amount.toFixed(2) })
                         )}
                     </button>
                 )}

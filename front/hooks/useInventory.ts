@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { InventoryService } from "@/service/api/inventory.service";
 import { ProductService } from "@/service/api/product.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
@@ -27,6 +28,7 @@ export interface InventoryRow {
 
 // Catálogo + stock y descuentos de una sucursal con soporte offline y caché local
 export function useInventory(branchId: string | null) {
+    const t = useTranslations("AdminErrors");
     const [products, setProducts] = useState<Product[]>([]);
     const [productsLoadedFor, setProductsLoadedFor] = useState<string | null>(null);
     const [inventoryMap, setInventoryMap] = useState<Record<string, InventoryItem>>({});
@@ -44,7 +46,7 @@ export function useInventory(branchId: string | null) {
             if (cached && cached.length > 0 && active()) {
                 setProducts(cached);
             } else if (active()) {
-                setError(getApiErrorMessage(err, "No se pudieron cargar los productos."));
+                setError(getApiErrorMessage(err, t("products")));
             }
         } finally {
             if (active()) setProductsLoadedFor(bId);
@@ -64,7 +66,7 @@ export function useInventory(branchId: string | null) {
                 setInventoryMap(Object.fromEntries(cached.map((item) => [item.productId, item])));
                 setError(null);
             } else if (active()) {
-                setError(getApiErrorMessage(err, "No se pudo cargar el inventario de la sucursal."));
+                setError(getApiErrorMessage(err, t("inventory")));
             }
         } finally {
             if (active()) setLoadedBranchId(bId);

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React, { Suspense } from 'react';
 import RegisterForm from '@/components/modules/auth/RegisterForm';
 
@@ -11,9 +13,10 @@ export default function page() {
     );
 };
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Crear cuenta",
-        description: "Registro de nuevos usuarios",
+        title: t("registerTitle"),
+        description: t("registerDescription"),
     };
 }

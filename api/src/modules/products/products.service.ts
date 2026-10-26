@@ -10,6 +10,8 @@ import { BulkDiscountDto } from '../branches/dto/bulk-discount.dto';
 import { getBranchPrice } from '../../common/utils/pricing';
 import { hasAllBranches } from '../../common/utils/permission.util';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
+import { i18nMessage } from '../../i18n/i18n-message';
+import { currentLanguage, localizeProduct, normalizeTranslations, readTranslations } from './product-translations';
 
 @Injectable()
 export class ProductsService {
@@ -25,17 +27,13 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
     where: { sku: createProductDto.sku},
   });
   if (existingSku) {
-    throw new ConflictException(
-      `Product with SKU ${createProductDto.sku} already exist`,
-    );
+    throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: createProductDto.sku }));
   }
   const category = await this.prisma.category.findUnique({
     where: { id: createProductDto.categoryId },
   });
   if (!category) {
-    throw new BadRequestException(
-      `Category with ID '${createProductDto.categoryId}' does not exist`,
-    );
+    throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: createProductDto.categoryId }));
   }
 
   // Exclusividad de sucursal: nunca se confía en lo que mande el cliente para esto. Sin
@@ -43,11 +41,11 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
   // cualquier branchId que haya mandado); con ALL_BRANCHES, se respeta lo enviado (null = global).
   const branchId = hasAllBranches(actor) ? (createProductDto.branchId ?? null) : actor.branchId;
   if (!hasAllBranches(actor) && !branchId) {
-    throw new BadRequestException('User is not assigned to a branch');
+    throw new BadRequestException(i18nMessage('errors.USER_WITHOUT_BRANCH'));
   }
 
   // collectionIds no es un campo escalar de Product: se conecta aparte vía relación m2m
-  const { collectionIds, ...productData } = createProductDto;
+  const { collectionIds, translations, ...productData } = createProductDto;
 
   // El catálogo es global: el producto nace con stock 0 en todas las sucursales hasta que se asigne en el inventario
   const product = await this.prisma.product.create({
@@ -56,6 +54,7 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
         branchId,
         price: new Prisma.Decimal(productData.price),
         stock: 0,
+        translations: normalizeTranslations(translations ?? {}) as Prisma.InputJsonValue,
         ...(collectionIds && collectionIds.length > 0
           ? { collections: { connect: collectionIds.map((id) => ({ id })) } }
           : {}),
@@ -130,10 +129,20 @@ if (isActive !== undefined) {
 }
 
 if (search) {
-  where.OR = [
+  const matches: Prisma.ProductWhereInput[] = [
     { name: { contains: search, mode: 'insensitive' } },
     { description: { contains: search, mode: 'insensitive' } },
   ];
+  // Quien navega en inglés busca "dress", no "vestido": se busca también en la traducción de su
+  // idioma. Los filtros JSON de Prisma no tienen modo insensible a mayúsculas: es coincidencia exacta.
+  const language = currentLanguage();
+  if (language !== 'es') {
+    matches.push(
+      { translations: { path: [language, 'name'], string_contains: search } },
+      { translations: { path: [language, 'description'], string_contains: search } },
+    );
+  }
+  where.OR = matches;
 }
 
 // Colección (ej. "otono-invierno"): un producto puede estar en varias, alcanza con que matchee una
@@ -215,7 +224,7 @@ async findOne(id: string, branchId?: string): Promise<ProductResponseDto> {
   });
 
   if (!product) {
-    throw new NotFoundException('Product not found');
+    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
   }
 
   if (!branchId) {
@@ -235,7 +244,7 @@ async update(
   });
 
   if (!existingProduct) {
-    throw new NotFoundException('Product not found');
+    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
   }
 
   if (updateProductDto.sku && updateProductDto.sku !== existingProduct.sku) {
@@ -274,7 +283,7 @@ async update(
   });
 
   if (!existingProduct) {
-    throw new NotFoundException('Product not found');
+    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
   }
 
   // Igual que en create(): sin ALL_BRANCHES no se puede reasignar la exclusividad de sucursal a
@@ -291,9 +300,7 @@ async update(
     });
 
     if (skuTaken) {
-      throw new ConflictException(
-        `Product with SKU ${updateProductDto.sku} already exists`,
-      );
+      throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: updateProductDto.sku }));
     }
   }
 
@@ -304,15 +311,18 @@ async update(
     });
 
     if (!categoryExists) {
-      throw new BadRequestException(
-        `Category with ID '${updateProductDto.categoryId}' does not exist`,
-      );
+      throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: updateProductDto.categoryId }));
     }
   }
 
   // 4. Preparar payload para Prisma (collectionIds no es un campo escalar: se maneja aparte)
-  const { collectionIds, ...rest } = updateProductDto;
+  const { collectionIds, translations, ...rest } = updateProductDto;
   const updateData: Prisma.ProductUpdateInput = { ...rest };
+
+  // translations: reemplaza el objeto completo (el admin manda los 4 idiomas juntos)
+  if (translations !== undefined) {
+    updateData.translations = normalizeTranslations(translations) as Prisma.InputJsonValue;
+  }
 
   if (updateProductDto.price !== undefined) {
     updateData.price = new Prisma.Decimal(updateProductDto.price);
@@ -343,7 +353,7 @@ async updateStock(id: string, quantity: number): Promise<ProductResponseDto> {
   });
 
   if (!product) {
-    throw new NotFoundException('Product not found');
+    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
   }
 
   const newStock = product.stock + quantity;
@@ -381,7 +391,7 @@ async remove(id: string): Promise<{ message: string; data: ProductResponseDto }>
   });
 
   if (!existing) {
-    throw new NotFoundException('Product not found');
+    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
   }
 
   // Idempotente: archivar algo ya archivado no es un error, el resultado buscado ya se cumple
@@ -427,12 +437,23 @@ async remove(id: string): Promise<{ message: string; data: ProductResponseDto }>
   context?: { inventory: InventoryAggregate | null },
  ): ProductResponseDto {
   const inventory = context?.inventory ?? null;
+  const translations = readTranslations(product.translations);
+  const locale = currentLanguage();
+  const localized = localizeProduct({ name: product.name, description: product.description }, translations, locale);
   const hasDiscount =
     inventory != null &&
     (inventory.discountPrice != null || inventory.discountPercentage != null);
 
   return {
     ...product,
+    // name/description para mostrar; base* + translations para el formulario de edición del admin
+    // (si editara el name ya traducido, pisaría el texto base en español con otro idioma)
+    name: localized.name,
+    description: localized.description,
+    baseName: product.name,
+    baseDescription: product.description,
+    translations,
+    locale,
     price: Number(product.price),
     effectivePrice: getBranchPrice(product, inventory),
     branchStock: context ? (inventory?.stock ?? 0) : null,

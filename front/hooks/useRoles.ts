@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { RolesService } from "@/service/api/roles.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { RoleItem, RolePayload } from "@/types/admin.types";
 
 // Todos los roles (vista /admin/roles). Las acciones lanzan el error para que el formulario lo muestre
 export function useRoles() {
+    const t = useTranslations("AdminErrors");
     const [roles, setRoles] = useState<RoleItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export function useRoles() {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudieron cargar los roles."));
+                if (active) setError(getApiErrorMessage(error, t("roles")));
             })
             .finally(() => {
                 if (active) setIsLoading(false);

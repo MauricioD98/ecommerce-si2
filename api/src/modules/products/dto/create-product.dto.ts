@@ -2,6 +2,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {ArrayNotEmpty,ArrayUnique,IsArray,IsBoolean,IsEnum,IsNotEmpty,IsNumber,IsOptional,IsString,IsUUID,MaxLength,Min,} from 'class-validator';
+import { i18nMessage } from '../../../i18n/i18n-message';
+import { IsProductTranslations, type ProductTranslations } from '../product-translations';
 
 export enum WomenSize {
   XS = 'XS',
@@ -30,11 +32,11 @@ export class CreateProductDto {
     example: [WomenSize.S, WomenSize.M, WomenSize.L],
   })
   @IsArray({ message: 'Las tallas deben enviarse como una lista' })
-  @ArrayNotEmpty({ message: 'Debe indicar al menos una talla' })
+  @ArrayNotEmpty({ message: i18nMessage('validation.SIZES_REQUIRED') })
   @ArrayUnique({ message: 'Las tallas no pueden repetirse' })
   @IsEnum(WomenSize, {
     each: true,
-    message: 'Cada talla debe ser un valor válido (XS, S, M, L, XL, XXL)',
+    message: i18nMessage('validation.SIZE_INVALID'),
   })
   sizes: WomenSize[];
 
@@ -57,6 +59,19 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Traducciones del nombre y la descripción. name/description son el texto base (español); acá van ' +
+      'en, fr, pt y zh. Lo que falte en un idioma se muestra en español. Al actualizar, reemplaza el objeto completo.',
+    example: {
+      en: { name: 'Long red evening dress', description: 'Satin, floor length' },
+      fr: { name: 'Robe de soirée longue rouge' },
+    },
+  })
+  @IsOptional()
+  @IsProductTranslations()
+  translations?: ProductTranslations;
 
   @ApiProperty({
     description: 'Product price Bs',

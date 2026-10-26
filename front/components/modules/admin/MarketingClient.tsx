@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useAdminRole } from '@/hooks/useAdminAccess';
@@ -25,6 +26,7 @@ const messageToHtml = (message: string): string =>
 
 export default function MarketingClient() {
     const { isGlobal, branchId: ownBranchId } = useAdminRole();
+    const t = useTranslations('AdminMarketing');
     const { branches, isLoading: branchesLoading } = useAdminBranches();
     // '' = todas las sucursales (solo con alcance global)
     const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -37,8 +39,8 @@ export default function MarketingClient() {
     // Con alcance de sucursal el backend usa siempre la propia: el selector no aparece
     const targetBranchId = isGlobal ? selectedBranchId : ownBranchId ?? '';
     const audienceLabel = targetBranchId
-        ? branches.find((branch) => branch.id === targetBranchId)?.name ?? 'tu sucursal'
-        : 'todos los usuarios';
+        ? branches.find((branch) => branch.id === targetBranchId)?.name ?? t('yourBranch')
+        : t('allUsers');
 
     const canSend = subject.trim().length > 0 && message.trim().length > 0 && !isSending;
 
@@ -47,8 +49,8 @@ export default function MarketingClient() {
         if (!canSend) return;
 
         const question = targetBranchId
-            ? `¿Enviar esta campaña a los clientes de ${audienceLabel}?`
-            : '¿Enviar esta campaña a TODOS los usuarios? No se puede deshacer.';
+            ? t('confirmBranch', { audience: audienceLabel })
+            : t('confirmAll');
         if (!window.confirm(question)) return;
 
         setIsSending(true);
@@ -65,7 +67,7 @@ export default function MarketingClient() {
             setSubject('');
             setMessage('');
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo enviar la campaña.'));
+            setError(getApiErrorMessage(error, t('sendFailed')));
         } finally {
             setIsSending(false);
         }
@@ -75,11 +77,9 @@ export default function MarketingClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Marketing</h1>
+                    <h1>{t('title')}</h1>
                     <p>
-                        {isGlobal
-                            ? 'Envía un correo promocional a todos los usuarios o a los clientes de una sucursal.'
-                            : `Envía un correo promocional a los clientes que ya compraron en ${audienceLabel}.`}
+                        {isGlobal ? t('subtitleGlobal') : t('subtitleOwn', { audience: audienceLabel })}
                     </p>
                 </div>
             </div>
@@ -88,8 +88,13 @@ export default function MarketingClient() {
 
             {result && (
                 <div className={styles.successMessage}>
-                    Campaña enviada a <strong>{result.audience}</strong>: {result.sent} de {result.recipients} correos
-                    {result.failed > 0 ? `. ${result.failed} no se pudieron enviar (revisa el log del servidor).` : '.'}
+                    {t.rich(result.failed > 0 ? 'sentWithFailures' : 'sent', {
+                        audience: result.audience,
+                        sent: result.sent,
+                        recipients: result.recipients,
+                        failed: result.failed,
+                        strong: (chunks) => <strong>{chunks}</strong>,
+                    })}
                 </div>
             )}
 
@@ -97,7 +102,7 @@ export default function MarketingClient() {
                 <form className={`${styles.form} ${styles.formCard}`} onSubmit={handleSubmit}>
                     {isGlobal ? (
                         <div className={styles.field}>
-                            <label htmlFor="campaign-branch">Audiencia</label>
+                            <label htmlFor="campaign-branch">{t('audience')}</label>
                             <select
                                 id="campaign-branch"
                                 className={styles.input}
@@ -105,45 +110,45 @@ export default function MarketingClient() {
                                 onChange={(e) => setSelectedBranchId(e.target.value)}
                                 disabled={branchesLoading}
                             >
-                                <option value="">Todas las sucursales (todos los usuarios)</option>
+                                <option value="">{t('allBranches')}</option>
                                 {branches.map((branch) => (
                                     <option key={branch.id} value={branch.id}>
-                                        Clientes de {branch.name}
+                                        {t('branchCustomers', { branch: branch.name })}
                                     </option>
                                 ))}
                             </select>
                         </div>
                     ) : (
                         <div className={styles.field}>
-                            <label>Audiencia</label>
+                            <label>{t('audience')}</label>
                             <p className={styles.cellSub}>
-                                Clientes con al menos un pedido en <strong>{audienceLabel}</strong>
+                                {t.rich('ownAudience', { audience: audienceLabel, strong: (chunks) => <strong>{chunks}</strong> })}
                             </p>
                         </div>
                     )}
 
                     <div className={styles.field}>
-                        <label htmlFor="campaign-subject">Asunto</label>
+                        <label htmlFor="campaign-subject">{t('subject')}</label>
                         <input
                             id="campaign-subject"
                             className={styles.input}
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
                             maxLength={SUBJECT_MAX}
-                            placeholder="¡20% de descuento este fin de semana!"
+                            placeholder={t('subjectPlaceholder')}
                         />
                         <small>{subject.length}/{SUBJECT_MAX}</small>
                     </div>
 
                     <div className={styles.field}>
-                        <label htmlFor="campaign-message">Mensaje</label>
+                        <label htmlFor="campaign-message">{t('message')}</label>
                         <textarea
                             id="campaign-message"
                             className={`${styles.input} ${styles.textarea}`}
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             maxLength={MESSAGE_MAX}
-                            placeholder="Escribe el mensaje. Deja una línea en blanco para separar párrafos."
+                            placeholder={t('messagePlaceholder')}
                         />
                         <small>{message.length}/{MESSAGE_MAX}</small>
                     </div>
@@ -151,7 +156,7 @@ export default function MarketingClient() {
                     <div className={styles.modalFooter}>
                         <button type="submit" className={styles.button} disabled={!canSend}>
                             <Send size={16} />
-                            {isSending ? 'Enviando...' : 'Enviar campaña'}
+                            {isSending ? t('sending') : t('send')}
                         </button>
                     </div>
                 </form>

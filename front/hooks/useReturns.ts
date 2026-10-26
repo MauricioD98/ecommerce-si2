@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ReturnsService } from "@/service/api/returns.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { ProcessReturnPayload, ReturnableOrder, ReturnRecord } from "@/types/returns.types";
@@ -6,6 +7,7 @@ import { ProcessReturnPayload, ReturnableOrder, ReturnRecord } from "@/types/ret
 // Buscador de la venta original del punto de devolución. La búsqueda es explícita (no on-type): el
 // cajero escribe el código del ticket y confirma, así no se dispara una consulta por cada tecla.
 export function useOrderSearch(branchId: string | null) {
+    const t = useTranslations("AdminErrors");
     const [results, setResults] = useState<ReturnableOrder[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export function useOrderSearch(branchId: string | null) {
                 setResults(await ReturnsService.searchOrder(term, branchId ?? undefined));
             } catch (error) {
                 setResults([]);
-                setError(getApiErrorMessage(error, "No se pudo buscar la venta."));
+                setError(getApiErrorMessage(error, t("searchSale")));
             } finally {
                 setIsSearching(false);
                 setHasSearched(true);
@@ -42,6 +44,7 @@ export function useOrderSearch(branchId: string | null) {
 
 // Historial de devoluciones para auditoría. Con productId trae solo las de esa prenda.
 export function useReturnHistory(params: { productId?: string; branchId?: string | null; enabled?: boolean }) {
+    const t = useTranslations("AdminErrors");
     const { productId, branchId, enabled = true } = params;
     const [returns, setReturns] = useState<ReturnRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +67,7 @@ export function useReturnHistory(params: { productId?: string; branchId?: string
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudo cargar el historial de devoluciones."));
+                if (active) setError(getApiErrorMessage(error, t("returnHistory")));
             })
             .finally(() => {
                 if (active) setIsLoading(false);

@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { useRoles } from '@/hooks/useRoles';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { RoleItem, RolePayload } from '@/types/admin.types';
-import { PERMISSION_LABELS, PERMISSION_OPTIONS, SUPER_ADMIN_ROLE } from '@/utils/permissions';
+import { BASE_ROLE_KEYS, SUPER_ADMIN_ROLE, isPermission } from '@/utils/permissions';
+import { PermissionCatalogItem, RolesService } from '@/service/api/roles.service';
 
 interface RoleFormModalProps {
     role?: RoleItem;
@@ -17,9 +19,21 @@ interface RoleFormModalProps {
 }
 
 function RoleFormModal({ role, onClose, onSubmit }: RoleFormModalProps) {
+    const t = useTranslations('AdminRoles');
+    const tc = useTranslations('AdminCommon');
     const [name, setName] = useState(role?.name ?? '');
     const [description, setDescription] = useState(role?.description ?? '');
     const [permissions, setPermissions] = useState<string[]>(role?.permissions ?? []);
+    // Los checkboxes salen del catálogo del backend, no de una lista copiada en el front
+    const [catalog, setCatalog] = useState<PermissionCatalogItem[] | null>(null);
+    const [catalogError, setCatalogError] = useState<string | null>(null);
+
+    useEffect(() => {
+        RolesService.getPermissionCatalog()
+            .then(setCatalog)
+            .catch((err) => setCatalogError(getApiErrorMessage(err, t('permissionsFailed'))));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +44,7 @@ function RoleFormModal({ role, onClose, onSubmit }: RoleFormModalProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) {
-            setError('El nombre del rol es obligatorio.');
+            setError(t('nameRequired'));
             return;
         }
 
@@ -40,55 +54,62 @@ function RoleFormModal({ role, onClose, onSubmit }: RoleFormModalProps) {
             await onSubmit({ name: name.trim(), description: description.trim(), permissions });
             onClose();
         } catch (error) {
-            setError(getApiErrorMessage(error, 'No se pudo guardar el rol.'));
+            setError(getApiErrorMessage(error, t('saveFailed')));
             setIsSaving(false);
         }
     };
 
     return (
-        <AdminModal title={role ? 'Editar rol' : 'Nuevo rol'} onClose={onClose}>
+        <AdminModal title={role ? t('editTitle') : t('newTitle')} onClose={onClose}>
             <form className={styles.form} onSubmit={handleSubmit}>
                 {error && <div className={styles.errorMessage}>{error}</div>}
 
                 <div className={styles.field}>
-                    <label htmlFor="role-name">Nombre</label>
+                    <label htmlFor="role-name">{tc('name')}</label>
                     <input
                         id="role-name"
                         className={styles.input}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         maxLength={50}
-                        placeholder="Supervisor de turno"
+                        placeholder={t('namePlaceholder')}
                         // Los roles base no se pueden renombrar
                         disabled={role?.isBase}
                     />
-                    {role?.isBase && <small>Los roles base no se pueden renombrar.</small>}
+                    {role?.isBase && <small>{t('baseNoRename')}</small>}
                 </div>
 
                 <div className={styles.field}>
-                    <label htmlFor="role-description">Descripción</label>
+                    <label htmlFor="role-description">{tc('description')}</label>
                     <input
                         id="role-description"
                         className={styles.input}
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         maxLength={255}
-                        placeholder="Qué hace este rol"
+                        placeholder={t('descriptionPlaceholder')}
                     />
                 </div>
 
                 <fieldset className={styles.permissionGroup}>
-                    <legend>Permisos</legend>
-                    {PERMISSION_OPTIONS.map((option) => (
-                        <label key={option.value} className={styles.permissionOption}>
+                    <legend>{t('permissions')}</legend>
+                    {catalogError && <div className={styles.errorMessage}>{catalogError}</div>}
+                    {!catalog && !catalogError && <span className={styles.cellSub}>{t('loadingPermissions')}</span>}
+                    {catalog?.map(({ permission, grantable }) => (
+                        <label key={permission} className={styles.permissionOption} title={grantable ? undefined : t('notGrantable')}>
                             <input
                                 type="checkbox"
-                                checked={permissions.includes(option.value)}
-                                onChange={() => togglePermission(option.value)}
+                                checked={permissions.includes(permission)}
+                                // Un permiso que el usuario no tiene no se puede otorgar (el backend lo rechaza igual)
+                                disabled={!grantable}
+                                onChange={() => togglePermission(permission)}
                             />
                             <span className={styles.cellMain}>
-                                <span className={styles.cellTitle}>{option.label}</span>
-                                <span className={styles.cellSub}>{option.description}</span>
+                                <span className={styles.cellTitle}>{isPermission(permission) ? t(`perms.${permission}.label`) : permission}</span>
+                                <span className={styles.cellSub}>
+                                    {isPermission(permission) ? t(`perms.${permission}.description`) : ''}
+                                    {!grantable && ` · ${t('notGrantable')}`}
+                                </span>
                             </span>
                         </label>
                     ))}
@@ -96,10 +117,10 @@ function RoleFormModal({ role, onClose, onSubmit }: RoleFormModalProps) {
 
                 <div className={styles.modalFooter}>
                     <button type="button" className={styles.buttonSecondary} onClick={onClose}>
-                        Cancelar
+                        {tc('cancel')}
                     </button>
                     <button type="submit" className={styles.button} disabled={isSaving}>
-                        {isSaving ? 'Guardando...' : 'Guardar'}
+                        {isSaving ? tc('saving') : tc('save')}
                     </button>
                 </div>
             </form>
@@ -109,6 +130,8 @@ function RoleFormModal({ role, onClose, onSubmit }: RoleFormModalProps) {
 
 export default function RolesClient() {
     const { isSuperAdmin } = useAdminRole();
+    const t = useTranslations('AdminRoles');
+    const tc = useTranslations('AdminCommon');
     const { roles, isLoading, error, createRole, updateRole, deleteRole } = useRoles();
     // undefined = cerrado, null = crear, RoleItem = editar
     const [editing, setEditing] = useState<RoleItem | null | undefined>(undefined);
@@ -124,14 +147,14 @@ export default function RolesClient() {
     };
 
     const handleDelete = async (role: RoleItem) => {
-        if (!window.confirm(`¿Eliminar el rol "${role.name}"?`)) return;
+        if (!window.confirm(t('confirmDelete', { name: role.name }))) return;
 
         setBusyId(role.id);
         setActionError(null);
         try {
             await deleteRole(role.id);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo eliminar el rol.'));
+            setActionError(getApiErrorMessage(error, t('deleteFailed')));
         } finally {
             setBusyId(null);
         }
@@ -141,12 +164,12 @@ export default function RolesClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Roles</h1>
-                    <p>Crea roles y elige qué puede hacer cada uno en el panel. Los cambios aplican a los usuarios en su próximo inicio de sesión.</p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                 </div>
                 <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                     <Plus size={16} />
-                    Nuevo rol
+                    {t('new')}
                 </button>
             </div>
 
@@ -154,43 +177,49 @@ export default function RolesClient() {
 
             <div className={styles.tableCard}>
                 {isLoading ? (
-                    <div className={styles.loadingState}>Cargando roles...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : roles.length === 0 ? (
-                    <div className={styles.emptyState}>Aún no hay roles.</div>
+                    <div className={styles.emptyState}>{t('empty')}</div>
                 ) : (
                     <div className={styles.tableWrapper}>
                         <table className={styles.table}>
                             <thead>
                                 <tr>
-                                    <th>Rol</th>
-                                    <th>Permisos</th>
-                                    <th className={styles.numeric}>Usuarios</th>
-                                    <th className={styles.numeric}>Acciones</th>
+                                    <th>{t('role')}</th>
+                                    <th>{t('permissions')}</th>
+                                    <th className={styles.numeric}>{t('users')}</th>
+                                    <th className={styles.numeric}>{tc('actions')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {roles.map((role) => {
                                     // Super Admin es inmutable en el backend
                                     const isProtected = role.name === SUPER_ADMIN_ROLE;
+                                    // Nombre y descripción de los roles base, en el idioma elegido
+                                    const baseKey = role.isBase ? BASE_ROLE_KEYS[role.name] : undefined;
                                     return (
                                         <tr key={role.id}>
                                             <td>
                                                 <div className={styles.cellMain}>
                                                     <span className={styles.cellTitle}>
-                                                        {role.name}
-                                                        {role.isBase && <span className={`${styles.badge} ${styles.badgeMuted} ${styles.inlineBadge}`}>Base</span>}
+                                                        {baseKey ? t(`baseRoles.${baseKey}.name`) : role.name}
+                                                        {role.isBase && <span className={`${styles.badge} ${styles.badgeMuted} ${styles.inlineBadge}`}>{t('base')}</span>}
                                                     </span>
-                                                    {role.description && <span className={styles.cellSub}>{role.description}</span>}
+                                                    {baseKey ? (
+                                                        <span className={styles.cellSub}>{t(`baseRoles.${baseKey}.description`)}</span>
+                                                    ) : (
+                                                        role.description && <span className={styles.cellSub}>{role.description}</span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td>
                                                 {role.permissions.length === 0 ? (
-                                                    <span className={styles.cellSub}>Sin permisos</span>
+                                                    <span className={styles.cellSub}>{t('noPermissions')}</span>
                                                 ) : (
                                                     <div className={styles.badgeList}>
                                                         {role.permissions.map((permission) => (
                                                             <span key={permission} className={`${styles.badge} ${styles.badgeInfo}`}>
-                                                                {PERMISSION_LABELS[permission] ?? permission}
+                                                                {isPermission(permission) ? t(`perms.${permission}.label`) : permission}
                                                             </span>
                                                         ))}
                                                     </div>
@@ -200,7 +229,7 @@ export default function RolesClient() {
                                             <td>
                                                 <div className={styles.actions}>
                                                     {isProtected ? (
-                                                        <span className={`${styles.badge} ${styles.badgeMuted}`}>Protegido</span>
+                                                        <span className={`${styles.badge} ${styles.badgeMuted}`}>{t('protected')}</span>
                                                     ) : (
                                                         <>
                                                             <button
@@ -209,7 +238,7 @@ export default function RolesClient() {
                                                                 onClick={() => setEditing(role)}
                                                             >
                                                                 <Pencil size={14} />
-                                                                Editar
+                                                                {tc('edit')}
                                                             </button>
                                                             {/* Eliminar roles es una acción de alto riesgo: solo el Super Admin la ve */}
                                                             {isSuperAdmin && !role.isBase && (
@@ -220,7 +249,7 @@ export default function RolesClient() {
                                                                     onClick={() => handleDelete(role)}
                                                                 >
                                                                     <Trash2 size={14} />
-                                                                    Eliminar
+                                                                    {tc('delete')}
                                                                 </button>
                                                             )}
                                                         </>

@@ -5,7 +5,8 @@ import Image from 'next/image';
 import { AlertTriangle, Loader2, PowerOff, ScanFace, Sparkles, X } from 'lucide-react';
 import { createDecartClient, models } from '@decartai/sdk';
 import type { DecartSDKError, RealTimeClient } from '@decartai/sdk';
-import { store } from '@/store';
+import { apiClient } from '@/service/api/axios.config';
+import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Product } from '@/types/product.types';
 import styles from './virtual-try-on.module.scss';
 
@@ -14,7 +15,7 @@ import styles from './virtual-try-on.module.scss';
 // RTCPeerConnection a mano): nosotros le pasamos el MediaStream y él negocia con la plataforma.
 //
 // Decart factura por SEGUNDO GENERADO, así que el control de gasto es triple:
-//  1. El token efímero que firma /api/decart/session trae maxSessionDuration (techo del servidor).
+//  1. El token efímero que firma POST /api/v1/try-on/session (backend) trae maxSessionDuration (techo del servidor).
 //  2. El setTimeout de TRYON_SECONDS de acá corta la sesión desde el cliente.
 //  3. El botón rojo permite cortar antes.
 // El contador arranca cuando el modelo empieza a generar ('generating'), que es cuando corre el
@@ -143,14 +144,15 @@ export default function VirtualTryOnModal({ product, onClose }: { product: Produ
                 const garmentBlob = await garmentResponse.blob();
                 if (cancelled) return;
 
-                // 3. Token efímero firmado por el servidor. La DECART_API_KEY nunca llega al browser.
-                const accessToken = store.getState().auth.accessToken;
-                const sessionResponse = await fetch('/api/decart/session', {
-                    method: 'POST',
-                    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-                });
-                const session = await sessionResponse.json();
-                if (!sessionResponse.ok) throw new Error(session?.message ?? 'No se pudo iniciar la sesión.');
+                // 3. Token efímero firmado por el backend con la API key de Decart DE ESTA TIENDA
+                //    (cifrada en el plano de control; nunca llega al browser). apiClient agrega el
+                //    Bearer, el x-tenant-id y renueva el access token si venció.
+                let session: { apiKey: string; model: string };
+                try {
+                    ({ data: session } = await apiClient.post<{ apiKey: string; model: string }>('/try-on/session'));
+                } catch (err) {
+                    throw new Error(getApiErrorMessage(err, 'No se pudo iniciar la sesión del probador virtual.'));
+                }
                 if (cancelled) return;
 
                 // 4. Conexión realtime: el SDK abre el WebRTC y devuelve el stream transformado.

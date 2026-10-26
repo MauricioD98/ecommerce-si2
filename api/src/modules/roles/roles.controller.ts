@@ -7,7 +7,7 @@ import { RoleResponseDto } from './dto/role-response.dto';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/decorators/guards/permissions.guard';
 import { AnyPermission, Permissions } from '../../common/decorators/permissions.decorator';
-import { Permission } from '../../common/constants/permissions';
+import { ALL_PERMISSIONS, Permission, SUPER_ADMIN_ROLE } from '../../common/constants/permissions';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 
@@ -36,6 +36,21 @@ export class RolesController {
     return await this.rolesService.findAssignable(user);
   }
 
+  /**
+   * Catálogo de permisos (lo define el código, no la tienda) para los checkboxes del formulario.
+   * grantable: los que este usuario puede otorgar; el Super Admin, todos (ver RolesService.assertCanGrant).
+   */
+  @Get('permissions')
+  @Permissions(Permission.MANAGE_ROLES)
+  @ApiOperation({ summary: 'Permission catalog defined by the platform (MANAGE_ROLES)' })
+  findPermissions(@GetUser() user: AuthUser): { permission: string; grantable: boolean }[] {
+    const isSuperAdmin = user.role.name === SUPER_ADMIN_ROLE;
+    return ALL_PERMISSIONS.map((permission) => ({
+      permission,
+      grantable: isSuperAdmin || user.role.permissions.includes(permission),
+    }));
+  }
+
   @Get(':id')
   @Permissions(Permission.MANAGE_ROLES)
   @ApiOperation({ summary: 'Get a role by ID (MANAGE_ROLES)' })
@@ -53,8 +68,8 @@ export class RolesController {
   @ApiResponse({ status: 201, type: RoleResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiResponse({ status: 409, description: 'Role name already exists' })
-  async create(@Body() dto: CreateRoleDto): Promise<RoleResponseDto> {
-    return await this.rolesService.create(dto);
+  async create(@Body() dto: CreateRoleDto, @GetUser() actor: AuthUser): Promise<RoleResponseDto> {
+    return await this.rolesService.create(dto, actor);
   }
 
   @Patch(':id')
@@ -69,8 +84,9 @@ export class RolesController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
+    @GetUser() actor: AuthUser,
   ): Promise<RoleResponseDto> {
-    return await this.rolesService.update(id, dto);
+    return await this.rolesService.update(id, dto, actor);
   }
 
   @Delete(':id')

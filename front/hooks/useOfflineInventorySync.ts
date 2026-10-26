@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { InventoryService } from "@/service/api/inventory.service";
+import { useTranslations } from "next-intl";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import {
     getOfflineInventoryUpdates,
@@ -9,6 +10,7 @@ import {
 } from "@/utils/offlineInventoryQueue";
 
 export function useOfflineInventorySync() {
+    const t = useTranslations("Offline");
     const [pendingCount, setPendingCount] = useState(0);
     const [pendingUpdates, setPendingUpdates] = useState<OfflineInventoryUpdate[]>([]);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -42,7 +44,7 @@ export function useOfflineInventorySync() {
                 } catch (error) {
                     const message = getApiErrorMessage(
                         error,
-                        `Error al actualizar stock de ${update.productName || update.productId}`
+                        t("syncError", { name: update.productName || update.productId })
                     );
                     await updateOfflineInventoryUpdate(update.id, { status: "failed", lastError: message });
                     failureMessage = message;
@@ -51,7 +53,7 @@ export function useOfflineInventorySync() {
 
             if (successCount > 0) {
                 setLastSyncSuccess(
-                    `¡Se sincronizaron exitosamente ${successCount} cambio(s) de stock con la base de datos en Neon!`
+                    t("syncSuccess", { count: successCount })
                 );
                 if (typeof window !== "undefined") {
                     if (navigator.serviceWorker?.controller) {

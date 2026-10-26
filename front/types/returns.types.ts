@@ -7,17 +7,9 @@ export type ReturnReason = "WRONG_SIZE" | "DEFECTIVE" | "CHANGED_MIND" | "OTHER"
 // Estado físico con el que vuelve la prenda, y lo único que decide a qué inventario entra
 export type ItemCondition = "SELLABLE" | "DAMAGED";
 
-export const RETURN_REASON_LABELS: Record<ReturnReason, string> = {
-    WRONG_SIZE: "Talla equivocada",
-    DEFECTIVE: "Prenda defectuosa",
-    CHANGED_MIND: "Cambió de opinión",
-    OTHER: "Otro motivo",
-};
-
-export const ITEM_CONDITION_LABELS: Record<ItemCondition, string> = {
-    SELLABLE: "Vender nuevamente",
-    DAMAGED: "Defectuoso / Merma",
-};
+// Textos: messages/<idioma>.json → AdminReturns.reasons.<motivo> / AdminReturns.conditions.<estado>
+export const RETURN_REASONS: ReturnReason[] = ["WRONG_SIZE", "DEFECTIVE", "CHANGED_MIND", "OTHER"];
+export const ITEM_CONDITIONS: ItemCondition[] = ["SELLABLE", "DAMAGED"];
 
 // Línea de la venta original, con lo que ya se devolvió y lo que todavía se puede devolver
 export interface ReturnableOrderItem {

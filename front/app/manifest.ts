@@ -1,12 +1,15 @@
 import type { MetadataRoute } from "next";
+import { getServerStoreName } from "@/utils/storeName.server";
 
 // Convención de Next (App Router): este archivo se sirve automáticamente en /manifest.webmanifest
 // y Next inyecta el <link rel="manifest"> solo. No requiere next-pwa ni ninguna otra herramienta.
-export default function manifest(): MetadataRoute.Manifest {
+// La app instalada lleva el nombre de la tienda (ver utils/storeName.server.ts)
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+    const store = await getServerStoreName();
     return {
-        name: "Stella Femme",
-        short_name: "Stella Femme",
-        description: "Moda femenina con retiro en tienda o envío a domicilio en Santa Cruz de la Sierra, Bolivia.",
+        name: store,
+        short_name: store.length > 12 ? store.slice(0, 12) : store,
+        description: store,
         start_url: "/",
         display: "standalone",
         background_color: "#ffffff",

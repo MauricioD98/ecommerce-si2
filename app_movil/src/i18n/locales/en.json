@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "restore": "Restore"
+  },
+  "tabs": {
+    "shop": "Shop",
+    "cart": "Cart",
+    "orders": "Orders",
+    "profile": "Profile"
+  },
+  "language": {
+    "title": "Language",
+    "subtitle": "Choose the app language",
+    "deviceHint": "By default the app uses your phone's language."
+  },
+  "profile": {
+    "defaultUser": "User",
+    "editProfile": "Edit Profile",
+    "editProfileDesc": "First name, last name and email",
+    "security": "Security & Password",
+    "securityDesc": "Update password",
+    "orders": "My Orders",
+    "ordersDesc": "Purchase history and tracking",
+    "apiServer": "API Server",
+    "logout": "Log Out",
+    "logoutConfirm": "Are you sure you want to log out of your account?",
+    "apiModalTitle": "Configure API Server",
+    "apiModalDesc": "Connect to the cloud API (Azure) or set the URL for local development.",
+    "apiUrlLabel": "API Base URL",
+    "cloudServer": "Cloud Server (Azure Production)",
+    "localServer": "Local Server (PC): {{address}}",
+    "urlSaved": "URL Saved",
+    "urlSavedBody": "Connecting to: {{url}}",
+    "urlRestored": "URL Restored",
+    "urlRestoredBody": "Default URL: {{url}}"
+  }
+}

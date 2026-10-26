@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { currentLanguage, localizedProductName } from '../products/product-translations';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderApiResponseDto, OrderResponseDto } from './dto/order-response.dto';
 import { FulfillmentType, Order, OrderItem, OrderStatus, Product, User } from '@prisma/client';
@@ -483,6 +484,8 @@ private map(order: Order & { orderItems: (OrderItem &{ product: Product})[];
   user:User; 
   },
 ): OrderResponseDto {
+  // Una sola lectura del idioma por pedido, no una por línea
+  const language = currentLanguage();
   return {
     id: order.id,
     userId: order.userId,
@@ -502,7 +505,8 @@ private map(order: Order & { orderItems: (OrderItem &{ product: Product})[];
     items: order.orderItems.map((item) => ({
       id: item.id,
       productId: item.productId,
-      productName: item.product.name,
+      // En el idioma del request; el pedido guardado no cambia (OrderItem no copia el nombre)
+      productName: localizedProductName(item.product, language),
       size: item.size,
       quantity: item.quantity,
       price: Number(item.price),

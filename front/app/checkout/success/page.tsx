@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React, { Suspense } from 'react';
 import CheckoutSuccessClient from '@/components/modules/checkout/CheckoutSuccessClient';
 
@@ -11,12 +13,13 @@ export default function Page() {
     );
 }
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: 'Pago confirmado',
-        description: 'Confirmación de tu pago',
+        title: t("checkoutSuccessTitle"),
+        description: t("checkoutSuccessDescription"),
         icons: {
-            icon: '/favicon.ico',
+            icon: "/favicon.ico",
         },
     };
 }

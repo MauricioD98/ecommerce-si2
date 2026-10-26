@@ -2,6 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 
 interface AdminModalProps {
@@ -11,6 +12,8 @@ interface AdminModalProps {
 }
 
 export default function AdminModal({ title, onClose, children }: AdminModalProps) {
+    const tc = useTranslations('AdminCommon');
+
     // Cierra con Escape
     useEffect(() => {
         const handleKey = (e: KeyboardEvent) => {
@@ -31,7 +34,7 @@ export default function AdminModal({ title, onClose, children }: AdminModalProps
             >
                 <div className={styles.modalHeader}>
                     <h2>{title}</h2>
-                    <button type="button" className={styles.iconButton} onClick={onClose} aria-label="Cerrar">
+                    <button type="button" className={styles.iconButton} onClick={onClose} aria-label={tc('close')}>
                         <X size={20} />
                     </button>
                 </div>

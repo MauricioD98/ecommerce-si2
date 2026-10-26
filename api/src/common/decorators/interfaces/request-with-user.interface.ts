@@ -10,6 +10,8 @@ export interface AuthUser {
     permissions: string[];
   };
   branchId: string | null;
+  // Tienda que emitió el token; JwtStrategy garantiza que coincide con req.tenant
+  tenantId: string;
 }
 
 export interface RequestWithUser extends Request {

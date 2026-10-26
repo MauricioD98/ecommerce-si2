@@ -10,6 +10,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { FulfillmentType, OrderSource, OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { currentLanguage, localizedProductName } from '../products/product-translations';
 import { BranchesService } from '../branches/branches.service';
 import { InventoryService } from '../branches/inventory.service';
 import { ProductsService } from '../products/products.service';
@@ -110,6 +111,9 @@ export class PosService {
     }
 
     const lines: { productId: string; productName: string; quantity: number; unitPrice: number; size: string }[] = [];
+    // productName es solo para el ticket de la respuesta (no se guarda en el pedido): va en el
+    // idioma de la caja (Accept-Language)
+    const language = currentLanguage();
 
     for (const item of dto.items) {
       const product = productById.get(item.productId);
@@ -123,7 +127,7 @@ export class PosService {
 
       lines.push({
         productId: product.id,
-        productName: product.name,
+        productName: localizedProductName(product, language),
         quantity: item.quantity,
         unitPrice: getBranchPrice(product, discountByProduct.get(product.id) ?? null),
         size: item.size,

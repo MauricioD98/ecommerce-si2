@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { MapPin, Store, Truck } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './delivery-step.module.scss';
 import DeliveryAddressPicker from './DeliveryAddressPicker';
 import { useBranches } from '@/hooks/useBranches';
@@ -27,6 +28,7 @@ export default function DeliveryStep({
 }: DeliveryStepProps) {
     // La sucursal elegida es la misma donde el cliente seleccionó y realizó su pedido
     const { branches, selectedBranch, selectedBranchId, isLoading, error } = useBranches();
+    const t = useTranslations('Checkout.delivery');
 
     const isPickup = fulfillmentType === 'PICKUP';
     // El envío a domicilio necesita una dirección con su ubicación en el mapa
@@ -40,22 +42,22 @@ export default function DeliveryStep({
         {
             type: 'DELIVERY',
             icon: <Truck size={22} />,
-            title: 'Envío a domicilio',
-            description: 'Recibe tu pedido en la dirección que indiques',
+            title: t('homeDelivery'),
+            description: t('homeDeliveryDescription'),
         },
         {
             type: 'PICKUP',
             icon: <Store size={22} />,
-            title: 'Retiro en tienda',
-            description: 'Recógelo en la sucursal que elijas. Sin costo de envío',
+            title: t('pickup'),
+            description: t('pickupDescription'),
         },
     ];
 
     return (
         <div className={styles.delivery}>
-            <h2>Método de entrega</h2>
+            <h2>{t('title')}</h2>
 
-            <div className={styles.options} role="radiogroup" aria-label="Método de entrega">
+            <div className={styles.options} role="radiogroup" aria-label={t('title')}>
                 {options.map((option) => (
                     <button
                         key={option.type}
@@ -75,10 +77,10 @@ export default function DeliveryStep({
             </div>
 
             <h3 className={styles.subtitle}>
-                {isPickup ? 'Sucursal de retiro' : 'Sucursal de despacho'}
+                {isPickup ? t('pickupBranch') : t('dispatchBranch')}
             </h3>
 
-            {isLoading && <p className={styles.hint}>Cargando sucursal...</p>}
+            {isLoading && <p className={styles.hint}>{t('loadingBranch')}</p>}
             {error && <p className={styles.error}>{error}</p>}
 
             {displayedBranches.length > 0 && (
@@ -91,30 +93,33 @@ export default function DeliveryStep({
                         >
                             <span className={styles.branchName}>{branch.name}</span>
                             {branch.address && <span className={styles.branchAddress}>{branch.address}</span>}
-                            {branch.phone && <span className={styles.branchAddress}>Tel: {branch.phone}</span>}
+                            {branch.phone && <span className={styles.branchAddress}>{t('phone', { phone: branch.phone })}</span>}
                         </div>
                     ))}
                 </div>
             )}
             {!activeBranch && !isLoading && (
-                <p className={styles.hint}>No se encontró la sucursal del pedido.</p>
+                <p className={styles.hint}>{t('branchNotFound')}</p>
             )}
 
             {!isPickup && (
                 <>
-                    <h3 className={styles.subtitle}>Dirección de entrega</h3>
+                    <h3 className={styles.subtitle}>{t('addressTitle')}</h3>
                     <DeliveryAddressPicker deliveryAddress={deliveryAddress} onAddressChange={onAddressChange} />
 
                     {deliveryAddress ? (
                         <div className={styles.selectedAddress}>
                             <MapPin size={18} />
                             <span>
-                                Entregaremos en <strong>{deliveryAddress.address}</strong>
-                                {deliveryAddress.reference ? ` (${deliveryAddress.reference})` : ''}
+                                {t.rich('deliverTo', {
+                                    address: deliveryAddress.address,
+                                    reference: deliveryAddress.reference ? ` (${deliveryAddress.reference})` : '',
+                                    strong: (chunks) => <strong>{chunks}</strong>,
+                                })}
                             </span>
                         </div>
                     ) : (
-                        <p className={styles.hint}>Elige una dirección guardada o agrega una nueva en el mapa.</p>
+                        <p className={styles.hint}>{t('chooseAddress')}</p>
                     )}
                 </>
             )}
@@ -122,7 +127,7 @@ export default function DeliveryStep({
             {stockError && <p className={styles.error}>{stockError}</p>}
 
             <button type="button" className={styles.continueButton} onClick={onContinue} disabled={!canContinue}>
-                Continuar al pago
+                {t('continue')}
             </button>
         </div>
     );

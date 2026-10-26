@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Check, XCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './orders.module.scss';
 import { ORDER_TIMELINE_STEPS, OrderStatusValue } from './orderStatus';
 
@@ -11,16 +12,18 @@ interface OrderTimelineProps {
 
 // Línea de tiempo del pedido: [✓ Pago Confirmado] -- [✓ Preparando] -- [ En Camino ] -- [ Entregado ]
 export default function OrderTimeline({ status }: OrderTimelineProps) {
+    const t = useTranslations('Account');
+
     if (status === 'CANCELADO') {
         return (
             <div className={styles.cancelledBanner}>
                 <XCircle size={20} />
-                <span>Este pedido fue cancelado.</span>
+                <span>{t('orders.cancelled')}</span>
             </div>
         );
     }
 
-    const currentIndex = ORDER_TIMELINE_STEPS.findIndex((step) => step.status === status);
+    const currentIndex = ORDER_TIMELINE_STEPS.findIndex((step) => step === status);
 
     return (
         <div className={styles.timeline}>
@@ -30,7 +33,7 @@ export default function OrderTimeline({ status }: OrderTimelineProps) {
                 const isLast = index === ORDER_TIMELINE_STEPS.length - 1;
 
                 return (
-                    <React.Fragment key={step.status}>
+                    <React.Fragment key={step}>
                         <div className={styles.timelineStep}>
                             <span
                                 className={`${styles.timelineDot} ${done ? styles.timelineDotDone : ''} ${active ? styles.timelineDotActive : ''}`}
@@ -38,7 +41,7 @@ export default function OrderTimeline({ status }: OrderTimelineProps) {
                                 {done ? <Check size={16} /> : index + 1}
                             </span>
                             <span className={`${styles.timelineLabel} ${done ? styles.timelineLabelDone : ''}`}>
-                                {step.label}
+                                {t(`timeline.${step}`)}
                             </span>
                         </div>
                         {!isLast && (

@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import ProductFormModal from './ProductFormModal';
@@ -11,8 +12,12 @@ import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { ProductPayload } from '@/types/admin.types';
 import { Product } from '@/types/product.types';
+import { formatMoney } from '@/i18n/config';
 
 export default function ProductsClient() {
+    const t = useTranslations('AdminProducts');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
     const [page, setPage] = useState(1);
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
@@ -74,7 +79,7 @@ export default function ProductsClient() {
             // Si era el único de la última página, se vuelve a la anterior
             if (products.length === 1 && page > 1) setPage(page - 1);
         } catch (error) {
-            setActionError(getApiErrorMessage(error, 'No se pudo archivar el producto.'));
+            setActionError(getApiErrorMessage(error, t('archiveFailed')));
         } finally {
             setBusyId(null);
         }
@@ -84,15 +89,12 @@ export default function ProductsClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Productos</h1>
-                    <p>
-                        Catálogo general de la tienda. Los cambios aplican a todas las sucursales; las ofertas se
-                        gestionan en Inventario.
-                    </p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                     {!isGlobal && (
                         <p className={styles.branchNotice}>
                             <MapPin size={14} />
-                            Mostrando stock y disponibilidad para: <strong>{activeBranchName ?? 'tu sucursal'}</strong>
+                            {t.rich('branchNotice', { branch: activeBranchName ?? t('yourBranch'), strong: (chunks) => <strong>{chunks}</strong> })}
                         </p>
                     )}
                 </div>
@@ -101,8 +103,8 @@ export default function ProductsClient() {
                         className={styles.input}
                         value={searchInput}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre"
-                        aria-label="Buscar producto"
+                        placeholder={t('searchPlaceholder')}
+                        aria-label={t('searchLabel')}
                     />
                     <label className={styles.inlineCheckbox}>
                         <input
@@ -113,11 +115,11 @@ export default function ProductsClient() {
                                 setPage(1);
                             }}
                         />
-                        Ver archivados
+                        {t('showArchived')}
                     </label>
                     <button type="button" className={styles.button} onClick={() => setEditing(null)}>
                         <Plus size={16} />
-                        Nuevo producto
+                        {t('new')}
                     </button>
                 </div>
             </div>
@@ -126,14 +128,14 @@ export default function ProductsClient() {
 
             <div className={styles.tableCard}>
                 {isLoading && products.length === 0 ? (
-                    <div className={styles.loadingState}>Cargando productos...</div>
+                    <div className={styles.loadingState}>{t('loading')}</div>
                 ) : products.length === 0 ? (
                     <div className={styles.emptyState}>
                         {search
-                            ? `No se encontraron productos para "${search}".`
+                            ? t('noResults', { search })
                             : showArchived
-                              ? 'No hay productos archivados.'
-                              : 'Aún no hay productos en el catálogo.'}
+                              ? t('noArchived')
+                              : t('empty')}
                     </div>
                 ) : (
                     <>
@@ -141,14 +143,14 @@ export default function ProductsClient() {
                             <table className={styles.table}>
                                 <thead>
                                     <tr>
-                                        <th>Imagen</th>
-                                        <th>Producto</th>
-                                        <th>Categoría</th>
-                                        <th>Tallas</th>
-                                        <th className={styles.numeric}>Precio</th>
-                                        {!isGlobal && <th className={styles.numeric}>Stock ({activeBranchName ?? 'tu sucursal'})</th>}
-                                        <th>Estado</th>
-                                        <th className={styles.numeric}>Acciones</th>
+                                        <th>{t('image')}</th>
+                                        <th>{t('product')}</th>
+                                        <th>{t('category')}</th>
+                                        <th>{t('sizes')}</th>
+                                        <th className={styles.numeric}>{t('price')}</th>
+                                        {!isGlobal && <th className={styles.numeric}>{t('stockFor', { branch: activeBranchName ?? t('yourBranch') })}</th>}
+                                        <th>{tc('status')}</th>
+                                        <th className={styles.numeric}>{tc('actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -162,7 +164,7 @@ export default function ProductsClient() {
                                             <td>
                                                 <div className={styles.cellMain}>
                                                     <span className={styles.cellTitle}>{product.name}</span>
-                                                    <span className={styles.cellSub}>SKU: {product.sku}</span>
+                                                    <span className={styles.cellSub}>{t('sku', { sku: product.sku })}</span>
                                                 </div>
                                             </td>
                                             <td>{product.category}</td>
@@ -173,24 +175,24 @@ export default function ProductsClient() {
                                                     ))}
                                                 </div>
                                             </td>
-                                            <td className={styles.numeric}>Bs {Number(product.price).toFixed(2)}</td>
+                                            <td className={styles.numeric}>{formatMoney(Number(product.price), locale)}</td>
                                             {!isGlobal && (
                                                 <td className={styles.numeric}>
                                                     <span className={`${styles.badge} ${product.stock <= 0 ? styles.badgeDanger : styles.badgeSuccess}`}>
-                                                        {product.stock <= 0 ? 'Sin stock' : product.stock}
+                                                        {product.stock <= 0 ? t('noStock') : product.stock}
                                                     </span>
                                                 </td>
                                             )}
                                             <td>
                                                 <span className={`${styles.badge} ${product.isActive === false ? styles.badgeMuted : styles.badgeSuccess}`}>
-                                                    {product.isActive === false ? 'Inactivo' : 'Activo'}
+                                                    {product.isActive === false ? tc('inactive') : tc('active')}
                                                 </span>
                                             </td>
                                             <td>
                                                 <div className={styles.actions}>
                                                     <button type="button" className={styles.buttonSecondary} onClick={() => setEditing(product)}>
                                                         <Pencil size={14} />
-                                                        Editar
+                                                        {tc('edit')}
                                                     </button>
                                                     <button
                                                         type="button"
@@ -198,13 +200,13 @@ export default function ProductsClient() {
                                                         disabled={busyId === product.id || product.isActive === false}
                                                         title={
                                                             product.isActive === false
-                                                                ? 'Ya está archivado: reactivalo desde Editar'
-                                                                : 'Archivar: deja de verse en la tienda y en la caja'
+                                                                ? t('alreadyArchived')
+                                                                : t('archiveHint')
                                                         }
                                                         onClick={() => setConfirmingDelete(product)}
                                                     >
                                                         <Trash2 size={14} />
-                                                        Eliminar
+                                                        {tc('delete')}
                                                     </button>
                                                 </div>
                                             </td>
@@ -217,11 +219,11 @@ export default function ProductsClient() {
                         {meta.totalPages > 1 && (
                             <div className={styles.pagination}>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p - 1)} disabled={page === 1}>
-                                    Anterior
+                                    {tc('previous')}
                                 </button>
-                                <span>Página {page} de {meta.totalPages}</span>
+                                <span>{tc('pageOf', { page, total: meta.totalPages })}</span>
                                 <button type="button" className={styles.buttonSecondary} onClick={() => setPage((p) => p + 1)} disabled={page >= meta.totalPages}>
-                                    Siguiente
+                                    {tc('next')}
                                 </button>
                             </div>
                         )}
@@ -244,17 +246,13 @@ export default function ProductsClient() {
             )}
 
             {confirmingDelete && (
-                <AdminModal title="Archivar producto" onClose={() => setConfirmingDelete(null)}>
+                <AdminModal title={t('archiveTitle')} onClose={() => setConfirmingDelete(null)}>
                     <div className={styles.confirmBody}>
                         <p>
-                            ¿Seguro que querés eliminar <strong>{confirmingDelete.name}</strong>?
+                            {t.rich('archiveQuestion', { name: confirmingDelete.name, strong: (chunks) => <strong>{chunks}</strong> })}
                         </p>
                         <p className={styles.confirmNote}>
-                            Se archiva, no se borra: deja de aparecer en la tienda y en la caja, pero sus
-                            {confirmingDelete.orderCount > 0
-                                ? ` ${confirmingDelete.orderCount} venta${confirmingDelete.orderCount === 1 ? '' : 's'} y devoluciones`
-                                : ' ventas y devoluciones'}{' '}
-                            siguen en el histórico. Podés recuperarlo con <em>Ver archivados</em>.
+                            {t.rich('archiveNote', { count: confirmingDelete.orderCount, em: (chunks) => <em>{chunks}</em> })}
                         </p>
                     </div>
                     <div className={styles.modalFooter}>
@@ -264,7 +262,7 @@ export default function ProductsClient() {
                             onClick={() => setConfirmingDelete(null)}
                             disabled={busyId === confirmingDelete.id}
                         >
-                            Cancelar
+                            {tc('cancel')}
                         </button>
                         <button
                             type="button"
@@ -273,7 +271,7 @@ export default function ProductsClient() {
                             disabled={busyId === confirmingDelete.id}
                         >
                             <Trash2 size={14} />
-                            {busyId === confirmingDelete.id ? 'Archivando...' : 'Sí, archivar'}
+                            {busyId === confirmingDelete.id ? t('archiving') : t('confirmArchive')}
                         </button>
                     </div>
                 </AdminModal>

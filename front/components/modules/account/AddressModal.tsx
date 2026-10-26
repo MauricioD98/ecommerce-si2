@@ -3,6 +3,7 @@
 import React, { FormEvent, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Info, LocateFixed, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './account.module.scss';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { CreateAddressPayload, MapPosition, SANTA_CRUZ_CENTER, UserAddress } from '@/types/address.types';
@@ -10,8 +11,14 @@ import { CreateAddressPayload, MapPosition, SANTA_CRUZ_CENTER, UserAddress } fro
 // Reutiliza el mapa del checkout. Leaflet usa `window`: solo se renderiza en el navegador
 const AddressMap = dynamic(() => import('../checkout/AddressMap'), {
     ssr: false,
-    loading: () => <div className={styles.mapPlaceholder}>Cargando mapa...</div>,
+    loading: () => <MapLoading />,
 });
+
+// Componente aparte: el loading de dynamic() no puede usar hooks inline
+function MapLoading() {
+    const t = useTranslations('Checkout.addresses');
+    return <div className={styles.mapPlaceholder}>{t('loadingMap')}</div>;
+}
 
 const MIN_ADDRESS_LENGTH = 5;
 
@@ -23,13 +30,16 @@ interface AddressModalProps {
 }
 
 export default function AddressModal({ initial, onSave, onClose }: AddressModalProps) {
+    const t = useTranslations('Account.addresses');
+    // Etiquetas del formulario de dirección: las mismas que el checkout
+    const tForm = useTranslations('Checkout.addresses');
     const [position, setPosition] = useState<MapPosition>(
         initial ? { lat: initial.latitude, lng: initial.longitude } : SANTA_CRUZ_CENTER,
     );
     // Al crear, el marcador arranca en el centro de la ciudad: hay que moverlo para confirmar una ubicación real
     const [hasPickedLocation, setHasPickedLocation] = useState(Boolean(initial));
     const [focusKey, setFocusKey] = useState(0);
-    const [title, setTitle] = useState(initial?.title ?? 'Casa');
+    const [title, setTitle] = useState(() => initial?.title ?? tForm('defaultName'));
     const [address, setAddress] = useState(initial?.address ?? '');
     const [reference, setReference] = useState(initial?.reference ?? '');
     const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +66,7 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
 
     const handleLocate = () => {
         if (!navigator.geolocation) {
-            setError('Tu navegador no permite obtener la ubicación.');
+            setError(tForm('geolocationUnsupported'));
             return;
         }
         navigator.geolocation.getCurrentPosition(
@@ -65,7 +75,7 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
                 setFocusKey((key) => key + 1);
                 setError(null);
             },
-            () => setError('No se pudo obtener tu ubicación. Mueve el marcador manualmente.'),
+            () => setError(tForm('geolocationFailed')),
         );
     };
 
@@ -87,7 +97,7 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
                 longitude: position.lng,
             });
         } catch (err) {
-            setError(getApiErrorMessage(err, 'No se pudo guardar la dirección.'));
+            setError(getApiErrorMessage(err, tForm('saveFailed')));
             setIsSaving(false);
         }
     };
@@ -98,18 +108,18 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
                 className={styles.modal}
                 role="dialog"
                 aria-modal="true"
-                aria-label={initial ? 'Editar dirección' : 'Nueva dirección'}
+                aria-label={initial ? t('edit') : t('new')}
                 onMouseDown={(e) => e.stopPropagation()}
             >
                 <div className={styles.modalHeader}>
-                    <h2>{initial ? 'Editar dirección' : 'Nueva dirección'}</h2>
-                    <button type="button" className={styles.iconButton} onClick={onClose} aria-label="Cerrar">
+                    <h2>{initial ? t('edit') : t('new')}</h2>
+                    <button type="button" className={styles.iconButton} onClick={onClose} aria-label={t('close')}>
                         <X size={20} />
                     </button>
                 </div>
 
                 <form className={styles.form} onSubmit={handleSubmit}>
-                    <p className={styles.hint}>Arrastra el marcador o toca el mapa para señalar la ubicación exacta.</p>
+                    <p className={styles.hint}>{tForm('mapHint')}</p>
 
                     <div className={styles.mapWrapper}>
                         <AddressMap position={position} onPositionChange={handlePositionChange} focusKey={focusKey} />
@@ -117,29 +127,29 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
 
                     <div className={styles.mapFooter}>
                         <button type="button" className={styles.linkButton} onClick={handleLocate}>
-                            <LocateFixed size={16} /> Usar mi ubicación
+                            <LocateFixed size={16} /> {tForm('useMyLocation')}
                         </button>
                         <span className={styles.hint}>
                             {hasPickedLocation
                                 ? `Lat ${position.lat.toFixed(5)}, Lng ${position.lng.toFixed(5)}`
-                                : 'Aún no elegiste una ubicación'}
+                                : tForm('noLocation')}
                         </span>
                     </div>
 
                     <div className={styles.field}>
-                        <label htmlFor="address-title">Nombre de la dirección</label>
-                        <input id="address-title" type="text" value={title} maxLength={50} placeholder="Casa, Trabajo..." onChange={(e) => setTitle(e.target.value)} />
+                        <label htmlFor="address-title">{tForm('name')}</label>
+                        <input id="address-title" type="text" value={title} maxLength={50} placeholder={tForm('namePlaceholder')} onChange={(e) => setTitle(e.target.value)} />
                     </div>
 
                     <div className={styles.field}>
-                        <label htmlFor="address-street">Calle y número</label>
-                        <input id="address-street" type="text" value={address} maxLength={255} placeholder="Av. San Martín #1050, Equipetrol" autoComplete="street-address" onChange={(e) => setAddress(e.target.value)} />
-                        {address.length > 0 && !isAddressValid && <span className={styles.fieldError}>Ingresa la calle y el número.</span>}
+                        <label htmlFor="address-street">{tForm('street')}</label>
+                        <input id="address-street" type="text" value={address} maxLength={255} placeholder={tForm('streetPlaceholder')} autoComplete="street-address" onChange={(e) => setAddress(e.target.value)} />
+                        {address.length > 0 && !isAddressValid && <span className={styles.fieldError}>{tForm('streetInvalid')}</span>}
                     </div>
 
                     <div className={styles.field}>
-                        <label htmlFor="address-reference">Referencias (opcional)</label>
-                        <input id="address-reference" type="text" value={reference} maxLength={255} placeholder="Casa blanca con portón negro" onChange={(e) => setReference(e.target.value)} />
+                        <label htmlFor="address-reference">{tForm('reference')}</label>
+                        <input id="address-reference" type="text" value={reference} maxLength={255} placeholder={t('referencePlaceholder')} onChange={(e) => setReference(e.target.value)} />
                     </div>
 
                     {error && (
@@ -151,10 +161,10 @@ export default function AddressModal({ initial, onSave, onClose }: AddressModalP
 
                     <div className={styles.modalActions}>
                         <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={isSaving}>
-                            Cancelar
+                            {t('cancel')}
                         </button>
                         <button type="submit" className={styles.primaryButton} disabled={!canSubmit}>
-                            {isSaving ? 'Guardando...' : initial ? 'Guardar cambios' : 'Guardar dirección'}
+                            {isSaving ? tForm('saving') : initial ? t('saveChanges') : t('saveAddress')}
                         </button>
                     </div>
                 </form>

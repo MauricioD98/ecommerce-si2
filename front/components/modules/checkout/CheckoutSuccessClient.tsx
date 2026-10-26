@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Check } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import styles from './checkout.module.scss';
 import { useCart } from '@/hooks/useCart';
 import { PaymentService } from '@/service/api/payment.service';
@@ -18,6 +19,7 @@ export default function CheckoutSuccessClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { clearAllCart } = useCart();
+    const t = useTranslations('Checkout.success');
 
     const orderId = searchParams.get('orderId');
     const paymentIntentId = searchParams.get('payment_intent');
@@ -34,7 +36,7 @@ export default function CheckoutSuccessClient() {
             if (redirectStatus === 'failed') {
                 if (active) {
                     setStatus('error');
-                    setMessage('El pago no se pudo completar. Intenta con otro método o vuelve a intentarlo.');
+                    setMessage(t('failed'));
                 }
                 return;
             }
@@ -42,7 +44,7 @@ export default function CheckoutSuccessClient() {
             if (!orderId || !paymentIntentId) {
                 if (active) {
                     setStatus('error');
-                    setMessage('Falta información del pago. Si ya se te cobró, revisa tu correo o contáctanos.');
+                    setMessage(t('missingInfo'));
                 }
                 return;
             }
@@ -73,7 +75,7 @@ export default function CheckoutSuccessClient() {
             } catch (error) {
                 if (active) {
                     setStatus('error');
-                    setMessage(getApiErrorMessage(error, 'No se pudo confirmar tu pago. Contáctanos si ya se te cobró.'));
+                    setMessage(getApiErrorMessage(error, t('confirmFailed')));
                 }
             }
         };
@@ -111,7 +113,7 @@ export default function CheckoutSuccessClient() {
                 <div className={styles.container}>
                     <div className={styles.loadingContainer}>
                         <div className={styles.spinner} />
-                        <p className={styles.loadingText}>Confirmando tu pago...</p>
+                        <p className={styles.loadingText}>{t('confirming')}</p>
                     </div>
                 </div>
             </section>
@@ -125,7 +127,7 @@ export default function CheckoutSuccessClient() {
                     <div className={styles.stepContent}>
                         <div className={styles.errorMessage}>{message}</div>
                         <button type="button" className={styles.continueButton} onClick={() => router.push('/checkout')}>
-                            Volver al pago
+                            {t('backToPayment')}
                         </button>
                     </div>
                 </div>
@@ -141,14 +143,14 @@ export default function CheckoutSuccessClient() {
                         <div className={styles.successIcon}>
                             <Check size={56} strokeWidth={3} />
                         </div>
-                        <h2>¡Pago realizado con éxito!</h2>
+                        <h2>{t('title')}</h2>
                         {orderNumber && (
                             <p className={styles.orderId}>
-                                Tu pedido #<strong>{orderNumber}</strong> ha sido confirmado.
+                                {t.rich('orderConfirmed', { order: orderNumber, strong: (chunks) => <strong>{chunks}</strong> })}
                             </p>
                         )}
                         <p style={{ marginTop: '0.75rem', marginBottom: '1.25rem', color: '#6b7280', fontSize: '0.95rem' }}>
-                            Redirigiendo a la tienda en {countdown} segundos...
+                            {t('redirecting', { seconds: countdown })}
                         </p>
                         <button
                             type="button"
@@ -157,7 +159,7 @@ export default function CheckoutSuccessClient() {
                                 window.location.href = '/';
                             }}
                         >
-                            Volver a la tienda
+                            {t('backToStore')}
                         </button>
                     </div>
                 </div>

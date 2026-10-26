@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { OrderService } from "@/service/api/order.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
+import { useLocaleVersion } from "@/hooks/useLocaleVersion";
+import { useTranslations } from "next-intl";
 import { Order } from "@/types/orders.types";
 
 // Detalle de un pedido propio (usado por la página de tracking en "Mis pedidos")
@@ -8,6 +10,9 @@ export function useOrderDetail(orderId: string | undefined) {
     const [order, setOrder] = useState<Order | null>(null);
     const [loadedId, setLoadedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Los nombres de producto vienen traducidos: se recarga al cambiar de idioma
+    const localeVersion = useLocaleVersion();
+    const t = useTranslations("Account.orders");
 
     useEffect(() => {
         if (!orderId) return;
@@ -20,7 +25,7 @@ export function useOrderDetail(orderId: string | undefined) {
                 setError(null);
             })
             .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, "No se pudo cargar el pedido."));
+                if (active) setError(getApiErrorMessage(error, t("loadOneFailed")));
             })
             .finally(() => {
                 if (active) setLoadedId(orderId);
@@ -29,7 +34,8 @@ export function useOrderDetail(orderId: string | undefined) {
         return () => {
             active = false;
         };
-    }, [orderId]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [orderId, localeVersion]);
 
     return { order, isLoading: loadedId !== orderId, error };
 }

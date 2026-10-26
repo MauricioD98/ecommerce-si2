@@ -2,54 +2,59 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useStoreName } from '@/providers/StoreInfoProvider';
 import styles from './footer.module.scss';
 
 export default function Footer() {
+    const t = useTranslations('Footer');
+    const storeName = useStoreName();
+
     return (
         <footer className={styles.footer}>
             <div className={styles.container}>
                 <div className={styles.content}>
                     <div className={styles.brand}>
-                        <h3>STELLA FEMME</h3>
-                        <p>Moda femenina con estilo y calidad, en tu sucursal o en tu puerta.</p>
+                        <h3>{storeName}</h3>
+                        <p>{t('tagline')}</p>
                     </div>
 
                     <div className={styles.section}>
-                        <h4>Sucursales</h4>
+                        <h4>{t('branches')}</h4>
                         <ul>
                             <li>
-                                <Link href="/">Sucursal Centro</Link>
+                                <Link href="/">{t('branchCentro')}</Link>
                             </li>
                             <li>
-                                <Link href="/">Sucursal Equipetrol</Link>
+                                <Link href="/">{t('branchEquipetrol')}</Link>
                             </li>
                             <li>
-                                <Link href="/">Tienda Online</Link>
+                                <Link href="/">{t('onlineStore')}</Link>
                             </li>
                         </ul>
                     </div>
 
                     <div className={styles.section}>
-                        <h4>Soporte</h4>
+                        <h4>{t('support')}</h4>
                         <ul>
                             <li>
-                                <Link href="/">Preguntas Frecuentes</Link>
+                                <Link href="/">{t('faq')}</Link>
                             </li>
                             <li>
-                                <Link href="/">Guía de Tallas</Link>
+                                <Link href="/">{t('sizeGuide')}</Link>
                             </li>
                             <li>
-                                <Link href="/">Envíos y Entregas</Link>
+                                <Link href="/">{t('shipping')}</Link>
                             </li>
                             <li>
-                                <Link href="/">Política de Devoluciones</Link>
+                                <Link href="/">{t('returns')}</Link>
                             </li>
                         </ul>
                     </div>
                 </div>
 
                 <p className={styles.copyright}>
-                    © {new Date().getFullYear()} Stella Femme. Todos los derechos reservados.
+                    {t('rights', { year: new Date().getFullYear(), store: storeName })}
                 </p>
             </div>
         </footer>

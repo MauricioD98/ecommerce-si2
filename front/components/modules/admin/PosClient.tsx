@@ -2,7 +2,9 @@
 
 import React, { useRef, useState } from 'react';
 import { Banknote, CreditCard, Minus, Plus, QrCode, Search, ShoppingCart, Trash2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
 import styles from './pos.module.scss';
+import { formatMoney } from '@/i18n/config';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { usePosCatalog } from '@/hooks/usePos';
@@ -19,14 +21,19 @@ interface TicketLine {
     quantity: number;
 }
 
-const PAYMENT_METHODS: { value: PosPaymentMethod; label: string; icon: React.ReactNode }[] = [
-    { value: 'CASH', label: 'Efectivo', icon: <Banknote size={18} /> },
-    { value: 'PHYSICAL_CARD', label: 'Tarjeta (POS)', icon: <CreditCard size={18} /> },
-    { value: 'QR', label: 'QR / Transferencia', icon: <QrCode size={18} /> },
+// Etiqueta de cada método: AdminPos.methods.<método>
+const PAYMENT_METHODS: { value: PosPaymentMethod; icon: React.ReactNode }[] = [
+    { value: 'CASH', icon: <Banknote size={18} /> },
+    { value: 'PHYSICAL_CARD', icon: <CreditCard size={18} /> },
+    { value: 'QR', icon: <QrCode size={18} /> },
 ];
 
 export default function PosClient() {
     const { isGlobal, branchId: cashierBranchId } = useAdminRole();
+    const t = useTranslations('AdminPos');
+    const tc = useTranslations('AdminCommon');
+    const locale = useLocale();
+    const money = (value: number) => formatMoney(value, locale);
     const { branches } = useAdminBranches();
     const [selectedBranchId, setSelectedBranchId] = useState('');
 
@@ -77,16 +84,14 @@ export default function PosClient() {
     const addToTicket = (product: Product, size: string) => {
         const sizeStock = getSizeStock(product, size);
         if (sizeStock <= 0) {
-            setCheckoutError(`"${product.name}" no tiene stock en la talla ${size} en esta sucursal.`);
+            setCheckoutError(t('errors.sizeNoStock', { name: product.name, size }));
             return;
         }
 
         // El techo de cada línea es el stock de ESA talla, no el del producto entero
         const existing = ticket.find((line) => line.product.id === product.id && line.size === size);
         if (existing && existing.quantity >= sizeStock) {
-            setCheckoutError(
-                `Solo ${sizeStock} ${sizeStock === 1 ? 'unidad' : 'unidades'} de "${product.name}" en talla ${size} en esta sucursal.`,
-            );
+            setCheckoutError(t('errors.sizeLimit', { count: sizeStock, name: product.name, size }));
             return;
         }
 
@@ -151,9 +156,7 @@ export default function PosClient() {
 
         const invalidLine = ticket.find((line) => getSizeStock(line.product, line.size) < line.quantity);
         if (invalidLine) {
-            setCheckoutError(
-                `"${invalidLine.product.name}" (${invalidLine.size}) ya no tiene stock suficiente. Quítalo o ajusta la cantidad del ticket.`,
-            );
+            setCheckoutError(t('errors.lineNoStock', { name: invalidLine.product.name, size: invalidLine.size }));
             return;
         }
 
@@ -177,7 +180,7 @@ export default function PosClient() {
             }, 500);
 
         } catch (error) {
-            setCheckoutError(getApiErrorMessage(error, 'No se pudo completar la venta.'));
+            setCheckoutError(getApiErrorMessage(error, t('errors.checkoutFailed')));
         } finally {
             setIsCharging(false);
         }
@@ -187,8 +190,8 @@ export default function PosClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>Punto de Venta</h1>
-                    <p>Cobra ventas físicas en mostrador. El inventario se descuenta de la misma sucursal que la tienda en línea.</p>
+                    <h1>{t('title')}</h1>
+                    <p>{t('subtitle')}</p>
                 </div>
 
                 {isGlobal && (
@@ -197,7 +200,7 @@ export default function PosClient() {
                         value={selectedBranchId}
                         onChange={(e) => setSelectedBranchId(e.target.value)}
                     >
-                        <option value="">Selecciona una sucursal</option>
+                        <option value="">{t('selectBranch')}</option>
                         {branches.filter((b) => b.isActive).map((branch) => (
                             <option key={branch.id} value={branch.id}>{branch.name}</option>
                         ))}
@@ -206,7 +209,7 @@ export default function PosClient() {
             </div>
 
             {!effectiveBranchId ? (
-                <div className={styles.emptyState}>Selecciona una sucursal para empezar a cobrar.</div>
+                <div className={styles.emptyState}>{t('selectBranchFirst')}</div>
             ) : (
                 <div className={styles.layout}>
                     <div className={styles.catalog}>
@@ -214,7 +217,7 @@ export default function PosClient() {
                             <Search size={18} />
                             <input
                                 type="text"
-                                placeholder="Buscar producto por nombre..."
+                                placeholder={t('searchPlaceholder')}
                                 value={searchInput}
                                 onChange={(e) => handleSearchChange(e.target.value)}
                             />
@@ -225,9 +228,9 @@ export default function PosClient() {
                         {/* Lo único que scrollea de la columna central: el buscador de arriba queda fijo */}
                         <div className={styles.catalogScroll}>
                         {isLoadingProducts ? (
-                            <div className={styles.emptyState}>Cargando productos...</div>
+                            <div className={styles.emptyState}>{t('loading')}</div>
                         ) : products.length === 0 ? (
-                            <div className={styles.emptyState}>No se encontraron productos.</div>
+                            <div className={styles.emptyState}>{t('noProducts')}</div>
                         ) : (
                             <div className={styles.productGrid}>
                                 {products.map((product) => (
@@ -240,15 +243,15 @@ export default function PosClient() {
                                         >
                                             <img src={product.imageUrl} alt={product.name} className={styles.productImage} />
                                             <span className={styles.productName}>{product.name}</span>
-                                            <span className={styles.productPrice}>Bs {(product.effectivePrice ?? product.price).toFixed(2)}</span>
+                                            <span className={styles.productPrice}>{money(product.effectivePrice ?? product.price)}</span>
                                             <span className={`${styles.stockBadge} ${product.stock <= 0 ? styles.stockBadgeOut : ''}`}>
-                                                {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
+                                                {product.stock <= 0 ? t('noStock') : t('stock', { count: product.stock })}
                                             </span>
                                         </button>
 
                                         {pendingSizeProductId === product.id && (
                                             <div className={styles.sizePicker}>
-                                                <span className={styles.sizePickerLabel}>Talla</span>
+                                                <span className={styles.sizePickerLabel}>{t('size')}</span>
                                                 <div className={styles.sizePickerOptions}>
                                                     {product.sizes.map((size) => {
                                                         const sizeStock = getSizeStock(product, size);
@@ -261,7 +264,7 @@ export default function PosClient() {
                                                                 onClick={() => addToTicket(product, size)}
                                                                 disabled={sizeOutOfStock}
                                                                 aria-disabled={sizeOutOfStock}
-                                                                title={sizeOutOfStock ? `Talla ${size} agotada en esta sucursal` : undefined}
+                                                                title={sizeOutOfStock ? t('sizeSoldOut', { size }) : undefined}
                                                             >
                                                                 {size} <span className={styles.sizePickerOptionStock}>({sizeStock})</span>
                                                             </button>
@@ -273,7 +276,7 @@ export default function PosClient() {
                                                     className={styles.sizePickerCancel}
                                                     onClick={() => setPendingSizeProductId(null)}
                                                 >
-                                                    Cancelar
+                                                    {tc('cancel')}
                                                 </button>
                                             </div>
                                         )}
@@ -286,13 +289,13 @@ export default function PosClient() {
 
                     <aside className={styles.ticket}>
                         <h2 className={styles.ticketTitle}>
-                            <ShoppingCart size={18} /> Ticket
+                            <ShoppingCart size={18} /> {t('ticket')}
                         </h2>
 
                         {/* Zona con scroll: líneas del ticket, datos de factura y método de pago */}
                         <div className={styles.ticketScroll}>
                         {ticket.length === 0 ? (
-                            <div className={styles.emptyState}>Agrega productos desde el catálogo.</div>
+                            <div className={styles.emptyState}>{t('emptyTicket')}</div>
                         ) : (
                             <div className={styles.ticketLines}>
                                 {ticket.map((line) => (
@@ -302,7 +305,7 @@ export default function PosClient() {
                                                 {line.product.name} <span className={styles.ticketLineSize}>({line.size})</span>
                                             </span>
                                             <span className={styles.ticketLinePrice}>
-                                                Bs ${(line.product.effectivePrice ?? line.product.price).toFixed(2)} c/u
+                                                {t('unitPrice', { price: money(line.product.effectivePrice ?? line.product.price) })}
                                             </span>
                                         </div>
                                         <div className={styles.ticketLineActions}>
@@ -310,7 +313,7 @@ export default function PosClient() {
                                                 type="button"
                                                 className={styles.quantityButton}
                                                 onClick={() => changeQuantity(line.product.id, line.size, -1)}
-                                                aria-label="Quitar uno"
+                                                aria-label={t('removeOne')}
                                             >
                                                 <Minus size={14} />
                                             </button>
@@ -320,7 +323,7 @@ export default function PosClient() {
                                                 className={styles.quantityButton}
                                                 onClick={() => changeQuantity(line.product.id, line.size, 1)}
                                                 disabled={line.quantity >= getSizeStock(line.product, line.size)}
-                                                aria-label="Agregar uno"
+                                                aria-label={t('addOne')}
                                             >
                                                 <Plus size={14} />
                                             </button>
@@ -328,7 +331,7 @@ export default function PosClient() {
                                                 type="button"
                                                 className={styles.removeButton}
                                                 onClick={() => removeLine(line.product.id, line.size)}
-                                                aria-label="Quitar del ticket"
+                                                aria-label={t('removeLine')}
                                             >
                                                 <Trash2 size={14} />
                                             </button>
@@ -340,7 +343,7 @@ export default function PosClient() {
 
                         <div className={styles.customerFields}>
                             <div className={styles.field}>
-                                <label htmlFor="pos-nit">NIT / CI</label>
+                                <label htmlFor="pos-nit">{t('nit')}</label>
                                 <input
                                     id="pos-nit"
                                     type="text"
@@ -350,11 +353,11 @@ export default function PosClient() {
                                 />
                             </div>
                             <div className={styles.field}>
-                                <label htmlFor="pos-razon">Nombre / Razón Social</label>
+                                <label htmlFor="pos-razon">{t('razonSocial')}</label>
                                 <input
                                     id="pos-razon"
                                     type="text"
-                                    placeholder="Sin nombre"
+                                    placeholder={t('noName')}
                                     value={razonSocial}
                                     onChange={(e) => setRazonSocial(e.target.value)}
                                 />
@@ -370,7 +373,7 @@ export default function PosClient() {
                                     onClick={() => setPaymentMethod(method.value)}
                                 >
                                     {method.icon}
-                                    {method.label}
+                                    {t(`methods.${method.value}`)}
                                 </button>
                             ))}
                         </div>
@@ -378,7 +381,7 @@ export default function PosClient() {
                         {paymentMethod === 'CASH' && (
                             <div className={styles.cashPanel}>
                                 <div className={styles.field}>
-                                    <label htmlFor="pos-received">Monto Recibido</label>
+                                    <label htmlFor="pos-received">{t('amountReceived')}</label>
                                     <input
                                         id="pos-received"
                                         type="number"
@@ -391,8 +394,8 @@ export default function PosClient() {
                                     />
                                 </div>
                                 <div className={`${styles.changeRow} ${cashBlocked ? styles.changeRowInsufficient : ''}`}>
-                                    <span>Cambio</span>
-                                    <span>{change !== null ? `Bs ${change.toFixed(2)}` : '—'}</span>
+                                    <span>{t('change')}</span>
+                                    <span>{change !== null ? money(change) : '—'}</span>
                                 </div>
                             </div>
                         )}
@@ -403,8 +406,8 @@ export default function PosClient() {
                         {/* Anclado abajo: el cajero ve el total y el botón de cobrar sin scrollear */}
                         <div className={styles.ticketFooter}>
                             <div className={styles.ticketTotal}>
-                                <span>Total</span>
-                                <span>Bs ${total.toFixed(2)}</span>
+                                <span>{t('total')}</span>
+                                <span>{money(total)}</span>
                             </div>
 
                             <button
@@ -413,7 +416,7 @@ export default function PosClient() {
                                 disabled={ticket.length === 0 || isCharging || cashBlocked}
                                 onClick={handleCharge}
                             >
-                                {isCharging ? 'Cobrando...' : `Cobrar Bs ${total.toFixed(2)}`}
+                                {isCharging ? t('charging') : t('charge', { amount: money(total) })}
                             </button>
                         </div>
                     </aside>

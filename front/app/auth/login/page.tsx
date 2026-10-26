@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import React, { Suspense } from 'react';
 import LoginForm from '@/components/modules/auth/LoginForm';
 
@@ -11,13 +13,10 @@ export default function page() {
     );
 };
 
-export function generateMetadata() {
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getTranslations("Metadata");
     return {
-        title: "Autenticación",
-        description: "Autenticación de usuarios",
-        icons:{
-            icon: `path to asset file`
-        }
-
+        title: t("loginTitle"),
+        description: t("loginDescription"),
     };
 }

@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "save": "Enregistrer",
+    "close": "Fermer",
+    "restore": "Restaurer"
+  },
+  "tabs": {
+    "shop": "Boutique",
+    "cart": "Panier",
+    "orders": "Commandes",
+    "profile": "Profil"
+  },
+  "language": {
+    "title": "Langue",
+    "subtitle": "Choisissez la langue de l'application",
+    "deviceHint": "Par défaut, l'application utilise la langue de votre téléphone."
+  },
+  "profile": {
+    "defaultUser": "Utilisateur",
+    "editProfile": "Modifier le profil",
+    "editProfileDesc": "Prénom, nom et e-mail",
+    "security": "Sécurité et mot de passe",
+    "securityDesc": "Changer le mot de passe",
+    "orders": "Mes commandes",
+    "ordersDesc": "Historique et suivi des achats",
+    "apiServer": "Serveur API",
+    "logout": "Se déconnecter",
+    "logoutConfirm": "Voulez-vous vraiment vous déconnecter de votre compte ?",
+    "apiModalTitle": "Configurer le serveur API",
+    "apiModalDesc": "Connectez-vous à l'API dans le cloud (Azure) ou réglez l'URL pour le développement local.",
+    "apiUrlLabel": "URL de base de l'API",
+    "cloudServer": "Serveur cloud (Azure Production)",
+    "localServer": "Serveur local (PC) : {{address}}",
+    "urlSaved": "URL enregistrée",
+    "urlSavedBody": "Connexion à : {{url}}",
+    "urlRestored": "URL restaurée",
+    "urlRestoredBody": "URL par défaut : {{url}}"
+  }
+}

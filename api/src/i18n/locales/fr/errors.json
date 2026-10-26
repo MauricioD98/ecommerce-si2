@@ -1,0 +1,42 @@
+{
+  "status": {
+    "400": "Requête invalide",
+    "401": "Non autorisé",
+    "403": "Vous n'avez pas l'autorisation d'effectuer cette action",
+    "404": "Ressource introuvable",
+    "409": "Conflit avec l'état actuel de la ressource",
+    "429": "Trop de requêtes. Veuillez réessayer dans quelques minutes",
+    "500": "Erreur interne du serveur",
+    "502": "Erreur de communication avec un service externe",
+    "503": "Service indisponible. Veuillez réessayer plus tard"
+  },
+  "EMAIL_TAKEN": "Cette adresse e-mail est déjà enregistrée",
+  "REGISTER_FAILED": "Une erreur s'est produite lors de l'inscription",
+  "USER_NOT_FOUND": "Utilisateur introuvable",
+  "INVALID_CREDENTIALS": "E-mail ou mot de passe invalide",
+  "TOO_MANY_ATTEMPTS": {
+    "one": "Trop de tentatives échouées. Veuillez réessayer dans {count} minute",
+    "other": "Trop de tentatives échouées. Veuillez réessayer dans {count} minutes"
+  },
+  "ACCOUNT_LOCKED": "Trop de tentatives échouées. Votre compte est bloqué pendant 5 minutes",
+  "PRODUCT_NOT_FOUND": "Produit introuvable",
+  "SKU_TAKEN": "Un produit avec le SKU {sku} existe déjà",
+  "CATEGORY_NOT_FOUND": "La catégorie « {id} » n'existe pas",
+  "USER_WITHOUT_BRANCH": "L'utilisateur n'est affecté à aucun point de vente",
+  "PLAN_UNAVAILABLE": "Cette offre n'est pas disponible pour le moment",
+  "OWNER_EMAIL_TAKEN": "Cet e-mail gère déjà une boutique. Utilisez-en un autre ou contactez-nous.",
+  "DOMAIN_TAKEN": "Ce domaine est déjà associé à une autre boutique",
+  "PAYMENT_URL_MISSING": "Stripe n'a pas renvoyé l'URL de paiement",
+  "CHECKOUT_NOT_FOUND": "Nous n'avons pas trouvé ce paiement",
+  "SIGNUP_NOT_FOUND": "Demande introuvable",
+  "SIGNUP_NOT_PAID": "Cette demande n'a pas été payée",
+  "SIGNUP_IN_PROGRESS": "La boutique est déjà créée ou en cours de création",
+  "CONTACT_SEND_FAILED": "Impossible d'envoyer votre message. Veuillez réessayer plus tard.",
+  "TENANT_NOT_FOUND": "Boutique introuvable",
+  "SUBSCRIPTION_ALREADY_ACTIVE": "Votre boutique a déjà un abonnement actif. Utilisez « Gérer l’abonnement » pour changer d’offre ou annuler.",
+  "NO_BILLING_ACCOUNT": "Votre boutique n’a pas encore d’abonnement Stripe",
+  "BILLING_OWNER_ONLY": "Seul le Super Admin de la boutique peut gérer l’abonnement",
+  "CONNECT_NOT_ENABLED": "Votre compte Stripe n’a pas encore activé Connect. Activez-le dans le Dashboard Stripe (Connect → Commencer) et réessayez.",
+  "ROLE_PERMISSIONS_EXCEED": "Vous ne pouvez pas accorder des autorisations que votre rôle n’a pas : {permissions}",
+  "ROLE_TOO_POWERFUL": "Vous ne pouvez pas modifier un rôle ayant plus d’autorisations que le vôtre"
+}
