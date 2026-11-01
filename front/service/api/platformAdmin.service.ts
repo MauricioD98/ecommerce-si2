@@ -3,7 +3,8 @@ import { getClientLocale } from "@/i18n/client";
 
 // Plano de control (Super Admin del SaaS). Usa fetch y no apiClient a propósito: apiClient manda el
 // JWT y la tienda del usuario, y ante un 401 intenta refrescar la sesión y cerrarla. Acá no hay
-// usuario: solo la llave de plataforma en x-platform-key (PlatformAdminGuard).
+// usuario de tienda: el administrador de la plataforma entra con email y contraseña
+// (POST /platform/auth/login) y manda su propio token en Authorization (PlatformAdminGuard).
 
 export type TenantStatus = "PROVISIONING" | "ACTIVE" | "SUSPENDED" | "FAILED";
 
@@ -43,13 +44,25 @@ export class PlatformApiError extends Error {
     }
 }
 
-async function request<T>(key: string, path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`${getApiBaseUrl()}/platform/tenants${path}`, {
+export interface PlatformAdminProfile {
+    id: string;
+    email: string;
+    name: string | null;
+}
+
+export interface PlatformSession {
+    accessToken: string;
+    expiresIn: number;
+    admin: PlatformAdminProfile;
+}
+
+async function request<T>(token: string | null, path: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`${getApiBaseUrl()}/platform${path}`, {
         ...init,
         headers: {
             "Content-Type": "application/json",
             "Accept-Language": getClientLocale(),
-            "x-platform-key": key,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
             ...init?.headers,
         },
         cache: "no-store",
@@ -63,12 +76,14 @@ async function request<T>(key: string, path: string, init?: RequestInit): Promis
 }
 
 export const platformAdminService = {
-    getTenants: (key: string) => request<PlatformTenant[]>(key, ""),
-    getMetrics: (key: string) => request<PlatformMetrics>(key, "/metrics"),
-    setStatus: (key: string, id: string, status: "ACTIVE" | "SUSPENDED") =>
-        request<Pick<PlatformTenant, "id" | "slug" | "name" | "status">>(key, `/${id}/status`, {
+    login: (email: string, password: string) =>
+        request<PlatformSession>(null, "/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    getTenants: (token: string) => request<PlatformTenant[]>(token, "/tenants"),
+    getMetrics: (token: string) => request<PlatformMetrics>(token, "/tenants/metrics"),
+    setStatus: (token: string, id: string, status: "ACTIVE" | "SUSPENDED") =>
+        request<Pick<PlatformTenant, "id" | "slug" | "name" | "status">>(token, `/tenants/${id}/status`, {
             method: "PATCH",
             body: JSON.stringify({ status }),
         }),
-    retry: (key: string, id: string) => request<PlatformTenant>(key, `/${id}/retry`, { method: "POST" }),
+    retry: (token: string, id: string) => request<PlatformTenant>(token, `/tenants/${id}/retry`, { method: "POST" }),
 };

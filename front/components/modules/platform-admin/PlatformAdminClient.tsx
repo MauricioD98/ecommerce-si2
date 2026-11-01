@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ExternalLink, KeyRound, LogOut, PauseCircle, PlayCircle, RefreshCw, RotateCcw } from 'lucide-react';
+import { ExternalLink, LogOut, PauseCircle, PlayCircle, RefreshCw, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import tableStyles from '@/components/modules/admin/admin-table.module.scss';
 import styles from './platform-admin.module.scss';
@@ -15,9 +15,14 @@ import {
     platformAdminService,
 } from '@/service/api/platformAdmin.service';
 
-// Solo en esta pestaña: se borra al cerrarla. No va a localStorage (persistiría en el equipo).
-// "Abrir" lleva a la tienda con ?tenant=<id>, que el front usa para elegirla (utils/tenant.ts).
-const KEY_STORAGE = 'sf_platform_key';
+// La sesión (token + email) vive solo en esta pestaña: se borra al cerrarla. No va a localStorage
+// (persistiría en el equipo). "Abrir" lleva a la tienda con ?tenant=<id> (utils/tenant.ts).
+const SESSION_STORAGE = 'sf_platform_session';
+
+interface StoredSession {
+    token: string;
+    email: string;
+}
 
 const STATUS_BADGE: Record<TenantStatus, string> = {
     ACTIVE: tableStyles.badgeSuccess,
@@ -37,11 +42,12 @@ const SUBSCRIPTION_BADGE: Record<string, string> = {
     paused: tableStyles.badgeMuted,
 };
 
-const readStoredKey = (): string => {
+const readStoredSession = (): StoredSession | null => {
     try {
-        return sessionStorage.getItem(KEY_STORAGE) ?? '';
+        const parsed = JSON.parse(sessionStorage.getItem(SESSION_STORAGE) ?? 'null');
+        return typeof parsed?.token === 'string' && typeof parsed?.email === 'string' ? parsed : null;
     } catch {
-        return '';
+        return null;
     }
 };
 
@@ -50,8 +56,10 @@ export default function PlatformAdminClient() {
     const tSub = useTranslations('AdminSubscription');
     const locale = useLocale();
 
-    const [key, setKey] = useState('');
-    const [keyInput, setKeyInput] = useState('');
+    const [session, setSession] = useState<StoredSession | null>(null);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSigningIn, setIsSigningIn] = useState(false);
     const [tenants, setTenants] = useState<PlatformTenant[]>([]);
     const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -61,35 +69,36 @@ export default function PlatformAdminClient() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<TenantStatus | ''>('');
 
-    useEffect(() => setKey(readStoredKey()), []);
+    useEffect(() => setSession(readStoredSession()), []);
+    const token = session?.token ?? '';
 
     const signOut = useCallback(() => {
         try {
-            sessionStorage.removeItem(KEY_STORAGE);
+            sessionStorage.removeItem(SESSION_STORAGE);
         } catch {
             // sin storage: igual se olvida en memoria
         }
-        setKey('');
+        setSession(null);
         setTenants([]);
         setMetrics(null);
     }, []);
 
     const load = useCallback(
-        async (platformKey: string) => {
+        async (sessionToken: string) => {
             setIsLoading(true);
             setError(null);
             try {
                 const [tenantList, metricData] = await Promise.all([
-                    platformAdminService.getTenants(platformKey),
-                    platformAdminService.getMetrics(platformKey),
+                    platformAdminService.getTenants(sessionToken),
+                    platformAdminService.getMetrics(sessionToken),
                 ]);
                 setTenants(tenantList);
                 setMetrics(metricData);
             } catch (err) {
-                // Llave incorrecta o revocada: se vuelve a pedir
+                // Sesión vencida o cuenta desactivada: se vuelve a pedir el login
                 if (err instanceof PlatformApiError && err.status === 401) {
                     signOut();
-                    setError(t('invalidKey'));
+                    setError(t('sessionExpired'));
                 } else {
                     setError(err instanceof Error ? err.message : t('loadFailed'));
                 }
@@ -101,20 +110,30 @@ export default function PlatformAdminClient() {
     );
 
     useEffect(() => {
-        if (key) load(key);
-    }, [key, load]);
+        if (token) load(token);
+    }, [token, load]);
 
-    const handleKeySubmit = (e: FormEvent) => {
+    const handleLogin = async (e: FormEvent) => {
         e.preventDefault();
-        const value = keyInput.trim();
-        if (!value) return;
+        if (!email.trim() || !password) return;
+        setIsSigningIn(true);
+        setError(null);
         try {
-            sessionStorage.setItem(KEY_STORAGE, value);
-        } catch {
-            // sin storage: la llave vive solo mientras la página esté abierta
+            const { accessToken, admin } = await platformAdminService.login(email.trim(), password);
+            const next = { token: accessToken, email: admin.email };
+            try {
+                sessionStorage.setItem(SESSION_STORAGE, JSON.stringify(next));
+            } catch {
+                // sin storage: la sesión vive solo mientras la página esté abierta
+            }
+            setPassword('');
+            setSession(next);
+        } catch (err) {
+            // La API ya responde el motivo traducido (credenciales inválidas, cuenta bloqueada…)
+            setError(err instanceof Error && err.message ? err.message : t('loginFailed'));
+        } finally {
+            setIsSigningIn(false);
         }
-        setKeyInput('');
-        setKey(value);
     };
 
     const changeStatus = async (tenant: PlatformTenant, status: 'ACTIVE' | 'SUSPENDED') => {
@@ -125,9 +144,9 @@ export default function PlatformAdminClient() {
         setError(null);
         setNotice(null);
         try {
-            await platformAdminService.setStatus(key, tenant.id, status);
+            await platformAdminService.setStatus(token, tenant.id, status);
             setNotice(status === 'SUSPENDED' ? t('suspended', { name: tenant.name }) : t('reactivated', { name: tenant.name }));
-            await load(key);
+            await load(token);
         } catch (err) {
             setError(err instanceof Error ? err.message : t('actionFailed'));
         } finally {
@@ -140,9 +159,9 @@ export default function PlatformAdminClient() {
         setError(null);
         setNotice(null);
         try {
-            await platformAdminService.retry(key, tenant.id);
+            await platformAdminService.retry(token, tenant.id);
             setNotice(t('retried', { name: tenant.name }));
-            await load(key);
+            await load(token);
         } catch (err) {
             setError(err instanceof Error ? err.message : t('actionFailed'));
         } finally {
@@ -165,30 +184,42 @@ export default function PlatformAdminClient() {
     const formatMrr = (value: number, currency: string) =>
         new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency }).format(value);
 
-    // ------------------------------------------------------------------ Llave de plataforma
-    if (!key) {
+    // ------------------------------------------------------------------ Login de plataforma
+    if (!session) {
         return (
             <div className={styles.gate}>
-                <form className={styles.gateCard} onSubmit={handleKeySubmit}>
-                    <KeyRound size={28} aria-hidden />
+                <form className={styles.gateCard} onSubmit={handleLogin}>
+                    <ShieldCheck size={28} aria-hidden />
                     <h1>{t('gateTitle')}</h1>
                     <p>{t('gateText')}</p>
                     {error && <div className={tableStyles.errorMessage}>{error}</div>}
                     <label className={tableStyles.field}>
-                        <span>{t('keyLabel')}</span>
+                        <span>{t('emailLabel')}</span>
+                        <input
+                            type="email"
+                            className={tableStyles.input}
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            autoComplete="username"
+                            autoFocus
+                            required
+                        />
+                    </label>
+                    <label className={tableStyles.field}>
+                        <span>{t('passwordLabel')}</span>
                         <input
                             type="password"
                             className={tableStyles.input}
-                            value={keyInput}
-                            onChange={(e) => setKeyInput(e.target.value)}
-                            autoComplete="off"
-                            autoFocus
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            autoComplete="current-password"
+                            required
                         />
                     </label>
-                    <button type="submit" className={tableStyles.button} disabled={!keyInput.trim()}>
-                        {t('enter')}
+                    <button type="submit" className={tableStyles.button} disabled={isSigningIn || !email.trim() || !password}>
+                        {isSigningIn ? t('signingIn') : t('enter')}
                     </button>
-                    <small>{t('keyHint')}</small>
+                    <small>{t('loginHint')}</small>
                 </form>
             </div>
         );
@@ -213,8 +244,9 @@ export default function PlatformAdminClient() {
             <header className={styles.topbar}>
                 <span className={styles.brand}>STELLA FEMME · {t('brandSuffix')}</span>
                 <div className={styles.topbarActions}>
+                    <span className={tableStyles.cellSub}>{session.email}</span>
                     <LanguageSwitcher />
-                    <button type="button" className={tableStyles.buttonSecondary} onClick={() => load(key)} disabled={isLoading}>
+                    <button type="button" className={tableStyles.buttonSecondary} onClick={() => load(token)} disabled={isLoading}>
                         <RefreshCw size={16} className={isLoading ? styles.spin : ''} />
                         {t('refresh')}
                     </button>

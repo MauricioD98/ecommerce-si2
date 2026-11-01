@@ -141,6 +141,28 @@ model TenantIntegration {
   @@map("tenant_integrations")
 }
 
+// Administradores del SaaS: entran a /plataforma con email y contraseña. No son usuarios de ninguna
+// tienda (un Super Admin de una tienda NO administra la plataforma). El primero se crea con
+// `npm run platform:admin -- <email> <contraseña>`.
+model PlatformAdmin {
+  id            String    @id @default(uuid()) @db.Uuid
+  // Normalizado a minúsculas
+  email         String    @unique
+  // bcrypt
+  passwordHash  String    @map("password_hash")
+  name          String?
+  // false = no puede entrar y sus tokens vigentes dejan de valer (el guard lo consulta en cada request)
+  isActive      Boolean   @default(true) @map("is_active")
+  loginAttempts Int       @default(0) @map("login_attempts")
+  lockedUntil   DateTime? @map("locked_until")
+  lastLoginAt   DateTime? @map("last_login_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_admins")
+}
+
 model TenantCredential {
   id         String         @id @default(uuid()) @db.Uuid
   tenantId   String         @map("tenant_id") @db.Uuid
