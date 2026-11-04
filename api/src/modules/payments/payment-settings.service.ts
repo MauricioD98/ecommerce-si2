@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { simulatedPaymentsEnabled } from '../../common/checkout/checkout-policy';
 import { UsdtNetwork } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -145,6 +146,7 @@ export class PaymentSettingsService {
     const usdtReady = Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress);
     return {
       card: cardEnabled,
+      simulatedQr: simulatedPaymentsEnabled(),
       bankQr: qrReady ? { instructions: settings!.qrInstructions ?? '' } : null,
       usdt: usdtReady
         ? {

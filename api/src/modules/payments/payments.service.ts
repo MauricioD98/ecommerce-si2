@@ -1,22 +1,34 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { PrismaService } from '../../prisma/prisma.service';
-import { OrderStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
+import { InboxStatus } from '../../generated/control/client';
+import { CompensationStatus, OrderStatus, PaymentAttemptStatus, PaymentMethod, PaymentStatus, Prisma } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
-import { CreatePaymentIntentResponse, PaymentResponseDto, PaymentApiResponseDto } from './dto/payment-response.dto';
+import { CreatePaymentIntentResponse, PaymentResponseDto } from './dto/payment-response.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { InventoryService } from '../branches/inventory.service';
 import { StripeConnectService } from './stripe-connect.service';
 import { SubscriptionsService } from '../platform/subscriptions.service';
 import { requireTenant, runInTenant, withTenantParam } from '../../tenancy/tenant-context';
+import { ControlPrismaService } from '../../tenancy/control-prisma.service';
+import { CheckoutCode, CheckoutException } from '../../common/checkout/checkout-errors';
+import { STRIPE_IDEMPOTENCY_HORIZON_MS, paymentCurrency, simulatedPaymentsEnabled, toMinorUnits } from '../../common/checkout/checkout-policy';
+import { lockOrder, withTxRetry } from '../../common/checkout/tx.util';
+import { failpoint } from '../../common/checkout/failpoints';
+import { PaymentSettlementService } from './payment-settlement.service';
+import { StripeGateway, isProviderUnavailable } from './stripe-gateway.service';
+
+const INBOX_LEASE_MS = 2 * 60 * 1000;
+const INBOX_MAX_ATTEMPTS = 25;
+const INTENT_REUSABLE = new Set<string>(['requires_payment_method', 'requires_confirmation', 'requires_action']);
+const INTENT_EXPIRY_GRACE_MS = 15 * 60 * 1000;
 
 @Injectable()
 export class PaymentsService {
-    private stripe: Stripe;
     private readonly logger = new Logger(PaymentsService.name);
 
     constructor(
@@ -24,30 +36,18 @@ export class PaymentsService {
         private invoiceService: InvoiceService,
         private mailService: MailService,
         private notificationsService: NotificationsService,
-        private inventoryService: InventoryService,
         private stripeConnect: StripeConnectService,
         private subscriptions: SubscriptionsService,
-    ) {
-        this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-    }
+        private control: ControlPrismaService,
+        private settlement: PaymentSettlementService,
+        private gateway: StripeGateway,
+    ) {}
 
-    // Los ítems del carrito reservan (descuentan) stock real al agregarse (CartService.addItem).
-    // Si se borran sin pasar por acá (ej. al cerrar el carrito tras un pago), ese stock queda
-    // descontado para siempre porque nadie lo devuelve. Esto pasa con cualquier ítem agregado al
-    // carrito después de crear la orden pero antes de que el pago se confirme.
-    private async releaseCartStock(tx: Prisma.TransactionClient, cartId: string): Promise<void> {
-        const items = await tx.cartItem.findMany({ where: { cartId } });
-        for (const item of items) {
-            if (item.quantity <= 0) continue;
-            if (item.branchId) {
-                await this.inventoryService.increment(tx, item.productId, item.branchId, item.size ?? '', item.quantity);
-            } else {
-                await tx.product.update({ where: { id: item.productId }, data: { stock: { increment: item.quantity } } });
-            }
-        }
-        await tx.cartItem.deleteMany({ where: { cartId } });
-    }
-
+    // Una orden tiene una sola liquidación válida. Protocolo:
+    //  1. Transacción corta: orden bloqueada, intento durable con importe/moneda/destino inmutables.
+    //  2. FUERA de la transacción: Stripe con clave idempotente derivada de tienda + orden + intento.
+    //  3. Se guarda el id del PaymentIntent. Si la API cae entre 2 y 3, reintentar repite la misma clave y
+    //     Stripe devuelve el MISMO PaymentIntent; el webhook y el barrido también pueden enlazarlo.
     async createPaymentIntent(
     userId: string,
     createPaymentIntentDto: CreatePaymentIntentDto,
@@ -56,158 +56,325 @@ export class PaymentsService {
     data: CreatePaymentIntentResponse;
     message: string;
   }> {
-    const { orderId, currency = 'usd' } = createPaymentIntentDto;
-
-    const order = await this.prisma.order.findFirst({
-    where: { id: orderId, userId },
-    });
-    if (!order) {
-    throw new NotFoundException(`Order with ID ${orderId} not found`);
-    }
-
-    if (order.paymentStatus === PaymentStatus.COMPLETADO) {
-      throw new BadRequestException('payment already completed for this order');
-    }
-
-    // El monto SIEMPRE se calcula desde la orden ya guardada en la BD: nunca se confía en un monto enviado por el cliente
-    const amount = order.totalAmount.toNumber();
-    const amountInCents = Math.round(amount * 100);
-
-    // Stripe Connect (destination charge): los fondos van a la cuenta conectada de la tienda y la
-    // plataforma retiene solo su comisión. metadata.tenantId es lo que usa el webhook para saber
-    // en qué schema está la orden.
+    const { orderId } = createPaymentIntentDto;
     const { tenantId } = requireTenant();
+    // Stripe Connect (destination charge): los fondos van a la cuenta conectada de la tienda y la
+    // plataforma retiene solo su comisión. Se resuelve antes de abrir la transacción (plano de control).
     const payout = await this.stripeConnect.getPayoutAccount(tenantId);
 
-    const paymentIntent = await this.stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency,
-      metadata: { orderId, userId, tenantId },
-      automatic_payment_methods: {
-        enabled: true,
-      },
-      // La tienda figura como comerciante (extracto bancario del cliente, disputas, liquidación)
-      on_behalf_of: payout.accountId,
-      transfer_data: { destination: payout.accountId },
-      application_fee_amount: this.stripeConnect.feeFor(amountInCents, payout.feeBps),
-    });
+    for (let round = 0; round < 3; round += 1) {
+      const { attempt, payment } = await withTxRetry(() =>
+        this.prisma.$transaction(async (tx) => {
+          if (!(await lockOrder(tx, orderId))) throw new NotFoundException(`Order with ID ${orderId} not found`);
+          const order = await tx.order.findFirst({ where: { id: orderId, userId } });
+          if (!order) throw new NotFoundException(`Order with ID ${orderId} not found`);
+          this.assertOrderPayable(order);
 
-    // upsert: reintentar el pago de la misma orden (ej. tarjeta rechazada) reutiliza el registro en vez de chocar
-    // con la restricción única de Payment.orderId
-    const [payment] = await this.prisma.$transaction([
-      this.prisma.payment.upsert({
-        where: { orderId },
-        create: {
-          orderId,
-          userId,
-          amount,
-          currency,
-          status: PaymentStatus.PENDIENTE,
-          paymentMethod: 'STRIPE',
-          transactionId: paymentIntent.id,
+          let current = await tx.paymentAttempt.findFirst({
+            where: { orderId, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+          });
+          if (!current) {
+            // El monto SIEMPRE se calcula desde la orden guardada: nunca se confía en el cliente
+            const currency = paymentCurrency();
+            const amountMinor = toMinorUnits(order.totalAmount, currency);
+            const attemptNumber = (await tx.paymentAttempt.count({ where: { orderId } })) + 1;
+            const id = randomUUID();
+            current = await tx.paymentAttempt.create({
+              data: {
+                id,
+                orderId,
+                userId,
+                attemptNumber,
+                amountMinor,
+                currency,
+                destinationAccount: payout.accountId,
+                feeAmountMinor: this.stripeConnect.feeFor(amountMinor, payout.feeBps) ?? null,
+                idempotencyKey: `sf-pi-${tenantId}-${orderId}-${id}`,
+              },
+            });
+          }
+          const saved = await tx.payment.upsert({
+            where: { orderId },
+            create: {
+              orderId,
+              userId,
+              amount: order.totalAmount,
+              currency: current.currency,
+              status: PaymentStatus.PENDIENTE,
+              paymentMethod: 'STRIPE',
+              transactionId: current.stripePaymentIntentId,
+            },
+            update: { amount: order.totalAmount, currency: current.currency, paymentMethod: 'STRIPE' },
+          });
+          // El cliente ya está pagando: margen para que no venza mientras escribe su tarjeta
+          const minimumExpiry = new Date(Date.now() + INTENT_EXPIRY_GRACE_MS);
+          await tx.order.update({
+            where: { id: orderId },
+            data: {
+              paymentMethod: PaymentMethod.STRIPE,
+              ...(order.paymentExpiresAt && order.paymentExpiresAt < minimumExpiry ? { paymentExpiresAt: minimumExpiry } : {}),
+            },
+          });
+          return { attempt: current, payment: saved };
+        }),
+      );
+      await failpoint('payments.afterAttemptPersisted');
+
+      const intent = await this.obtainIntent(attempt);
+      if (intent === 'RETRY') continue;
+
+      if (intent.status === 'succeeded') {
+        await this.reconcileIntent(intent);
+        throw new CheckoutException(CheckoutCode.ORDER_ALREADY_PAID);
+      }
+      if (intent.status === 'processing') {
+        throw new CheckoutException(CheckoutCode.PAYMENT_PENDING, HttpStatus.CONFLICT, {}, { providerStatus: intent.status });
+      }
+      if (!INTENT_REUSABLE.has(intent.status)) continue;
+
+      return {
+        success: true,
+        data: {
+          // client_secret nunca se persiste: se pide a Stripe en cada recuperación
+          clientSecret: intent.client_secret!,
+          paymentId: payment.id,
+          paymentIntentId: intent.id,
+          status: intent.status,
         },
-        update: {
-          amount,
-          currency,
-          status: PaymentStatus.PENDIENTE,
-          paymentMethod: 'STRIPE',
-          transactionId: paymentIntent.id,
-        },
-      }),
-      this.prisma.order.update({
-        where: { id: orderId },
-        data: { stripePaymentIntentId: paymentIntent.id },
-      }),
-    ]);
-
-       return {
-     success: true,
-     data: {
-    clientSecret: paymentIntent.client_secret!,
-    paymentId: payment.id,
-     },
-     message: 'Payment intent created successfully',
-    };
-
+        message: 'Payment intent ready',
+      };
+    }
+    throw new CheckoutException(CheckoutCode.ATTEMPT_IN_PROGRESS);
   }
 
-  // Endpoint usado por el frontend justo después de stripe.confirmPayment, para feedback inmediato.
-  // Es idempotente: el webhook puede llegar antes o después y no debe pisarle el resultado a este flujo.
+  private assertOrderPayable(order: { status: OrderStatus; paymentStatus: PaymentStatus; paymentExpiresAt: Date | null; cancelRequestedAt: Date | null }): void {
+    if (order.paymentStatus === PaymentStatus.COMPLETADO || order.paymentStatus === PaymentStatus.REEMBOLSADO) {
+      throw new CheckoutException(CheckoutCode.ORDER_ALREADY_PAID);
+    }
+    if (order.status !== OrderStatus.PENDIENTE || order.cancelRequestedAt) {
+      throw new CheckoutException(CheckoutCode.ORDER_NOT_PAYABLE);
+    }
+    if (order.paymentExpiresAt && order.paymentExpiresAt < new Date()) {
+      throw new CheckoutException(CheckoutCode.RESERVATION_EXPIRED);
+    }
+  }
+
+  // Recupera el PaymentIntent del intento durable o lo crea. 'RETRY' = este intento ya terminó: hace falta otro.
+  private async obtainIntent(attempt: {
+    id: string;
+    orderId: string;
+    userId: string;
+    status: PaymentAttemptStatus;
+    amountMinor: number;
+    currency: string;
+    destinationAccount: string | null;
+    feeAmountMinor: number | null;
+    idempotencyKey: string;
+    stripePaymentIntentId: string | null;
+    createdAt: Date;
+  }): Promise<Stripe.PaymentIntent | 'RETRY'> {
+    if (attempt.stripePaymentIntentId) {
+      const existing = await this.callProvider(() => this.gateway.retrieve(attempt.stripePaymentIntentId!));
+      if (existing.status !== 'canceled') return existing;
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attempt.id, status: PaymentAttemptStatus.OPEN },
+        data: { status: PaymentAttemptStatus.CANCELED, providerStatus: 'canceled' },
+      });
+      return 'RETRY';
+    }
+
+    // Fuera del horizonte de idempotencia la misma clave podría crear otro cobro: se concilia primero
+    if (Date.now() - attempt.createdAt.getTime() > STRIPE_IDEMPOTENCY_HORIZON_MS) {
+      const found = await this.callProvider(() => this.gateway.findByAttempt(attempt.id));
+      if (found) {
+        await this.linkIntent(attempt.id, found);
+        return found;
+      }
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attempt.id, status: PaymentAttemptStatus.CREATED },
+        data: { status: PaymentAttemptStatus.ABANDONED },
+      });
+      return 'RETRY';
+    }
+
+    const { tenantId } = requireTenant();
+    const intent = await this.callProvider(() =>
+      this.gateway.createPaymentIntent(
+        {
+          amount: attempt.amountMinor,
+          currency: attempt.currency,
+          // metadata.tenantId es lo que usa el webhook para saber en qué schema está la orden
+          metadata: { orderId: attempt.orderId, userId: attempt.userId, tenantId, attemptId: attempt.id },
+          automatic_payment_methods: { enabled: true },
+          // La tienda figura como comerciante (extracto bancario del cliente, disputas, liquidación)
+          on_behalf_of: attempt.destinationAccount ?? undefined,
+          transfer_data: attempt.destinationAccount ? { destination: attempt.destinationAccount } : undefined,
+          application_fee_amount: attempt.feeAmountMinor ?? undefined,
+        },
+        attempt.idempotencyKey,
+      ),
+    );
+    await failpoint('payments.afterProviderCreate');
+    await this.linkIntent(attempt.id, intent);
+    return intent;
+  }
+
+  private async linkIntent(attemptId: string, intent: Stripe.PaymentIntent): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.paymentAttempt.findUniqueOrThrow({ where: { id: attemptId } });
+      await lockOrder(tx, attempt.orderId);
+      const fresh = await tx.paymentAttempt.findUniqueOrThrow({ where: { id: attemptId } });
+      const stillOpen = fresh.status === PaymentAttemptStatus.CREATED || fresh.status === PaymentAttemptStatus.OPEN;
+      await tx.paymentAttempt.update({
+        where: { id: attemptId },
+        data: {
+          stripePaymentIntentId: intent.id,
+          livemode: intent.livemode,
+          providerStatus: intent.status,
+          ...(stillOpen ? { status: PaymentAttemptStatus.OPEN } : {}),
+        },
+      });
+      await tx.payment.updateMany({ where: { orderId: attempt.orderId, status: { not: PaymentStatus.COMPLETADO } }, data: { transactionId: intent.id } });
+      await tx.order.updateMany({ where: { id: attempt.orderId, paymentStatus: { not: PaymentStatus.COMPLETADO } }, data: { stripePaymentIntentId: intent.id } });
+    });
+  }
+
+  // Un timeout o 5xx del proveedor no prueba nada sobre lo que hizo: se informa como reintentable
+  private async callProvider<T>(call: () => Promise<T>): Promise<T> {
+    try {
+      return await call();
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (code === 'idempotency_key_in_use') throw new CheckoutException(CheckoutCode.ATTEMPT_IN_PROGRESS);
+      if (isProviderUnavailable(error)) throw new CheckoutException(CheckoutCode.PROVIDER_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE);
+      throw error;
+    }
+  }
+
+  // Solo reconcilia con evidencia del proveedor: el cliente nunca puede marcar nada como pagado.
+  // `processing` y `requires_action` siguen pendientes (409 PAYMENT_PENDING).
   async confirmPayment(
-    userId: string | undefined,
+    userId: string,
     confirmPaymentDto: ConfirmPaymentDto,
   ): Promise<{ success: boolean; data: PaymentResponseDto; message: string }> {
     const { paymentIntentId, orderId } = confirmPaymentDto;
 
-    // Soporte para pagos QR en confirmPayment
-    if (paymentIntentId.startsWith('QR_') || paymentIntentId.startsWith('QR-')) {
-      await this.markQrPaymentSucceeded(orderId, paymentIntentId);
-      const updatedPayment = await this.prisma.payment.findFirst({
-        where: { orderId },
-      });
-      if (updatedPayment) {
-        return {
-          success: true,
-          data: this.mapToPaymentResponse(updatedPayment),
-          message: 'Payment confirmed successfully',
-        };
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, userId }, select: { id: true } });
+    if (!order) throw new NotFoundException('payment not found');
+
+    // Pago manual o QR simulado: esta ruta no confirma nada, solo informa el estado real
+    if (!paymentIntentId.startsWith('pi_')) {
+      const local = await this.prisma.payment.findFirst({ where: { orderId, userId } });
+      if (local?.status === PaymentStatus.COMPLETADO) {
+        return { success: true, data: this.mapToPaymentResponse(local), message: 'Payment confirmed successfully' };
       }
+      throw new CheckoutException(CheckoutCode.PAYMENT_PENDING);
     }
 
-    let payment = await this.prisma.payment.findFirst({
-      where: {
-        orderId,
-        ...(userId ? { userId } : {}),
-      },
-    });
-    if (!payment) {
-      payment = await this.prisma.payment.findFirst({
-        where: { orderId },
-      });
-    }
-    if (!payment) {
-      throw new NotFoundException('payment not found');
-    }
-
-    if (payment.status !== PaymentStatus.COMPLETADO) {
-      let paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
-      // Todos los PI viven en la misma cuenta de plataforma: sin este chequeo, un PI pagado en otra
-      // tienda podría usarse para confirmar una orden de esta.
-      const currentTenantId = requireTenant().tenantId;
-      // Excepción transicional: PI de antes del multitenant (sin tenantId ni destino) en la tienda original
-      const isLegacyIntent =
-        !paymentIntent.metadata?.tenantId &&
-        !paymentIntent.transfer_data &&
-        currentTenantId === process.env.LEGACY_TENANT_ID;
-      if (paymentIntent.metadata?.tenantId !== currentTenantId && !isLegacyIntent) {
-        throw new NotFoundException('payment not found');
-      }
-      if (
-        paymentIntent.status === 'requires_payment_method' &&
-        process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
-      ) {
-        const publicUrl = process.env.FRONTEND_URL || 'https://stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io';
-        paymentIntent = await this.stripe.paymentIntents.confirm(paymentIntentId, {
+    const attempt = await this.prisma.paymentAttempt.findFirst({ where: { orderId, userId, stripePaymentIntentId: paymentIntentId } });
+    let intent = await this.callProvider(() => this.gateway.retrieve(paymentIntentId));
+    // Demostración sin SDK nativo (app móvil): nunca en producción, ver simulatedPaymentsEnabled()
+    if (attempt && intent.status === 'requires_payment_method' && simulatedPaymentsEnabled()) {
+      const publicUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+      intent = await this.callProvider(() =>
+        this.gateway.client.paymentIntents.confirm(paymentIntentId, {
           payment_method: 'pm_card_visa',
           return_url: withTenantParam(`${publicUrl}/checkout/success?orderId=${orderId}`),
-        });
+        }),
+      );
+    }
+    if (!attempt && intent.metadata?.attemptId) {
+      const pending = await this.prisma.paymentAttempt.findFirst({ where: { id: intent.metadata.attemptId, orderId, userId } });
+      if (!pending) {
+        await this.auditMismatch(intent, 'INTENT_NOT_OF_THIS_ORDER', { orderId, userId });
+        throw new CheckoutException(CheckoutCode.PAYMENT_MISMATCH);
       }
-      if (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'processing') {
-        throw new BadRequestException(`Payment not successful (status: ${paymentIntent.status})`);
-      }
-      await this.markPaymentSucceeded(paymentIntent);
+    } else if (!attempt) {
+      await this.auditMismatch(intent, 'INTENT_NOT_OF_THIS_ORDER', { orderId, userId });
+      throw new CheckoutException(CheckoutCode.PAYMENT_MISMATCH);
     }
 
-    const updatedPayment = await this.prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
+    const outcome = await this.reconcileIntent(intent, { orderId, userId });
+    if (outcome === 'MISMATCH') throw new CheckoutException(CheckoutCode.PAYMENT_MISMATCH);
+    if (outcome === 'COMPENSATION') throw new CheckoutException(CheckoutCode.ORDER_NOT_PAYABLE);
+    if (outcome === 'PENDING') {
+      throw new CheckoutException(CheckoutCode.PAYMENT_PENDING, HttpStatus.CONFLICT, {}, { providerStatus: intent.status });
+    }
+    if (outcome === 'FAILED') {
+      throw new BadRequestException(`Payment not successful (status: ${intent.status})`);
+    }
 
-    return {
-      success: true,
-      data: this.mapToPaymentResponse(updatedPayment),
-      message: 'Payment confirmed successfully',
-    };
+    const payment = await this.prisma.payment.findFirstOrThrow({ where: { orderId, userId } });
+    return { success: true, data: this.mapToPaymentResponse(payment), message: 'Payment confirmed successfully' };
   }
 
-  // Fuente de verdad de los webhooks de Stripe: valida la firma y procesa el evento
+  // Valida PI contra intento, orden, tienda, cuenta destino, modo, importe y moneda, y aplica su estado.
+  // Es el único camino hacia COMPLETADO con tarjeta: lo usan /confirm, el webhook y el barrido.
+  async reconcileIntent(
+    intent: Stripe.PaymentIntent,
+    expected?: { orderId: string; userId: string },
+  ): Promise<'SETTLED' | 'PENDING' | 'FAILED' | 'MISMATCH' | 'COMPENSATION' | 'UNKNOWN'> {
+    const { tenantId } = requireTenant();
+    let attempt = await this.prisma.paymentAttempt.findUnique({ where: { stripePaymentIntentId: intent.id } });
+    // Webhook antes de que la API guardara la respuesta de Stripe: se recupera desde el intento durable
+    if (!attempt && intent.metadata?.attemptId) {
+      attempt = await this.prisma.paymentAttempt.findUnique({ where: { id: intent.metadata.attemptId } });
+    }
+    if (!attempt) {
+      await this.auditMismatch(intent, 'INTENT_WITHOUT_ATTEMPT', {});
+      return 'UNKNOWN';
+    }
+
+    const problems: string[] = [];
+    // Intentos heredados: sus PI no tienen metadata.tenantId ni destino registrado
+    const isLegacy = attempt.idempotencyKey.startsWith('legacy-');
+    if (!isLegacy && intent.metadata?.tenantId !== tenantId) problems.push('tenant');
+    if (!isLegacy && intent.metadata?.orderId !== attempt.orderId) problems.push('order');
+    if (expected && (attempt.orderId !== expected.orderId || attempt.userId !== expected.userId)) problems.push('owner');
+    if (intent.amount !== attempt.amountMinor) problems.push('amount');
+    if (intent.currency.toLowerCase() !== attempt.currency.toLowerCase()) problems.push('currency');
+    if (intent.livemode !== this.gateway.livemode) problems.push('mode');
+    const destination = typeof intent.transfer_data?.destination === 'string' ? intent.transfer_data.destination : intent.transfer_data?.destination?.id;
+    if (attempt.destinationAccount && destination !== attempt.destinationAccount) problems.push('destination');
+    if (problems.length > 0) {
+      await this.auditMismatch(intent, 'INTENT_VALIDATION_FAILED', { attemptId: attempt.id, problems });
+      return 'MISMATCH';
+    }
+
+    if (!attempt.stripePaymentIntentId) await this.linkIntent(attempt.id, intent);
+
+    if (intent.status === 'succeeded') {
+      const outcome = await this.settlement.settle({
+        orderId: attempt.orderId,
+        method: PaymentMethod.STRIPE,
+        transactionId: intent.id,
+        currency: intent.currency,
+        paymentIntentId: intent.id,
+        amountMinor: intent.amount,
+      });
+      return outcome === 'COMPENSATION' ? 'COMPENSATION' : 'SETTLED';
+    }
+
+    await this.prisma.paymentAttempt.updateMany({
+      where: { id: attempt.id, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+      data: { providerStatus: intent.status },
+    });
+    if (intent.status === 'processing' || intent.status === 'requires_action' || intent.status === 'requires_confirmation') return 'PENDING';
+    return 'FAILED';
+  }
+
+  private async auditMismatch(intent: Stripe.PaymentIntent, reason: string, details: Record<string, unknown>): Promise<void> {
+    await this.settlement.recordIssue(
+      this.prisma,
+      'PAYMENT_MISMATCH',
+      `mismatch:${intent.id}:${reason}`,
+      { paymentIntentId: intent.id, reason, metadata: intent.metadata, amount: intent.amount, currency: intent.currency, ...details } as Prisma.InputJsonValue,
+      'ERROR',
+    );
+  }
+
+  // Fuente de verdad de los webhooks de Stripe: valida la firma, guarda el evento y recién entonces lo
+  // aplica. Una vez guardado se responde 200 aunque la transición falle: el barrido del inbox la retoma.
   async handleWebhookEvent(rawBody: Buffer, signature: string): Promise<{ received: boolean }> {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret) {
@@ -222,7 +389,7 @@ export class PaymentsService {
     let event: Stripe.Event | undefined;
     for (const secret of secrets) {
       try {
-        event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
+        event = this.gateway.verifyWebhook(rawBody, signature, secret);
         break;
       } catch {
         // probar el siguiente secreto
@@ -233,35 +400,113 @@ export class PaymentsService {
       throw new BadRequestException('Invalid Stripe signature');
     }
 
+    const accountId = event.account ?? 'platform';
+    await this.control.providerEventInbox.createMany({
+      data: [{ provider: 'stripe', accountId, eventId: event.id, type: event.type, payload: event as unknown as object }],
+      skipDuplicates: true,
+    });
+    await failpoint('webhook.afterInbox');
+
+    const row = await this.control.providerEventInbox.findUnique({
+      where: { provider_accountId_eventId: { provider: 'stripe', accountId, eventId: event.id } },
+      select: { id: true },
+    });
+    if (row) await this.processInboxRow(row.id);
+    return { received: true };
+  }
+
+  // Lease recuperable: una sola réplica procesa a la vez, y un crash solo deja un lease que vence.
+  // Marcar PROCESSED va DESPUÉS de la transición, que es idempotente: repetirla no tiene efectos.
+  async processInboxRow(id: string): Promise<void> {
+    const now = new Date();
+    const claimed = await this.control.providerEventInbox.updateMany({
+      where: {
+        id,
+        status: { in: [InboxStatus.PENDING, InboxStatus.UNRESOLVED] },
+        OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }],
+      },
+      data: { leaseUntil: new Date(now.getTime() + INBOX_LEASE_MS), attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) return;
+
+    const row = await this.control.providerEventInbox.findUniqueOrThrow({ where: { id } });
+    const backoff = new Date(Date.now() + Math.min(60 * 60 * 1000, 30_000 * 2 ** Math.min(row.attempts, 7)));
+    try {
+      const resolved = await this.dispatchEvent(row.payload as unknown as Stripe.Event);
+      await failpoint('webhook.beforeMarkProcessed');
+      await this.control.providerEventInbox.update({
+        where: { id },
+        data: resolved
+          ? { status: InboxStatus.PROCESSED, processedAt: new Date(), leaseUntil: null, lastError: null }
+          : // Tienda no resoluble: el evento legítimo no se pierde, se reintenta y se alerta
+            {
+              status: row.attempts >= INBOX_MAX_ATTEMPTS ? InboxStatus.DEAD : InboxStatus.UNRESOLVED,
+              leaseUntil: null,
+              nextAttemptAt: backoff,
+              lastError: 'tenant unresolved',
+            },
+      });
+      if (!resolved) this.logger.error(`Evento ${row.eventId} sin tienda resoluble (intento ${row.attempts})`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Falló el evento ${row.eventId} (${row.type}): ${message}`);
+      await this.control.providerEventInbox.update({
+        where: { id },
+        data: {
+          status: row.attempts >= INBOX_MAX_ATTEMPTS ? InboxStatus.DEAD : InboxStatus.PENDING,
+          leaseUntil: null,
+          nextAttemptAt: backoff,
+          lastError: message.slice(0, 500),
+        },
+      });
+    }
+  }
+
+  async sweepInbox(now = new Date()): Promise<void> {
+    const due = await this.control.providerEventInbox.findMany({
+      where: { status: { in: [InboxStatus.PENDING, InboxStatus.UNRESOLVED] }, nextAttemptAt: { lte: now } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    });
+    for (const { id } of due) await this.processInboxRow(id);
+  }
+
+  // true = aplicado (o sin nada que aplicar); false = tienda no resoluble por ahora
+  private async dispatchEvent(event: Stripe.Event): Promise<boolean> {
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markPaymentSucceeded(pi));
-        break;
+      case 'payment_intent.processing':
+      case 'payment_intent.requires_action':
+        return this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, async (pi) => {
+          await this.reconcileIntent(pi);
+        });
       case 'payment_intent.payment_failed':
-        await this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markPaymentFailed(pi));
-        break;
+        return this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markPaymentFailed(pi));
+      case 'payment_intent.canceled':
+        return this.inPaymentIntentTenant(event.data.object as Stripe.PaymentIntent, (pi) => this.markIntentCanceled(pi));
+      case 'charge.refunded':
+        return this.handleChargeRefunded(event.data.object as Stripe.Charge);
       // Onboarding de Connect: solo toca public.tenants, no necesita schema de tienda
       case 'account.updated':
         await this.stripeConnect.syncAccount(event.data.object as Stripe.Account);
-        break;
+        return true;
       // Alta self-service de tiendas (suscripción al SaaS): plano de control, sin schema de tienda.
       // Las sesiones de otros Checkout se ignoran adentro (metadata.kind !== 'tenant_signup').
       case 'checkout.session.completed':
       case 'checkout.session.async_payment_succeeded':
         await this.subscriptions.handleCheckoutPaid(event.data.object as Stripe.Checkout.Session);
-        break;
+        return true;
       case 'checkout.session.expired':
         await this.subscriptions.handleCheckoutExpired(event.data.object as Stripe.Checkout.Session);
-        break;
+        return true;
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         await this.subscriptions.handleSubscriptionChange(event.data.object as Stripe.Subscription);
-        break;
+        return true;
       default:
-        break;
+        return true;
     }
-
-    return { received: true };
   }
 
   // El webhook no pasa por TenantMiddleware (Stripe no manda x-tenant-id): la tienda se saca del
@@ -269,128 +514,200 @@ export class PaymentsService {
   private async inPaymentIntentTenant(
     pi: Stripe.PaymentIntent,
     fn: (pi: Stripe.PaymentIntent) => Promise<void>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const tenant = await this.stripeConnect.resolveTenantForPaymentIntent(pi);
     if (!tenant) {
-      // Se responde 200 igual: con error Stripe reintentaría el evento por días sin que cambie nada.
-      // Los PI previos a la migración multitenant caen acá (no tienen metadata.tenantId).
-      this.logger.warn(`Webhook ${pi.id} ignorado: no se pudo resolver la tienda`);
-      return;
+      // Los PI previos a la migración multitenant (sin LEGACY_TENANT_ID) y los de una tienda que cambió
+      // de cuenta caen acá: quedan en el inbox para reintento y alerta, nunca como pago confirmado.
+      this.logger.warn(`Webhook ${pi.id}: no se pudo resolver la tienda`);
+      return false;
     }
     await runInTenant(tenant, () => fn(pi));
+    return true;
   }
 
-  // Idempotente: llamado tanto por /confirm como por el webhook, cualquiera que llegue primero
-  private async markPaymentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
-    const orderId = paymentIntent.metadata?.orderId;
-    let payment = orderId
-      ? await this.prisma.payment.findFirst({ where: { orderId } })
-      : await this.prisma.payment.findFirst({ where: { transactionId: paymentIntent.id } });
+  // Un intento fallido no invalida un pago posterior: nunca degrada COMPLETADO (evento viejo o desordenado)
+  private async markPaymentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+    const attempt = await this.prisma.paymentAttempt.findFirst({
+      where: { OR: [{ stripePaymentIntentId: paymentIntent.id }, ...(paymentIntent.metadata?.attemptId ? [{ id: paymentIntent.metadata.attemptId }] : [])] },
+    });
+    if (!attempt) return;
 
-    if (!payment && orderId) {
-      const ord = await this.prisma.order.findUnique({ where: { id: orderId } });
-      if (ord) {
-        payment = await this.prisma.payment.create({
+    await withTxRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        await lockOrder(tx, attempt.orderId);
+        const order = await tx.order.findUniqueOrThrow({ where: { id: attempt.orderId } });
+        await tx.paymentAttempt.updateMany({
+          where: { id: attempt.id, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+          data: { providerStatus: paymentIntent.status },
+        });
+        if (order.paymentStatus !== PaymentStatus.PENDIENTE || order.status !== OrderStatus.PENDIENTE) return;
+        await tx.payment.updateMany({ where: { orderId: order.id, status: PaymentStatus.PENDIENTE }, data: { status: PaymentStatus.FALLIDO } });
+        await tx.order.update({ where: { id: order.id }, data: { paymentStatus: PaymentStatus.FALLIDO } });
+      }),
+    );
+  }
+
+  private async markIntentCanceled(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+    await this.prisma.paymentAttempt.updateMany({
+      where: { stripePaymentIntentId: paymentIntent.id, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+      data: { status: PaymentAttemptStatus.CANCELED, providerStatus: 'canceled' },
+    });
+  }
+
+  private async handleChargeRefunded(charge: Stripe.Charge): Promise<boolean> {
+    const tenantId = charge.metadata?.tenantId;
+    const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+    if (!tenantId || !paymentIntentId) return true;
+    const tenant = await this.control.tenant.findUnique({ where: { id: tenantId }, select: { id: true, schemaName: true } });
+    if (!tenant) return false;
+    await runInTenant({ tenantId: tenant.id, schemaName: tenant.schemaName }, () => this.markCompensationRefunded(paymentIntentId));
+    return true;
+  }
+
+  // Reembolso solicitado ≠ completado: REEMBOLSADO solo con la confirmación del proveedor
+  private async markCompensationRefunded(paymentIntentId: string, refundId?: string): Promise<void> {
+    const compensation = await this.prisma.paymentCompensation.findUnique({ where: { paymentIntentId } });
+    if (!compensation || compensation.status === CompensationStatus.REFUNDED) return;
+    await withTxRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        await lockOrder(tx, compensation.orderId);
+        await tx.paymentCompensation.update({
+          where: { id: compensation.id },
+          data: { status: CompensationStatus.REFUNDED, ...(refundId ? { refundId } : {}), lastError: null },
+        });
+        if (compensation.reason === 'LATE_PAYMENT') {
+          await tx.order.update({ where: { id: compensation.orderId }, data: { paymentStatus: PaymentStatus.REEMBOLSADO } });
+          await tx.payment.updateMany({ where: { orderId: compensation.orderId }, data: { status: PaymentStatus.REEMBOLSADO, transactionId: paymentIntentId } });
+        }
+      }),
+    );
+  }
+
+  // Compensaciones pendientes: reembolso idempotente (clave estable por compensación), reintentable.
+  async processCompensations(): Promise<void> {
+    const pending = await this.prisma.paymentCompensation.findMany({ where: { status: CompensationStatus.REQUESTED }, take: 50 });
+    for (const compensation of pending) {
+      try {
+        const refund = await this.gateway.refundDestinationCharge(compensation.paymentIntentId, `sf-refund-${compensation.id}`);
+        if (refund.status === 'succeeded') {
+          await this.markCompensationRefunded(compensation.paymentIntentId, refund.id);
+        } else {
+          await this.prisma.paymentCompensation.update({
+            where: { id: compensation.id },
+            data: { status: refund.status === 'failed' ? CompensationStatus.MANUAL_REVIEW : CompensationStatus.REFUND_PENDING, refundId: refund.id, attempts: { increment: 1 } },
+          });
+        }
+      } catch (error) {
+        const attempts = compensation.attempts + 1;
+        await this.prisma.paymentCompensation.update({
+          where: { id: compensation.id },
           data: {
-            orderId: ord.id,
-            userId: ord.userId,
-            amount: ord.totalAmount,
-            currency: paymentIntent.currency.toUpperCase(),
-            status: PaymentStatus.COMPLETADO,
-            paymentMethod: 'STRIPE',
-            transactionId: paymentIntent.id,
+            attempts,
+            lastError: (error instanceof Error ? error.message : String(error)).slice(0, 500),
+            ...(attempts >= 5 && !isProviderUnavailable(error) ? { status: CompensationStatus.MANUAL_REVIEW } : {}),
           },
         });
       }
     }
-
-    if (!payment || payment.status === PaymentStatus.COMPLETADO) return;
-    const targetOrderId = orderId || payment.orderId;
-
-    const [, order] = await this.prisma.$transaction([
-      this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.COMPLETADO,
-          paymentMethod: 'STRIPE',
-          transactionId: paymentIntent.id,
-        },
-      }),
-      this.prisma.order.update({
-        where: { id: targetOrderId },
-        data: {
-          paymentStatus: PaymentStatus.COMPLETADO,
-          status: OrderStatus.PROCESANDO,
-          paymentMethod: PaymentMethod.STRIPE,
-          stripePaymentIntentId: paymentIntent.id,
-        },
-      }),
-    ]);
-
-    if (order.cartId) {
-      await this.prisma.$transaction(async (tx) => {
-        // Los ítems comprados son una venta finalizada: se eliminan del carrito y se marca checkout=true.
-        // NUNCA devolver el stock a la tienda (releaseCartStock) porque el cliente ya pagó por ellos.
-        await tx.cartItem.deleteMany({ where: { cartId: order.cartId! } });
-        await tx.cart.update({ where: { id: order.cartId! }, data: { checkout: true } });
-      });
-    }
-
-    // Vaciar y marcar como completado cualquier carrito activo pendiente del usuario
-    const activeCarts = await this.prisma.cart.findMany({
-      where: { userId: order.userId, checkout: false },
-    });
-    for (const c of activeCarts) {
-      if (c.id === order.cartId) continue;
-      await this.prisma.$transaction(async (tx) => {
-        await tx.cartItem.deleteMany({ where: { cartId: c.id } });
-        await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
-      });
-    }
-
-    // Factura por correo y notificación push: sin await, para no demorar la respuesta del pago
-    void this.sendInvoiceEmail(orderId);
-    void this.notificationsService
-      .sendPushNotification(order.userId, {
-        title: 'Stella Femme',
-        body: `Tu pago del pedido ${order.orderNumber} fue confirmado.`,
-        url: `/account/orders/${order.id}`,
-      })
-      .catch(() => undefined);
   }
 
-  private async markPaymentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
-    const orderId = paymentIntent.metadata?.orderId;
-    if (!orderId) return;
-
-    const payment = await this.prisma.payment.findFirst({
-      where: { orderId, transactionId: paymentIntent.id },
+  // Intento persistido sin PaymentIntent (la API cayó tras llamar a Stripe): se concilia sin crear un cobro
+  // nuevo a ciegas. Dentro del horizonte, la misma clave devuelve el mismo PI; después se busca por metadata.
+  async recoverStaleAttempts(olderThanMs = 5 * 60 * 1000): Promise<void> {
+    const stale = await this.prisma.paymentAttempt.findMany({
+      where: { status: PaymentAttemptStatus.CREATED, stripePaymentIntentId: null, updatedAt: { lt: new Date(Date.now() - olderThanMs) } },
+      take: 50,
     });
-    if (!payment || payment.status === PaymentStatus.COMPLETADO) return;
-
-    await this.prisma.$transaction([
-      this.prisma.payment.update({ where: { id: payment.id }, data: { status: PaymentStatus.FALLIDO } }),
-      this.prisma.order.update({ where: { id: orderId }, data: { paymentStatus: PaymentStatus.FALLIDO } }),
-    ]);
+    for (const attempt of stale) {
+      try {
+        const intent = await this.obtainIntent(attempt);
+        if (intent !== 'RETRY') await this.reconcileIntent(intent);
+      } catch (error) {
+        this.logger.warn(`No se pudo conciliar el intento ${attempt.id}: ${error instanceof Error ? error.message : error}`);
+      }
+    }
   }
 
-  // Genera la factura en PDF de la orden y la envía al cliente. Nunca lanza: el pago ya está confirmado
-  private async sendInvoiceEmail(orderId: string): Promise<void> {
+  // Antes de vencer o cancelar una orden con cobro iniciado: ¿qué sabe el proveedor?
+  // 'FREE' = no hay cobro vivo, se puede liberar. 'PAID' = se liquidó. 'HOLD' = incierto, no liberar.
+  async resolveProviderBeforeRelease(orderId: string): Promise<'FREE' | 'PAID' | 'HOLD'> {
+    const attempt = await this.prisma.paymentAttempt.findFirst({
+      where: { orderId, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+    });
+    if (!attempt) return 'FREE';
     try {
-      const { buffer, filename, data } = await this.invoiceService.generateOrderInvoice(orderId);
-      if (!data.customer.email) return;
-
-      await this.mailService.sendInvoice({
-        to: data.customer.email,
-        firstName: data.customer.name,
-        orderNumber: data.number,
-        total: data.total,
-        pdf: buffer,
-        filename,
-      });
+      if (!attempt.stripePaymentIntentId) {
+        const found = await this.gateway.findByAttempt(attempt.id);
+        if (!found) {
+          // Marcarlo cierra la puerta: si un create en vuelo responde tarde, linkIntent no lo reabre, y su
+          // eventual cobro entra como pago tardío a compensación
+          await this.prisma.paymentAttempt.updateMany({
+            where: { id: attempt.id, status: PaymentAttemptStatus.CREATED },
+            data: { status: PaymentAttemptStatus.ABANDONED },
+          });
+          return 'FREE';
+        }
+        await this.linkIntent(attempt.id, found);
+        attempt.stripePaymentIntentId = found.id;
+      }
+      const intent = await this.gateway.retrieve(attempt.stripePaymentIntentId);
+      if (intent.status === 'succeeded') {
+        await this.reconcileIntent(intent);
+        return 'PAID';
+      }
+      if (intent.status === 'processing') return 'HOLD';
+      if (intent.status === 'canceled') return 'FREE';
+      // Sin dinero en juego todavía: se cancela FUERA de cualquier transacción, y si Stripe lo niega
+      // porque acaba de completarse, se vuelve a mirar
+      try {
+        await this.gateway.cancel(intent.id, `sf-cancel-${attempt.id}`);
+      } catch (error) {
+        if (isProviderUnavailable(error)) return 'HOLD';
+        const fresh = await this.gateway.retrieve(intent.id);
+        if (fresh.status === 'succeeded') {
+          await this.reconcileIntent(fresh);
+          return 'PAID';
+        }
+        return fresh.status === 'canceled' ? 'FREE' : 'HOLD';
+      }
+      return 'FREE';
     } catch (error) {
-      this.logger.error(`No se pudo enviar la factura de la orden ${orderId}: ${error instanceof Error ? error.message : error}`);
+      this.logger.warn(`Proveedor no disponible para la orden ${orderId}: ${error instanceof Error ? error.message : error}`);
+      return 'HOLD';
     }
+  }
+
+  // Genera la factura en PDF de la orden y la envía al cliente. La invoca el consumidor del outbox: si
+  // lanza, el evento se reintenta. El pago ya está confirmado y no depende de esto.
+  async sendInvoiceEmail(orderId: string): Promise<void> {
+    const { buffer, filename, data } = await this.invoiceService.generateOrderInvoice(orderId);
+    if (!data.customer.email) return;
+
+    await this.mailService.sendInvoice({
+      to: data.customer.email,
+      firstName: data.customer.name,
+      orderNumber: data.number,
+      total: data.total,
+      pdf: buffer,
+      filename,
+    });
+  }
+
+  async sendPaidPush(userId: string, orderId: string, orderNumber: string): Promise<void> {
+    await this.notificationsService.sendPushNotification(userId, {
+      title: 'Stella Femme',
+      body: `Tu pago del pedido ${orderNumber} fue confirmado.`,
+      url: `/account/orders/${orderId}`,
+    });
+  }
+
+  async sendCancelledPush(userId: string, orderId: string, orderNumber: string): Promise<void> {
+    await this.notificationsService.sendPushNotification(userId, {
+      title: `Pedido ${orderNumber}`,
+      body: 'Tu pedido fue cancelado.',
+      url: `/account/orders/${orderId}`,
+    });
   }
 
   async findAll(userId: string): Promise<{
@@ -453,6 +770,12 @@ export class PaymentsService {
     };
   }
 
+  private assertSimulationAllowed(): void {
+    if (!simulatedPaymentsEnabled()) {
+      throw new CheckoutException(CheckoutCode.PAYMENT_SIMULATION_DISABLED, HttpStatus.FORBIDDEN);
+    }
+  }
+
   async generateQrPayment(orderId: string, origin?: string): Promise<{
     orderId: string;
     orderNumber: string;
@@ -461,6 +784,7 @@ export class PaymentsService {
     confirmUrl: string;
     status: PaymentStatus;
   }> {
+    this.assertSimulationAllowed();
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
@@ -519,84 +843,21 @@ export class PaymentsService {
     };
   }
 
-  // QR simulado (method QR) o pago manual aprobado por la tienda (BANK_QR / USDT): mismo cierre que Stripe
-  async markQrPaymentSucceeded(orderId: string, customTxId?: string, method: PaymentMethod = PaymentMethod.QR): Promise<any> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { payment: true },
-    });
+  // QR simulado (demo). Mismo cierre que Stripe, pero bloqueado fuera de un entorno de pruebas explícito.
+  async markQrPaymentSucceeded(orderId: string, customTxId?: string): Promise<any> {
+    this.assertSimulationAllowed();
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
-
-    if (order.paymentStatus === PaymentStatus.COMPLETADO) {
-      return order;
-    }
-
-    const transactionId = (customTxId && !customTxId.startsWith('pi_'))
-      ? customTxId
-      : (order.payment?.transactionId && order.payment.transactionId.startsWith('QR-')
-          ? order.payment.transactionId
-          : `QR-${order.orderNumber}-${Date.now()}`);
-
-    const [, updatedOrder] = await this.prisma.$transaction([
-      this.prisma.payment.upsert({
-        where: { orderId },
-        create: {
-          orderId,
-          userId: order.userId,
-          amount: order.totalAmount,
-          currency: method === PaymentMethod.USDT ? 'USDT' : 'BOB',
-          status: PaymentStatus.COMPLETADO,
-          paymentMethod: method,
-          transactionId,
-        },
-        update: {
-          status: PaymentStatus.COMPLETADO,
-          paymentMethod: method,
-          transactionId,
-        },
-      }),
-      this.prisma.order.update({
-        where: { id: orderId },
-        data: {
-          paymentStatus: PaymentStatus.COMPLETADO,
-          status: OrderStatus.PROCESANDO,
-          paymentMethod: method,
-        },
-      }),
-    ]);
-
-    if (updatedOrder.cartId) {
-      await this.prisma.$transaction(async (tx) => {
-        // Los ítems comprados son una venta finalizada: se eliminan del carrito y se marca checkout=true.
-        // NUNCA devolver el stock a la tienda (releaseCartStock) porque el cliente ya pagó por ellos.
-        await tx.cartItem.deleteMany({ where: { cartId: updatedOrder.cartId! } });
-        await tx.cart.update({ where: { id: updatedOrder.cartId! }, data: { checkout: true } });
-      });
-    }
-
-    const activeCarts = await this.prisma.cart.findMany({
-      where: { userId: updatedOrder.userId, checkout: false },
+    if (order.status === OrderStatus.CANCELADO) throw new CheckoutException(CheckoutCode.ORDER_NOT_PAYABLE);
+    await this.settlement.settle({
+      orderId,
+      method: PaymentMethod.QR,
+      transactionId: customTxId && !customTxId.startsWith('pi_') ? customTxId : `QR-${order.orderNumber}`,
+      currency: 'BOB',
     });
-    for (const c of activeCarts) {
-      if (c.id === updatedOrder.cartId) continue;
-      await this.prisma.$transaction(async (tx) => {
-        await tx.cartItem.deleteMany({ where: { cartId: c.id } });
-        await tx.cart.update({ where: { id: c.id }, data: { checkout: true } });
-      });
-    }
-
-    void this.sendInvoiceEmail(orderId);
-    void this.notificationsService
-      .sendPushNotification(updatedOrder.userId, {
-        title: 'Stella Femme - Pago QR Confirmado',
-        body: `Tu pago por QR del pedido ${updatedOrder.orderNumber} fue confirmado exitosamente.`,
-        url: `/account/orders/${updatedOrder.id}`,
-      })
-      .catch(() => undefined);
-
-    return updatedOrder;
+    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } });
   }
 
   async getQrPaymentStatus(orderId: string): Promise<{
@@ -607,6 +868,7 @@ export class PaymentsService {
     orderNumber: string;
     totalAmount: number;
   }> {
+    this.assertSimulationAllowed();
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });

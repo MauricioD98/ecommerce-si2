@@ -38,8 +38,8 @@
     "checkoutSuccessDescription": "Confirmación de tu pago",
     "qrConfirmTitle": "Confirmación de pago QR",
     "qrConfirmDescription": "Confirmación del pago con código QR",
-    "offlineSuccessTitle": "Pedido guardado",
-    "offlineSuccessDescription": "Tu pedido se guardó en tu dispositivo y se enviará al recuperar la conexión",
+    "offlineSuccessTitle": "Borrador guardado",
+    "offlineSuccessDescription": "Tu compra aún no se realizó: revísala y confírmala cuando tengas conexión",
     "productTitle": "Detalle del producto",
     "productDescription": "Consulta los detalles del producto",
     "cartTitle": "Carrito de compras",
@@ -339,7 +339,10 @@
       "bankQr": "QR bancario",
       "bankQrDescription": "Paga desde la app de tu banco y sube el comprobante",
       "usdt": "USDT",
-      "usdtDescription": "Transferencia en la red {network}"
+      "usdtDescription": "Transferencia en la red {network}",
+      "verifying": "Estamos verificando tu compra. No hace falta que la repitas.",
+      "storageFailed": "No pudimos guardar tu compra en este dispositivo, así que no la enviamos. Libera espacio o revisa los permisos e inténtalo de nuevo.",
+      "storageFull": "El almacenamiento de este dispositivo está lleno, así que no enviamos tu compra. Libera espacio e inténtalo de nuevo."
     },
     "summary": {
       "title": "Resumen del pedido",
@@ -385,11 +388,14 @@
       "title": "¡Pago realizado con éxito!",
       "orderConfirmed": "Tu pedido #<strong>{order}</strong> ha sido confirmado.",
       "redirecting": "Redirigiendo a la tienda en {seconds, plural, one {# segundo} other {# segundos}}...",
-      "backToStore": "Volver a la tienda"
+      "backToStore": "Volver a la tienda",
+      "pendingTitle": "Tu pago está en proceso",
+      "pendingDescription": "Todavía no está confirmado. Te avisaremos y actualizaremos tu pedido cuando el banco responda. No hace falta que pagues de nuevo."
     },
     "offlineSuccess": {
-      "title": "¡Pedido guardado en tu dispositivo!",
-      "description": "Se enviará automáticamente cuando recuperes la conexión a Internet. No hace falta que hagas nada más: puedes cerrar la app tranquilo."
+      "title": "Borrador guardado. Compra aún no realizada",
+      "description": "No reservamos stock ni se cobró nada. Cuando tengas conexión, revisa precios y disponibilidad y confirma tu compra.",
+      "review": "Ver mis borradores"
     },
     "qrConfirm": {
       "loading": "Cargando confirmación...",
@@ -451,6 +457,18 @@
       "submittedTitle": "¡Recibimos tu comprobante!",
       "submittedText": "La tienda verificará el pago y confirmará tu pedido. Puedes seguir su estado en Mis pedidos.",
       "viewOrder": "Ver mi pedido"
+    },
+    "drafts": {
+      "title": "Borradores guardados sin conexión",
+      "notice": "Un borrador no es una compra: no reserva stock ni tiene pago. Al revisarlo verás los precios y el stock actuales antes de confirmar.",
+      "empty": "No tienes borradores pendientes.",
+      "summary": "{count, plural, one {# producto} other {# productos}} · {date}",
+      "legacyWarning": "Se guardó en una versión anterior, sin cuenta asociada, y pudo haberse enviado ya. Revisa tus pedidos antes de confirmar.",
+      "review": "Revisar y confirmar",
+      "discard": "Descartar",
+      "loadFailed": "No pudimos leer los borradores de este dispositivo.",
+      "reviewFailed": "No pudimos revisar este borrador. Inténtalo de nuevo.",
+      "someUnavailable": "{count, plural, one {# producto ya no está disponible} other {# productos ya no están disponibles}}."
     }
   },
   "Store": {
@@ -748,7 +766,8 @@
     "searchSale": "No se pudo buscar la venta.",
     "returnHistory": "No se pudo cargar el historial de devoluciones.",
     "roles": "No se pudieron cargar los roles.",
-    "staff": "No se pudo cargar el personal."
+    "staff": "No se pudo cargar el personal.",
+    "sessionRequired": "Inicia sesión para guardar el ajuste."
   },
   "AdminCommon": {
     "previous": "Anterior",
@@ -1241,15 +1260,21 @@
       "saleReturn": "Venta / Devolución",
       "sale": "Venta #{number}",
       "cashier": "Atendió: {name}"
-    }
+    },
+    "conflictRow": "Talla {size}: propusiste {proposed}, ahora hay {current}.",
+    "conflictApply": "Aplicar mi valor sobre el actual",
+    "conflictDiscard": "Descartar mi ajuste"
   },
   "Offline": {
     "syncError": "Error al actualizar stock de {name}",
     "syncSuccess": "¡Se sincronizaron {count} cambio(s) de stock con el servidor!",
-    "orderSendFailed": "No se pudo enviar un pedido guardado en este dispositivo.",
-    "sending": "Enviando pedidos guardados...",
-    "pendingOrders": "{count, plural, one {# pedido guardado en este dispositivo, pendiente de enviar.} other {# pedidos guardados en este dispositivo, pendientes de enviar.}}",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "verifying": "Estamos verificando tu compra…",
+    "pendingDrafts": "{count, plural, one {# borrador guardado: compra aún no realizada.} other {# borradores guardados: compras aún no realizadas.}}",
+    "reviewDrafts": "Revisar",
+    "updateAvailable": "Hay una nueva versión disponible.",
+    "updateNow": "Actualizar",
+    "inventoryNeedsReview": "Este ajuste se guardó sin la versión del stock: revísalo y vuelve a cargarlo."
   },
   "AdminPos": {
     "title": "Punto de Venta",

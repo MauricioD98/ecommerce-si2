@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { compareVariants, lockOrder, withTxRetry } from '../../common/checkout/tx.util';
 import {
   ItemCondition,
   OrderStatus,
@@ -92,7 +93,10 @@ export class ReturnsService {
     }
     await this.branchesService.findActiveOrFail(branchId);
 
-    const returnId = await this.prisma.$transaction(async (tx) => {
+    const returnId = await withTxRetry(() => this.prisma.$transaction(async (tx) => {
+      // Orden bloqueada: dos cajas a la vez devuelven en serie, y la segunda ya ve el tope actualizado.
+      // Leer dentro de la transacción no alcanza: sin bloqueo, ninguna vería la devolución sin confirmar de la otra.
+      await lockOrder(tx, dto.orderId);
       const order = await tx.order.findUnique({
         where: { id: dto.orderId },
         include: { orderItems: { include: { product: true } }, user: true, branch: true },
@@ -183,13 +187,19 @@ export class ReturnsService {
       });
 
       // REGLA DE NEGOCIO 2: el estado físico decide a qué inventario entra cada prenda.
-      for (const line of lines) {
-        if (line.condition === ItemCondition.SELLABLE) {
-          await this.inventoryService.increment(tx, line.productId, branchId, line.size, line.quantity);
+      const createdItems = await tx.returnItem.findMany({ where: { returnId: created.id } });
+      const sortedItems = [...createdItems].sort((a, b) =>
+        compareVariants({ productId: a.productId, branchId, size: a.size ?? '' }, { productId: b.productId, branchId, size: b.size ?? '' }),
+      );
+      for (const item of sortedItems) {
+        const effect = { effectId: `return:${item.id}`, refType: 'RETURN', refId: created.id };
+        if (item.condition === ItemCondition.SELLABLE) {
+          await this.inventoryService.increment(tx, item.productId, branchId, item.size ?? '', item.quantity, { ...effect, reason: 'RETURN_SELLABLE' });
         } else {
-          await this.inventoryService.incrementDamaged(tx, line.productId, branchId, line.size, line.quantity);
+          await this.inventoryService.incrementDamaged(tx, item.productId, branchId, item.size ?? '', item.quantity, { ...effect, reason: 'RETURN_DAMAGED' });
         }
       }
+      await this.inventoryService.syncGlobalStockMany(tx, createdItems.map((item) => item.productId));
 
       // Si ya no queda nada por devolver, la venta entera queda reembolsada
       const soldUnits = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -203,7 +213,7 @@ export class ReturnsService {
       }
 
       return created.id;
-    });
+    }));
 
     return this.findOne(returnId);
   }

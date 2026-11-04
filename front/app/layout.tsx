@@ -5,7 +5,7 @@ import BotpressChat from "@/components/modules/chatbot/BotpressChat";
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
-import { getServerStoreName } from "@/utils/storeName.server";
+import { getServerStoreName, getServerTenantId } from "@/utils/storeName.server";
 import { getServerStoreAppearance } from "@/utils/storeAppearance.server";
 import { getStoreFontClass } from "@/utils/fonts";
 import { BACKGROUND_ASSET_PATH, appearanceCssVars, backgroundImageCss } from "@/utils/appearanceTheme";
@@ -15,14 +15,21 @@ import { BACKGROUND_ASSET_PATH, appearanceCssVars, backgroundImageCss } from "@/
 // La descripción y el favicon los personaliza la tienda en /admin/settings/appearance.
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations("Metadata");
-  const [store, appearance] = await Promise.all([getServerStoreName(), getServerStoreAppearance()]);
+  const [store, appearance, tenantId] = await Promise.all([getServerStoreName(), getServerStoreAppearance(), getServerTenantId()]);
+  // ?tenant= porque manifest e íconos se piden sin cookies: en el host compartido nada más identifica la tienda
+  const tenantQuery = tenantId ? `?tenant=${tenantId}` : "";
   const description = appearance.description ?? t("rootDescription", { store });
   return {
     title: { default: t("rootTitle", { store }), template: `%s | ${store}` },
     description,
     applicationName: store,
+    manifest: `/web-manifest${tenantQuery}`,
+    appleWebApp: { capable: true, title: store, statusBarStyle: "default" },
     openGraph: { siteName: store, description, ...(appearance.logoUrl?.startsWith("http") ? { images: [appearance.logoUrl] } : {}) },
-    ...(appearance.faviconUrl ? { icons: { icon: appearance.faviconUrl } } : {}),
+    icons: {
+      ...(appearance.faviconUrl ? { icon: appearance.faviconUrl } : {}),
+      apple: `/pwa-icon/180${tenantQuery}`,
+    },
   };
 }
 

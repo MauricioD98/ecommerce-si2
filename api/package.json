@@ -20,6 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:acceptance": "node test/acceptance/run.js",
     "postinstall": "prisma generate && prisma generate --config prisma.control.config.ts",
     "migrate:all": "node dist/scripts/migrate.js",
     "migrate:control": "prisma migrate deploy --config prisma.control.config.ts",

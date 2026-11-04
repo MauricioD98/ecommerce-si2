@@ -38,8 +38,8 @@
     "checkoutSuccessDescription": "Confirmation de votre paiement",
     "qrConfirmTitle": "Confirmation du paiement QR",
     "qrConfirmDescription": "Confirmation du paiement par code QR",
-    "offlineSuccessTitle": "Commande enregistrée",
-    "offlineSuccessDescription": "Votre commande a été enregistrée sur votre appareil et sera envoyée dès le retour de la connexion",
+    "offlineSuccessTitle": "Brouillon enregistré",
+    "offlineSuccessDescription": "Votre achat n’est pas encore effectué : vérifiez-le et confirmez-le une fois en ligne",
     "productTitle": "Détails du produit",
     "productDescription": "Consultez les détails du produit",
     "cartTitle": "Panier",
@@ -339,7 +339,10 @@
       "bankQr": "QR bancaire",
       "bankQrDescription": "Payez depuis votre appli bancaire et importez le justificatif",
       "usdt": "USDT",
-      "usdtDescription": "Transfert sur le réseau {network}"
+      "usdtDescription": "Transfert sur le réseau {network}",
+      "verifying": "Nous vérifions votre achat. Inutile de le refaire.",
+      "storageFailed": "Impossible d’enregistrer votre achat sur cet appareil, il n’a donc pas été envoyé. Libérez de l’espace ou vérifiez les autorisations, puis réessayez.",
+      "storageFull": "Le stockage de cet appareil est plein, votre achat n’a donc pas été envoyé. Libérez de l’espace et réessayez."
     },
     "summary": {
       "title": "Récapitulatif de la commande",
@@ -385,11 +388,14 @@
       "title": "Paiement réussi !",
       "orderConfirmed": "Votre commande n° <strong>{order}</strong> a été confirmée.",
       "redirecting": "Redirection vers la boutique dans {seconds, plural, one {# seconde} other {# secondes}}...",
-      "backToStore": "Retour à la boutique"
+      "backToStore": "Retour à la boutique",
+      "pendingTitle": "Votre paiement est en cours",
+      "pendingDescription": "Il n’est pas encore confirmé. Nous vous préviendrons et mettrons à jour votre commande dès la réponse de la banque. Inutile de payer à nouveau."
     },
     "offlineSuccess": {
-      "title": "Commande enregistrée sur votre appareil !",
-      "description": "Elle sera envoyée automatiquement au retour de la connexion Internet. Vous n’avez rien d’autre à faire : vous pouvez fermer l’application."
+      "title": "Brouillon enregistré. Achat non effectué",
+      "description": "Aucun stock n’a été réservé et rien n’a été débité. Une fois en ligne, vérifiez les prix et la disponibilité, puis confirmez votre achat.",
+      "review": "Voir mes brouillons"
     },
     "qrConfirm": {
       "loading": "Chargement de la confirmation...",
@@ -451,6 +457,18 @@
       "submittedTitle": "Justificatif reçu !",
       "submittedText": "La boutique vérifiera le paiement et confirmera votre commande. Vous pouvez la suivre dans Mes commandes.",
       "viewOrder": "Voir ma commande"
+    },
+    "drafts": {
+      "title": "Brouillons enregistrés hors ligne",
+      "notice": "Un brouillon n’est pas un achat : il ne réserve pas de stock et n’inclut aucun paiement. En le vérifiant, vous verrez les prix et le stock actuels avant de confirmer.",
+      "empty": "Vous n’avez aucun brouillon en attente.",
+      "summary": "{count, plural, one {# produit} other {# produits}} · {date}",
+      "legacyWarning": "Enregistré par une version antérieure, sans compte associé, et peut-être déjà envoyé. Vérifiez vos commandes avant de confirmer.",
+      "review": "Vérifier et confirmer",
+      "discard": "Supprimer",
+      "loadFailed": "Impossible de lire les brouillons de cet appareil.",
+      "reviewFailed": "Impossible de vérifier ce brouillon. Réessayez.",
+      "someUnavailable": "{count, plural, one {# produit n’est plus disponible} other {# produits ne sont plus disponibles}}."
     }
   },
   "Store": {
@@ -748,7 +766,8 @@
     "searchSale": "Impossible de rechercher la vente.",
     "returnHistory": "Impossible de charger l’historique des retours.",
     "roles": "Impossible de charger les rôles.",
-    "staff": "Impossible de charger le personnel."
+    "staff": "Impossible de charger le personnel.",
+    "sessionRequired": "Connectez-vous pour enregistrer l’ajustement."
   },
   "AdminCommon": {
     "previous": "Précédent",
@@ -1241,15 +1260,21 @@
       "saleReturn": "Vente / Retour",
       "sale": "Vente n° {number}",
       "cashier": "Traité par : {name}"
-    }
+    },
+    "conflictRow": "Taille {size} : vous avez proposé {proposed}, il y en a maintenant {current}.",
+    "conflictApply": "Appliquer ma valeur sur l’actuelle",
+    "conflictDiscard": "Supprimer mon ajustement"
   },
   "Offline": {
     "syncError": "Erreur lors de la mise à jour du stock de {name}",
     "syncSuccess": "{count} modification(s) de stock synchronisée(s) avec le serveur !",
-    "orderSendFailed": "Impossible d’envoyer une commande enregistrée sur cet appareil.",
-    "sending": "Envoi des commandes enregistrées...",
-    "pendingOrders": "{count, plural, one {# commande enregistrée sur cet appareil, en attente d’envoi.} other {# commandes enregistrées sur cet appareil, en attente d’envoi.}}",
-    "retry": "Réessayer"
+    "retry": "Réessayer",
+    "verifying": "Nous vérifions votre achat…",
+    "pendingDrafts": "{count, plural, one {# brouillon enregistré : achat non effectué.} other {# brouillons enregistrés : achats non effectués.}}",
+    "reviewDrafts": "Vérifier",
+    "updateAvailable": "Une nouvelle version est disponible.",
+    "updateNow": "Mettre à jour",
+    "inventoryNeedsReview": "Cet ajustement a été enregistré sans la version du stock : vérifiez-le et saisissez-le à nouveau."
   },
   "AdminPos": {
     "title": "Point de vente",

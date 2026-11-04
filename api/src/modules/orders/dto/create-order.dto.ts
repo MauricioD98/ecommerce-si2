@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, IsUUID, Max, Min, ValidateNested } from 'class-validator';
+import { MAX_LINE_QUANTITY } from '../../../common/checkout/checkout-policy';
 import { FulfillmentType } from '@prisma/client';
 
 class OrderItemDto {
@@ -12,6 +13,7 @@ class OrderItemDto {
   @ApiProperty()
   @IsInt()
   @IsPositive()
+  @Max(MAX_LINE_QUANTITY)
   quantity: number;
 
   @ApiProperty({
@@ -40,10 +42,28 @@ class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @ApiProperty({
+    example: 7,
+    description: 'Revisión del carrito (GET /cart → version) sobre la que el cliente confirmó. Se consume una sola vez, incluso con otra Idempotency-Key.',
+  })
+  @IsInt()
+  @Min(1)
+  cartVersion: number;
+
+  @ApiPropertyOptional({
+    example: 215.5,
+    description: 'Total que el cliente vio y aceptó. Si el servidor calcula otro: 409 PRICE_CHANGED, sin efectos.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  expectedTotal?: number;
 
   @ApiProperty({ type: [OrderItemDto] })
   @IsArray()
   @ArrayNotEmpty()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import Stripe from 'stripe';
+import { createStripeClient } from './stripe-gateway.service';
 import { ControlPrismaService } from '../../tenancy/control-prisma.service';
 import { TenantContext } from '../../tenancy/tenant-context';
 
@@ -20,7 +21,7 @@ export interface PayoutAccount {
 @Injectable()
 export class StripeConnectService {
   private readonly logger = new Logger(StripeConnectService.name);
-  private readonly stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  private readonly stripe = createStripeClient();
 
   constructor(private readonly control: ControlPrismaService) {}
 

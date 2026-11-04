@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
-import { OptionalJwtAuthGuard } from '../../common/decorators/guards/optional-jwt-auth.guard';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiCreatedResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import { GetUser } from '../../common/decorators/get-user.decorator';
@@ -41,11 +40,11 @@ export class PaymentsController {
   }
 
   @Post('confirm')
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-  summary: "Confirm payment",
-  description: "Confirm a payment intent for an order"
+  summary: "Reconcile payment",
+  description: "Reconcilia el intento autorizado con la evidencia de Stripe. Nunca marca pagado desde el cliente: processing y requires_action responden 409 PAYMENT_PENDING."
  })
   @ApiResponse({
   status: 200,
@@ -57,12 +56,14 @@ export class PaymentsController {
  })
  async confirmPayment(
     @Body() confirmPaymentDto: ConfirmPaymentDto,
-    @GetUser('id') userId?: string,
+    @GetUser('id') userId: string,
   ) {
     return await this.paymentsService.confirmPayment(userId, confirmPaymentDto);
   }
 
-  // ─── PAGO CON QR (PROYECTO UNIVERSITARIO) ──────────────────────────────────
+  // ─── PAGO CON QR SIMULADO ───────────────────────────────────────────────────
+  // Sin validación real de cobro: bloqueado con 403 salvo ALLOW_SIMULATED_PAYMENTS=true fuera de producción
+  // (PaymentsService.assertSimulationAllowed). Aplica a todas estas rutas, también al escaneo por GET.
 
   @Post('qr/generate')
   @ApiOperation({
@@ -174,6 +175,8 @@ export class PaymentsController {
   }
 
 @Get()
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 @ApiOperation({
   summary: 'Get all payments',
   description: 'Get all payments for the current user',
@@ -187,6 +190,8 @@ async findAll(@GetUser('id') userId: string) {
 }
 
 @Get(':id')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 @ApiParam({
   name: 'id',
   description: 'Payment ID',
@@ -209,6 +214,8 @@ async findOne(@Param('id') id: string, @GetUser('id') userId: string) {
 
 
 @Get('order/:orderId')
+@UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 @ApiParam({
   name: 'orderId',
   description: 'Order ID',

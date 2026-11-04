@@ -20,7 +20,7 @@ interface InventoryRowEditorProps {
     row: InventoryRow;
     isGlobal: boolean;
     branchName?: string;
-    onSave: (productId: string, payload: SetInventoryPayload, productName?: string) => Promise<{ isOffline: boolean } | void>;
+    onSave: (productId: string, payload: Omit<SetInventoryPayload, "operationId" | "sizes"> & { sizes: { size: string; stock: number }[] }, productName?: string) => Promise<{ isOffline: boolean } | void>;
     onApplyToAll: (productId: string, discount: ProductDiscountPayload) => Promise<void>;
     // Abre el historial de devoluciones de esta prenda (pestaña de auditoría)
     onViewReturns: (productId: string) => void;
@@ -339,7 +339,7 @@ export default function InventoryClient() {
     const branchName = branches.find((branch) => branch.id === branchId)?.name;
 
     const { rows, isLoading, error, saveInventory, applyDiscountToAllBranches } = useInventory(branchId);
-    const { pendingCount, pendingUpdates, isSyncing, lastSyncError, lastSyncSuccess, syncNow } = useOfflineInventorySync();
+    const { pendingCount, pendingUpdates, isSyncing, lastSyncError, lastSyncSuccess, syncNow, resolveConflict, discardUpdate } = useOfflineInventorySync();
 
     const pendingProductIds = new Set(
         pendingUpdates
@@ -415,6 +415,27 @@ export default function InventoryClient() {
                     </button>
                 </div>
             )}
+
+            {pendingUpdates.filter((update) => update.status !== 'pending').map((update) => (
+                <div className={styles.errorMessage} style={{ marginBottom: '1rem' }} key={update.id} role="alert">
+                    <strong>{update.productName ?? update.productId}</strong>: {update.lastError}
+                    {update.conflicts?.map((conflict) => (
+                        <div key={conflict.size}>
+                            {t('conflictRow', { size: conflict.size, proposed: conflict.proposedStock, current: conflict.currentStock })}
+                        </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        {update.conflicts?.length ? (
+                            <button type="button" className={styles.syncButton} onClick={() => resolveConflict(update)}>
+                                {t('conflictApply')}
+                            </button>
+                        ) : null}
+                        <button type="button" className={styles.syncButton} onClick={() => discardUpdate(update)}>
+                            {t('conflictDiscard')}
+                        </button>
+                    </div>
+                </div>
+            ))}
 
             {lastSyncSuccess && (
                 <div

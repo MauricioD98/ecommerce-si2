@@ -114,7 +114,9 @@ model Product {
   // por talla ni por color — ver nota de auditoría en el chat sobre por qué no se creó ProductVariant.
   colors String[] @default([])
   price     Decimal @db.Decimal(10, 2)
-  stock     Int @default(0) // stock global (legado); el stock por sucursal está en ProductInventory
+  // Agregado materializado (SUM de ProductInventory.stock), solo para mostrar: NUNCA autoriza una venta.
+  // Lo recalcula InventoryService.syncGlobalStockMany con el producto bloqueado.
+  stock     Int @default(0)
   sku String @unique
   imageUrl String?
   isActive Boolean @default(true)
@@ -191,6 +193,10 @@ model ProductInventory {
   // por eso viven aparte de `stock` (y quedan fuera de Product.stock): existen físicamente en la
   // sucursal, pero solo para auditoría/baja, nunca para el catálogo ni la caja.
   damagedStock Int @default(0)
+
+  // Concurrencia optimista de los ajustes (también offline): TODA mutación de stock/mermas la incrementa.
+  // Un conteo basado en una versión vieja recibe conflicto en vez de resucitar unidades ya vendidas.
+  version Int @default(1)
 
   productId String
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -285,6 +291,7 @@ model CartItem {
 
   cartId String
   cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  reservation StockReservation?
 
   @@unique([cartId, productId, size])
   @@index([cartId])
@@ -446,6 +453,13 @@ model Order {
   fulfillmentType FulfillmentType @default(DELIVERY)
   discountApplied Decimal @default(0) @db.Decimal(10, 2)
 
+  // Vencimiento del pago pendiente (reloj del servidor, política por método en checkout-policy.ts)
+  paymentExpiresAt DateTime?
+  // Intención de cancelar persistida ANTES de hablar con el proveedor: un barrido la retoma tras un crash
+  cancelRequestedAt DateTime?
+  // Estado de conciliación financiera, aparte de la logística: null | LATE_PAYMENT | MANUAL_REVIEW
+  reconciliationStatus String?
+
   // Datos de facturación (venta física en POS). Null en ventas web o cuando el cliente no los pide
   nit String?
   razonSocial String?
@@ -458,6 +472,10 @@ model Order {
   paymentProof PaymentProof?
   // Devoluciones procesadas contra esta venta (puede haber varias, parciales)
   returns Return[]
+  checkoutAttempt CheckoutAttempt?
+  paymentAttempts PaymentAttempt[]
+  reservations StockReservation[]
+  compensations PaymentCompensation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -469,6 +487,7 @@ model Order {
   @@index([branchId])
   @@index([cashierId])
   @@index([source])
+  @@index([status, paymentExpiresAt])
   @@map("orders")
 }
 
@@ -481,7 +500,13 @@ model Cart {
 
   checkout Boolean @default(false)
 
+  // Único carrito activo por usuario. Null en carritos cerrados o en duplicados heredados que barre el cron.
+  activeUserId String? @unique
+  // Revisión: sube con cada cambio. Un checkout consume una revisión una sola vez.
+  version Int @default(1)
+
   cartItems CartItem[]
+  reservations StockReservation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -642,4 +667,195 @@ model Payment {
   @@index([userId])
   @@index([transactionId])
   @@map("payments")
+}
+
+// ─── Compra resistente a fallos ─────────────────────────────────────────────────────────────────
+// Ecuación del inventario: ProductInventory.stock = unidades disponibles. Las reservas ACTIVE y las
+// CONSUMED de pedidos vivos YA están descontadas de stock; no hay un contador "reservado" aparte.
+
+enum ReservationStatus {
+  ACTIVE // retenida por una línea de carrito
+  CONSUMED // transferida a una orden: mismo descuento, otro propietario
+  RELEASED // devuelta al stock (quitar del carrito, cancelar la orden)
+  EXPIRED // devuelta al stock por vencimiento
+}
+
+model StockReservation {
+  id       String @id @default(uuid())
+  status   ReservationStatus @default(ACTIVE)
+  quantity Int
+  // Sube con cada cambio de cantidad: forma parte del identificador de efecto de sus movimientos
+  revision Int @default(0)
+  expiresAt DateTime?
+
+  userId    String
+  productId String
+  branchId  String
+  size      String
+
+  // Propietario: una línea de carrito (ACTIVE) o una orden (CONSUMED)
+  cartId     String?
+  cart       Cart?   @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  cartItemId String? @unique
+  cartItem   CartItem? @relation(fields: [cartItemId], references: [id], onDelete: SetNull)
+  orderId    String?
+  order      Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([cartId])
+  @@index([orderId])
+  @@map("stock_reservations")
+}
+
+// Libro de movimientos. effectId es único: aplicar dos veces el mismo efecto es imposible aunque se
+// reintente (doble cancelación, cron duplicado, webhook repetido).
+model InventoryMovement {
+  id           String @id @default(uuid())
+  effectId     String @unique
+  productId    String
+  branchId     String
+  size         String
+  stockDelta   Int @default(0)
+  damagedDelta Int @default(0)
+  reason       String
+  refType      String?
+  refId        String?
+  createdAt    DateTime @default(now())
+
+  @@index([productId, branchId, size])
+  @@index([refType, refId])
+  @@map("inventory_movements")
+}
+
+enum CheckoutAttemptStatus {
+  IN_PROGRESS
+  SUCCEEDED
+  REJECTED
+}
+
+// Intento lógico de compra (Idempotency-Key). Se conserva aunque se purgue cualquier caché: es lo que
+// impide que un reintento vuelva a comprar. Índice parcial en la migración: una revisión de carrito
+// solo se consume una vez, incluso con claves distintas.
+model CheckoutAttempt {
+  id          String @id @default(uuid())
+  userId      String
+  operation   String
+  key         String
+  payloadHash String
+  status      CheckoutAttemptStatus @default(IN_PROGRESS)
+  cartId      String?
+  cartVersion Int?
+  orderId     String? @unique
+  order       Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  resultCode  String?
+  resultMessage String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, operation, key])
+  @@map("checkout_attempts")
+}
+
+enum PaymentAttemptStatus {
+  CREATED // persistido, todavía sin respuesta del proveedor
+  OPEN // el proveedor devolvió un PaymentIntent
+  SUCCEEDED
+  CANCELED
+  ABANDONED // sin PaymentIntent y fuera del horizonte de idempotencia del proveedor
+}
+
+// Intento durable de cobro: se persiste con sus parámetros económicos inmutables ANTES de llamar a
+// Stripe. Índice parcial en la migración: una orden tiene como máximo un intento abierto.
+model PaymentAttempt {
+  id             String @id @default(uuid())
+  orderId        String
+  order          Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId         String
+  attemptNumber  Int
+  provider       String @default("STRIPE")
+  status         PaymentAttemptStatus @default(CREATED)
+  providerStatus String?
+  amountMinor    Int
+  currency       String
+  destinationAccount String?
+  feeAmountMinor Int?
+  idempotencyKey String @unique
+  stripePaymentIntentId String? @unique
+  livemode       Boolean?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([orderId, attemptNumber])
+  @@index([status, updatedAt])
+  @@map("payment_attempts")
+}
+
+enum CompensationStatus {
+  REQUESTED // persistida, falta llamar al proveedor
+  REFUND_PENDING // reembolso solicitado, sin confirmación
+  REFUNDED // el proveedor confirmó el reembolso
+  MANUAL_REVIEW // requiere gestión humana
+}
+
+// Cobro que no puede cumplirse (pago tardío de una orden ya liberada, segundo cobro). Reponer inventario
+// no equivale a devolver dinero: aquí se distingue reembolso solicitado de completado.
+model PaymentCompensation {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentIntentId String @unique
+  reason    String
+  status    CompensationStatus @default(REQUESTED)
+  amountMinor Int
+  currency  String
+  refundId  String?
+  attempts  Int @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@map("payment_compensations")
+}
+
+enum OutboxStatus {
+  PENDING
+  DONE
+  DEAD
+}
+
+// Efectos externos (correo, factura, push) confirmados junto con la transición que los origina y
+// entregados por un consumidor reintentable. Entrega al menos una vez: el proveedor externo no deduplica.
+model OutboxEvent {
+  id        String @id @default(uuid())
+  type      String
+  dedupeKey String @unique
+  payload   Json
+  status    OutboxStatus @default(PENDING)
+  attempts  Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@map("outbox_events")
+}
+
+// Anomalías para operación: datos heredados inconsistentes, PaymentIntent rechazado, pago por conciliar...
+model OperationalIssue {
+  id        String @id @default(uuid())
+  type      String
+  severity  String @default("WARN")
+  dedupeKey String? @unique
+  details   Json
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([type, resolvedAt])
+  @@map("operational_issues")
 }

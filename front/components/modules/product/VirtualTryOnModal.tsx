@@ -158,7 +158,7 @@ export default function VirtualTryOnModal({ product, onClose }: { product: Produ
                 // 4. Conexión realtime: el SDK abre el WebRTC y devuelve el stream transformado.
                 const decart = createDecartClient({ apiKey: session.apiKey });
                 const realtime = await decart.realtime.connect(stream, {
-                    model: models.realtime(session.model),
+                    model: models.realtime(session.model as Parameters<typeof models.realtime>[0]),
                     resolution: '720p',
                     mirror: 'auto',
                     initialState: {

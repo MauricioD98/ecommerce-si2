@@ -36,5 +36,14 @@
     "urlSavedBody": "正在连接：{{url}}",
     "urlRestored": "URL 已恢复",
     "urlRestoredBody": "默认 URL：{{url}}"
+  },
+  "checkoutRecovery": {
+    "verifyingTitle": "正在核实您的购买",
+    "verifying": "我们正在核实您的购买，无需重复操作。",
+    "retry": "重试核实",
+    "rejectedTitle": "购买未完成",
+    "storageFailed": "无法在此设备上保存您的购买，因此未发送。请释放空间后重试。",
+    "pendingTitle": "付款处理中",
+    "pending": "您的付款尚未确认。银行回复后我们会更新您的订单，无需再次付款。"
   }
 }

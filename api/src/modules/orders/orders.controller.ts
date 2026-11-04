@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiTooManyRequestsResponse, getSchemaPath } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiConflictResponse, ApiCreatedResponse, ApiHeader, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiTooManyRequestsResponse, getSchemaPath } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/decorators/guards/permissions.guard';
 import { OrdersService } from './orders.service';
@@ -24,7 +24,16 @@ constructor(private readonly ordersService: OrdersService) {}
 @Post()
 @ModerateThrottle()
 @ApiOperation({
-  summary: "Create a new order"
+  summary: "Create a new order (idempotent)",
+  description: 'Misma Idempotency-Key + mismo payload devuelve la orden original. Un timeout, una desconexión o un 5xx no prueban que falló: reintentar con la MISMA clave o consultar GET /orders/attempts/:key.',
+})
+@ApiHeader({
+  name: 'Idempotency-Key',
+  required: true,
+  description: 'Generada UNA vez por intención de compra, antes del primer envío (16-128 caracteres [A-Za-z0-9_-]).',
+})
+@ApiConflictResponse({
+  description: 'Código estable en "code": OUT_OF_STOCK, CART_VERSION_CONFLICT, PRICE_CHANGED, RESERVATION_EXPIRED, ATTEMPT_IN_PROGRESS o IDEMPOTENCY_KEY_REUSED. Ninguno deja efectos.',
 })
 @ApiBody({
   type: CreateOrderDto
@@ -46,8 +55,22 @@ constructor(private readonly ordersService: OrdersService) {}
 async create(
   @Body() createOrderDto: CreateOrderDto,
   @GetUser() user: AuthUser,
+  @Headers('idempotency-key') idempotencyKey?: string,
 ) {
-    return await this.ordersService.create(user, createOrderDto);
+    return await this.ordersService.create(user, createOrderDto, idempotencyKey);
+}
+
+// Registrada antes de ':id' para que "attempts" no se interprete como un id de pedido
+@Get('attempts/:key')
+@RelaxedThrottle()
+@ApiOperation({
+  summary: 'Estado de un intento de compra propio',
+  description: 'Limitado al usuario y a la tienda del request. 404 ATTEMPT_NOT_FOUND no prueba que un POST en vuelo no vaya a completarse: reintentar con la misma clave, jamás iniciar otra compra por esa sola respuesta.',
+})
+@ApiParam({ name: 'key', description: 'Idempotency-Key del intento' })
+@ApiNotFoundResponse({ description: 'ATTEMPT_NOT_FOUND' })
+async getAttempt(@Param('key') key: string, @GetUser('id') userId: string) {
+  return await this.ordersService.getAttempt(userId, key);
 }
 
 @Get('admin/all')

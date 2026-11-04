@@ -61,6 +61,12 @@ export class CreatePaymentIntentResponse {
   })
   clientSecret: string;
 
+  @ApiProperty({ example: 'pi_165465465', description: 'PaymentIntent recuperado o creado para esta orden' })
+  paymentIntentId: string;
+
+  @ApiProperty({ example: 'requires_payment_method', description: 'Estado actual en el proveedor' })
+  status: string;
+
   @ApiProperty({
     example: '2165465-454-sds4s854d65',
     description: 'Payment ID in database',

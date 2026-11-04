@@ -36,5 +36,14 @@
     "urlSavedBody": "Connecting to: {{url}}",
     "urlRestored": "URL Restored",
     "urlRestoredBody": "Default URL: {{url}}"
+  },
+  "checkoutRecovery": {
+    "verifyingTitle": "Verifying your purchase",
+    "verifying": "We’re verifying your purchase. There’s no need to repeat it.",
+    "retry": "Retry verification",
+    "rejectedTitle": "The purchase wasn’t made",
+    "storageFailed": "We couldn’t save your purchase on this device, so we didn’t send it. Free up space and try again.",
+    "pendingTitle": "Payment processing",
+    "pending": "Your payment isn’t confirmed yet. We’ll update your order when the bank responds. There’s no need to pay again."
   }
 }

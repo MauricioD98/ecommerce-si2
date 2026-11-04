@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, IsUUID } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsPositive, IsString, IsUUID, Max, Min } from 'class-validator';
+import { MAX_LINE_QUANTITY } from '../../../common/checkout/checkout-policy';
 
 export class AddCartItemDto {
   @ApiProperty({
@@ -17,6 +18,7 @@ export class AddCartItemDto {
   })
   @IsInt()
   @IsPositive()
+  @Max(MAX_LINE_QUANTITY)
   quantity: number;
 
   @ApiPropertyOptional({
@@ -28,10 +30,16 @@ export class AddCartItemDto {
   size?: string;
 
   @ApiPropertyOptional({
-    description: 'Sucursal contra cuyo inventario se valida el stock (sin sucursal usa el stock global)',
+    description: 'Sucursal donde se reserva el stock (sin sucursal: la del ítem o la primera activa)',
     example: 'b1c2d3e4-f5a6-7890-1234-56789abcdef0',
   })
   @IsUUID()
   @IsOptional()
   branchId?: string;
+
+  @ApiPropertyOptional({ description: 'Revisión del carrito leída; si cambió, 409 CART_VERSION_CONFLICT' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedVersion?: number;
 }

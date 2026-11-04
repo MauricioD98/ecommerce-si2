@@ -93,8 +93,7 @@ export async function switchTenant(tenantId: string): Promise<void> {
         localStorage.setItem(STORAGE_KEY, next);
     } catch {}
 
-    // El service worker cachea GET /api/v1/* por URL, sin mirar headers: la misma URL de otra
-    // tienda devolvería la respuesta cacheada de esta. Se vacía antes de cambiar.
+    // Las copias públicas y las páginas guardadas dependen de la tienda: se vacían antes de cambiar.
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_API_CACHE" });
 
     const url = new URL(window.location.href);

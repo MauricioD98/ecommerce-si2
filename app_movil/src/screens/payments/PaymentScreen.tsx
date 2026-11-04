@@ -13,6 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../context/AuthContext';
+import { forgetAttemptsOfOrder } from '../../utils/checkoutAttempts';
 import { paymentsApi } from '../../api/payments.api';
 import { ordersApi } from '../../api/orders.api';
 import { Header } from '../../components/Header';
@@ -28,6 +31,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
   const { fetchCart, clearCartLocal } = useCart();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const userId = (user as { id?: string } | null)?.id;
+  // processing / 3DS: el servidor aún no tiene evidencia del pago. Nunca se muestra como pagado.
+  const [isPaymentPending, setIsPaymentPending] = useState<boolean>(false);
+  const [simulatedQrEnabled, setSimulatedQrEnabled] = useState<boolean>(false);
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
     const val = Number(amount);
@@ -84,6 +93,17 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [isSuccess, countdown, handleGoToCatalog]);
 
   useEffect(() => {
+    paymentsApi
+      .getOptions()
+      .then((options) => setSimulatedQrEnabled(Boolean(options.simulatedQr)))
+      .catch(() => setSimulatedQrEnabled(false));
+  }, []);
+
+  useEffect(() => {
+    if (isSuccess) forgetAttemptsOfOrder(userId, orderId).catch(() => undefined);
+  }, [isSuccess, userId, orderId]);
+
+  useEffect(() => {
     const initPayment = async () => {
       try {
         setIsLoadingIntent(true);
@@ -98,9 +118,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           throw new Error('El monto del pedido no es válido para procesar el pago.');
         }
 
+        // Reintentar recupera el MISMO PaymentIntent: importe y moneda los fija el servidor
         const res = await paymentsApi.createIntent({
           orderId,
-          currency: 'usd',
           description: `Pago de pedido ${orderId}`,
         });
 
@@ -109,8 +129,15 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           const piId = res.data.clientSecret.split('_secret_')[0];
           setPaymentIntentId(piId);
         }
-      } catch (err) {
-        Alert.alert('Error', getErrorMessage(err));
+      } catch (err: any) {
+        const code = err?.response?.data?.code;
+        if (code === 'ORDER_ALREADY_PAID') {
+          setIsSuccess(true);
+        } else if (code === 'PAYMENT_PENDING') {
+          setIsPaymentPending(true);
+        } else {
+          Alert.alert('Error', getErrorMessage(err));
+        }
       } finally {
         setIsLoadingIntent(false);
       }
@@ -205,8 +232,13 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       } catch {
         // Ignorar
       }
-    } catch (err) {
-      Alert.alert('Error de Pago', getErrorMessage(err));
+    } catch (err: any) {
+      if (err?.response?.data?.code === 'PAYMENT_PENDING' || !err?.response) {
+        setIsPaymentPending(true);
+        Alert.alert(t('checkoutRecovery.pendingTitle'), t('checkoutRecovery.pending'));
+      } else {
+        Alert.alert('Error de Pago', getErrorMessage(err));
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -289,6 +321,13 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {isPaymentPending && (
+          <View style={styles.amountCard}>
+            <Text style={styles.amountLabel}>{t('checkoutRecovery.pendingTitle')}</Text>
+            <Text style={styles.stripeBadgeText}>{t('checkoutRecovery.pending')}</Text>
+          </View>
+        )}
+
         {/* Amount Box */}
         <View style={styles.amountCard}>
           <Text style={styles.amountLabel}>Monto a Facturar</Text>
@@ -323,6 +362,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
           <TouchableOpacity
             style={[styles.methodTab, selectedMethod === 'qr' && styles.methodTabActive]}
+            disabled={!simulatedQrEnabled}
             onPress={() => setSelectedMethod('qr')}
             activeOpacity={0.7}
           >

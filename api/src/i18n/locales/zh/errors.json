@@ -50,5 +50,20 @@
   "TXID_ALREADY_USED": "该 TxID 已用于其他订单。",
   "PROOF_NOT_PENDING": "此付款没有待审核的凭证。",
   "APPEARANCE_IMAGE_TOO_LARGE": "图片超过 {max} KB。",
-  "INVALID_DASHBOARD_WIDGET": "组件“{id}”无效：请检查其位置、尺寸和图表类型。"
+  "INVALID_DASHBOARD_WIDGET": "组件“{id}”无效：请检查其位置、尺寸和图表类型。",
+  "OUT_OF_STOCK": "所选门店的 {size} 码库存不足。",
+  "CART_VERSION_CONFLICT": "您的购物车已变更，请检查后重新确认。",
+  "PRICE_CHANGED": "您的订单总额已变更，请检查后重新确认。",
+  "ATTEMPT_IN_PROGRESS": "您的购买正在处理中，我们稍后会查询结果。",
+  "PAYMENT_PENDING": "您的付款仍在等待确认。",
+  "RESERVATION_EXPIRED": "您的预留已过期，请检查购物车后重试。",
+  "IDEMPOTENCY_KEY_REUSED": "此购买密钥已用于其他数据。",
+  "IDEMPOTENCY_KEY_REQUIRED": "请更新应用以继续购买。",
+  "ATTEMPT_NOT_FOUND": "暂无此购买尝试的记录。",
+  "ORDER_ALREADY_PAID": "此订单已付款。",
+  "ORDER_NOT_PAYABLE": "此订单已无法付款。",
+  "PAYMENT_MISMATCH": "付款与此订单不符。",
+  "PAYMENT_SIMULATION_DISABLED": "此付款方式不可用。",
+  "INVENTORY_VERSION_CONFLICT": "库存在您读取后已变更，请先查看当前值再调整。",
+  "PROVIDER_UNAVAILABLE": "支付服务商无响应，请稍后再试。"
 }

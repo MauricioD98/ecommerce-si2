@@ -62,6 +62,8 @@ export interface InventorySizeStock {
     // Unidades en mermas de esa talla (devoluciones en mal estado). No son vendibles.
     // Opcional porque el payload de escritura (SetInventoryPayload) solo manda el stock vendible.
     damagedStock?: number;
+    // Versión de la fila: toda venta o ajuste la sube. 0 = la fila todavía no existe.
+    version?: number;
 }
 
 export interface InventoryItem {
@@ -90,7 +92,18 @@ export interface ProductDiscountPayload {
 // PUT /branches/:branchId/inventory/:productId: stock por talla y descuento de la sucursal
 // (el descuento aplica igual a todas las tallas)
 export interface SetInventoryPayload extends ProductDiscountPayload {
-    sizes: InventorySizeStock[];
+    // Identifica esta operación: reenviarla no la aplica dos veces
+    operationId: string;
+    sizes: { size: string; stock: number; expectedVersion: number }[];
+}
+
+// Respuesta 409 INVENTORY_VERSION_CONFLICT: lo leído, lo actual y lo propuesto, para resolver a mano
+export interface InventoryConflict {
+    size: string;
+    expectedVersion: number;
+    currentVersion: number;
+    currentStock: number;
+    proposedStock: number;
 }
 
 export type OrderStatus = "PENDIENTE" | "PROCESANDO" | "ENVIADO" | "ENTREGADO" | "CANCELADO";

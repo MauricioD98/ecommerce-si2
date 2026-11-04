@@ -1,6 +1,6 @@
-import { InventoryItem, SetInventoryPayload } from "@/types/admin.types";
+import { InventoryConflict, InventoryItem, SetInventoryPayload } from "@/types/admin.types";
 import { Product } from "@/types/product.types";
-import { INVENTORY_STORE, isOfflineDbSupported, withOfflineStore } from "./offlineDb";
+import { INVENTORY_STORE, isOfflineDbSupported, patchInOfflineStore, withOfflineStore } from "./offlineDb";
 import { getCurrentTenantId, tenantScopedKey } from "./tenant";
 
 export interface OfflineInventoryUpdate {
@@ -10,8 +10,13 @@ export interface OfflineInventoryUpdate {
     productName?: string;
     payload: SetInventoryPayload;
     createdAt: string;
-    status: "pending" | "failed";
+    // Quien hizo el ajuste. null solo en colas antiguas: se muestran para revisar, nunca se envían solas
+    userId: string | null;
+    // pending: se reintenta. failed: rechazo permanente (permisos, datos), no se reintenta. conflict: el stock
+    // cambió desde la lectura y hace falta una resolución explícita: jamás se sobrescribe automáticamente.
+    status: "pending" | "failed" | "conflict";
     lastError?: string;
+    conflicts?: InventoryConflict[];
 }
 
 // Las cachés de localStorage también van por tienda: los branchId son UUID por schema, pero sin
@@ -30,7 +35,8 @@ export async function addOfflineInventoryUpdate(
     branchId: string,
     productId: string,
     payload: SetInventoryPayload,
-    productName?: string
+    productName: string | undefined,
+    userId: string
 ): Promise<OfflineInventoryUpdate> {
     if (!isOfflineDbSupported()) {
         throw new Error("IndexedDB no disponible en este navegador");
@@ -41,7 +47,7 @@ export async function addOfflineInventoryUpdate(
 
     // Si ya existe una actualización pendiente para este mismo producto en esta sucursal, la actualizamos
     const existingList = await getOfflineInventoryUpdates();
-    const existing = existingList.find((item) => item.branchId === branchId && item.productId === productId);
+    const existing = existingList.find((item) => item.branchId === branchId && item.productId === productId && item.userId === userId);
 
     const update: OfflineInventoryUpdate = {
         id: existing ? existing.id : (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -52,6 +58,7 @@ export async function addOfflineInventoryUpdate(
         productName,
         payload,
         createdAt: new Date().toISOString(),
+        userId,
         status: "pending",
     };
 
@@ -82,13 +89,11 @@ export async function removeOfflineInventoryUpdate(id: string): Promise<void> {
 
 export async function updateOfflineInventoryUpdate(
     id: string,
-    patch: Partial<Pick<OfflineInventoryUpdate, "status" | "lastError">>
+    patch: Partial<Pick<OfflineInventoryUpdate, "status" | "lastError" | "conflicts" | "payload">>
 ): Promise<void> {
     if (!isSupported()) return;
     try {
-        const existing = await withStore<OfflineInventoryUpdate | undefined>("readonly", (store) => store.get(id));
-        if (!existing) return;
-        await withStore("readwrite", (store) => store.put({ ...existing, ...patch }));
+        await patchInOfflineStore<OfflineInventoryUpdate>(INVENTORY_STORE, id, (existing) => ({ ...existing, ...patch }));
     } catch {}
 }
 

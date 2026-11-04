@@ -38,8 +38,8 @@
     "checkoutSuccessDescription": "Your payment confirmation",
     "qrConfirmTitle": "QR payment confirmation",
     "qrConfirmDescription": "QR code payment confirmation",
-    "offlineSuccessTitle": "Order saved",
-    "offlineSuccessDescription": "Your order was saved on your device and will be sent when you’re back online",
+    "offlineSuccessTitle": "Draft saved",
+    "offlineSuccessDescription": "Your purchase hasn’t been made yet: review and confirm it once you’re online",
     "productTitle": "Product details",
     "productDescription": "See the product details",
     "cartTitle": "Shopping cart",
@@ -339,7 +339,10 @@
       "bankQr": "Bank QR",
       "bankQrDescription": "Pay from your banking app and upload the receipt",
       "usdt": "USDT",
-      "usdtDescription": "Transfer on the {network} network"
+      "usdtDescription": "Transfer on the {network} network",
+      "verifying": "We’re verifying your purchase. There’s no need to repeat it.",
+      "storageFailed": "We couldn’t save your purchase on this device, so we didn’t send it. Free up space or check permissions and try again.",
+      "storageFull": "This device’s storage is full, so we didn’t send your purchase. Free up space and try again."
     },
     "summary": {
       "title": "Order summary",
@@ -385,11 +388,14 @@
       "title": "Payment successful!",
       "orderConfirmed": "Your order #<strong>{order}</strong> has been confirmed.",
       "redirecting": "Redirecting to the store in {seconds, plural, one {# second} other {# seconds}}...",
-      "backToStore": "Back to store"
+      "backToStore": "Back to store",
+      "pendingTitle": "Your payment is processing",
+      "pendingDescription": "It isn’t confirmed yet. We’ll let you know and update your order when the bank responds. There’s no need to pay again."
     },
     "offlineSuccess": {
-      "title": "Order saved on your device!",
-      "description": "It will be sent automatically when you’re back online. You don’t need to do anything else: you can close the app."
+      "title": "Draft saved. Purchase not made yet",
+      "description": "No stock was reserved and nothing was charged. Once you’re online, review prices and availability and confirm your purchase.",
+      "review": "View my drafts"
     },
     "qrConfirm": {
       "loading": "Loading confirmation...",
@@ -451,6 +457,18 @@
       "submittedTitle": "We got your receipt!",
       "submittedText": "The store will verify the payment and confirm your order. You can track it in My orders.",
       "viewOrder": "View my order"
+    },
+    "drafts": {
+      "title": "Drafts saved offline",
+      "notice": "A draft isn’t a purchase: it doesn’t reserve stock or include payment. When you review it you’ll see current prices and stock before confirming.",
+      "empty": "You have no pending drafts.",
+      "summary": "{count, plural, one {# product} other {# products}} · {date}",
+      "legacyWarning": "This was saved by an earlier version, with no linked account, and may already have been sent. Check your orders before confirming.",
+      "review": "Review and confirm",
+      "discard": "Discard",
+      "loadFailed": "We couldn’t read the drafts on this device.",
+      "reviewFailed": "We couldn’t review this draft. Please try again.",
+      "someUnavailable": "{count, plural, one {# product is no longer available} other {# products are no longer available}}."
     }
   },
   "Store": {
@@ -748,7 +766,8 @@
     "searchSale": "Couldn’t search for the sale.",
     "returnHistory": "Couldn’t load the return history.",
     "roles": "Couldn’t load the roles.",
-    "staff": "Couldn’t load the staff."
+    "staff": "Couldn’t load the staff.",
+    "sessionRequired": "Sign in to save the adjustment."
   },
   "AdminCommon": {
     "previous": "Previous",
@@ -1241,15 +1260,21 @@
       "saleReturn": "Sale / Return",
       "sale": "Sale #{number}",
       "cashier": "Handled by: {name}"
-    }
+    },
+    "conflictRow": "Size {size}: you proposed {proposed}, there are now {current}.",
+    "conflictApply": "Apply my value over the current one",
+    "conflictDiscard": "Discard my adjustment"
   },
   "Offline": {
     "syncError": "Error updating the stock of {name}",
     "syncSuccess": "{count} stock change(s) synced with the server!",
-    "orderSendFailed": "Couldn’t send an order saved on this device.",
-    "sending": "Sending saved orders...",
-    "pendingOrders": "{count, plural, one {# order saved on this device, waiting to be sent.} other {# orders saved on this device, waiting to be sent.}}",
-    "retry": "Retry"
+    "retry": "Retry",
+    "verifying": "We’re verifying your purchase…",
+    "pendingDrafts": "{count, plural, one {# saved draft: purchase not made yet.} other {# saved drafts: purchases not made yet.}}",
+    "reviewDrafts": "Review",
+    "updateAvailable": "A new version is available.",
+    "updateNow": "Update",
+    "inventoryNeedsReview": "This adjustment was saved without the stock version: review it and enter it again."
   },
   "AdminPos": {
     "title": "Point of Sale",

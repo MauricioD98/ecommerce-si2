@@ -1,10 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, PaymentMethod, PaymentProofStatus, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentAttemptStatus, PaymentMethod, PaymentProofStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { i18nMessage } from '../../i18n/i18n-message';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from './payments.service';
+import { PaymentSettlementService } from './payment-settlement.service';
+import { CheckoutCode, CheckoutException } from '../../common/checkout/checkout-errors';
+import { lockOrder, withTxRetry } from '../../common/checkout/tx.util';
 import { UploadedImage, detectImageType, isValidTxId } from './payment-settings.service';
 
 const MANUAL_METHODS: PaymentMethod[] = [PaymentMethod.BANK_QR, PaymentMethod.USDT];
@@ -20,6 +23,7 @@ export class PaymentProofsService {
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
     private readonly payments: PaymentsService,
+    private readonly settlement: PaymentSettlementService,
   ) {}
 
   /** El cliente sube el comprobante (QR) o el TxID (USDT). Se puede reemplazar mientras no se revisó. */
@@ -67,12 +71,36 @@ export class PaymentProofsService {
       if (reused) throw new BadRequestException(i18nMessage('errors.TXID_ALREADY_USED'));
     }
 
+    // Cambio de método: un cobro con tarjeta abierto se resuelve antes. Si el proveedor ya tiene el dinero
+    // o no se sabe, no se acepta el comprobante: la orden tendría dos liquidaciones posibles.
+    const provider = await this.payments.resolveProviderBeforeRelease(orderId);
+    if (provider !== 'FREE') {
+      throw new CheckoutException(provider === 'PAID' ? CheckoutCode.ORDER_ALREADY_PAID : CheckoutCode.PAYMENT_PENDING);
+    }
+
     // Al reemplazar un comprobante sin imagen nueva (USDT) no se conserva la imagen anterior
     const data = { method, txId, image: image?.image ?? null, imageType: image?.imageType ?? null, status: PaymentProofStatus.PENDIENTE };
-    await this.prisma.$transaction([
-      this.prisma.paymentProof.upsert({ where: { orderId }, create: { orderId, ...data }, update: data }),
-      this.prisma.order.update({ where: { id: orderId }, data: { paymentMethod: method } }),
-    ]);
+    try {
+      await withTxRetry(() =>
+        this.prisma.$transaction(async (tx) => {
+          await lockOrder(tx, orderId);
+          const current = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { status: true, paymentStatus: true } });
+          if (current.status !== OrderStatus.PENDIENTE || current.paymentStatus === PaymentStatus.COMPLETADO) {
+            throw new BadRequestException(i18nMessage('errors.ORDER_NOT_AWAITING_PROOF'));
+          }
+          await tx.paymentAttempt.updateMany({
+            where: { orderId, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
+            data: { status: PaymentAttemptStatus.CANCELED },
+          });
+          await tx.paymentProof.upsert({ where: { orderId }, create: { orderId, ...data }, update: data });
+          await tx.order.update({ where: { id: orderId }, data: { paymentMethod: method } });
+        }),
+      );
+    } catch (error) {
+      // El índice único por TxID resuelve la carrera que la lectura de arriba no puede ver
+      if ((error as { code?: string })?.code === 'P2002') throw new BadRequestException(i18nMessage('errors.TXID_ALREADY_USED'));
+      throw error;
+    }
     return { success: true, data: { status: PaymentProofStatus.PENDIENTE }, message: 'Comprobante recibido' };
   }
 
@@ -84,40 +112,50 @@ export class PaymentProofsService {
     return { data: Buffer.from(proof.image), type: proof.imageType };
   }
 
+  // Aprobar y rechazar compiten por la misma fila bloqueada: una sola transición y una sola contabilización
   async approve(orderId: string, actor: AuthUser) {
-    const proof = await this.pendingProof(orderId, actor);
-    const order = await this.prisma.order.findUniqueOrThrow({ where: { id: orderId }, select: { orderNumber: true } });
-    // Condicionado a PENDIENTE: dos clicks (o dos admins) a la vez no aprueban dos veces
-    const { count } = await this.prisma.paymentProof.updateMany({
-      where: { orderId, status: PaymentProofStatus.PENDIENTE },
-      data: { status: PaymentProofStatus.APROBADO, reviewedById: actor.id, reviewedAt: new Date() },
-    });
-    if (count === 0) throw new BadRequestException(i18nMessage('errors.PROOF_NOT_PENDING'));
-    // Mismo cierre que un pago con tarjeta: Payment COMPLETADO, pedido PROCESANDO, carrito cerrado, factura
-    await this.payments.markQrPaymentSucceeded(orderId, proof.txId ?? `${proof.method}-${order.orderNumber}`, proof.method);
+    await this.orders.findOne(orderId, undefined, actor);
+    await withTxRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        await lockOrder(tx, orderId);
+        const proof = await tx.paymentProof.findUnique({ where: { orderId }, select: { status: true, method: true, txId: true } });
+        const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, select: { orderNumber: true, status: true } });
+        if (!proof || proof.status !== PaymentProofStatus.PENDIENTE) throw new BadRequestException(i18nMessage('errors.PROOF_NOT_PENDING'));
+        if (order.status === OrderStatus.CANCELADO) throw new CheckoutException(CheckoutCode.ORDER_NOT_PAYABLE);
+        await tx.paymentProof.update({
+          where: { orderId },
+          data: { status: PaymentProofStatus.APROBADO, reviewedById: actor.id, reviewedAt: new Date() },
+        });
+        // Mismo cierre que un pago con tarjeta: Payment COMPLETADO, pedido PROCESANDO, factura por outbox
+        await this.settlement.settleInTx(tx, {
+          orderId,
+          method: proof.method,
+          transactionId: proof.txId ?? `${proof.method}-${order.orderNumber}`,
+          currency: proof.method === PaymentMethod.USDT ? 'USDT' : 'BOB',
+        });
+      }),
+    );
     return this.orders.findOne(orderId, undefined, actor);
   }
 
   async reject(orderId: string, actor: AuthUser) {
-    await this.pendingProof(orderId, actor);
-    await this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.paymentProof.updateMany({
-        where: { orderId, status: PaymentProofStatus.PENDIENTE },
-        data: { status: PaymentProofStatus.RECHAZADO, reviewedById: actor.id, reviewedAt: new Date() },
-      });
-      if (count === 0) throw new BadRequestException(i18nMessage('errors.PROOF_NOT_PENDING'));
-      await tx.order.update({ where: { id: orderId }, data: { paymentStatus: PaymentStatus.FALLIDO } });
-    });
-    // Cancela el pedido y repone el stock que tenía reservado
-    return this.orders.cancel(orderId, undefined, actor);
+    await this.orders.findOne(orderId, undefined, actor);
+    await withTxRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        await lockOrder(tx, orderId);
+        const proof = await tx.paymentProof.findUnique({ where: { orderId }, select: { status: true } });
+        if (!proof || proof.status !== PaymentProofStatus.PENDIENTE) throw new BadRequestException(i18nMessage('errors.PROOF_NOT_PENDING'));
+        await tx.paymentProof.update({
+          where: { orderId },
+          data: { status: PaymentProofStatus.RECHAZADO, reviewedById: actor.id, reviewedAt: new Date() },
+        });
+        await tx.order.update({ where: { id: orderId }, data: { paymentStatus: PaymentStatus.FALLIDO } });
+        // Cancela el pedido y repone el stock que tenía reservado, una sola vez
+        await this.settlement.cancelInTx(tx, orderId, 'PROOF_REJECTED');
+      }),
+    );
+    return this.orders.findOne(orderId, undefined, actor);
   }
 
-  private async pendingProof(orderId: string, actor: AuthUser) {
-    await this.orders.findOne(orderId, undefined, actor);
-    const proof = await this.prisma.paymentProof.findUnique({ where: { orderId }, select: { status: true, method: true, txId: true } });
-    if (!proof || proof.status !== PaymentProofStatus.PENDIENTE) {
-      throw new BadRequestException(i18nMessage('errors.PROOF_NOT_PENDING'));
-    }
-    return proof;
-  }
+
 }

@@ -1,22 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { ReservationStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { InventoryService } from '../branches/inventory.service';
+import { CartService } from './cart.service';
 import { ControlPrismaService } from '../../tenancy/control-prisma.service';
 import { runInTenant } from '../../tenancy/tenant-context';
+import { backgroundJobsEnabled } from '../../common/checkout/checkout-policy';
+import { lockCart, withTxRetry } from '../../common/checkout/tx.util';
+import { failpoint } from '../../common/checkout/failpoints';
 
-// El carrito reserva stock real al agregar un ítem (CartService.addItem). Si el cliente lo
-// abandona sin pagar, ese stock queda descontado para siempre a menos que algo lo libere: este
-// cron corre cada 15 minutos y libera los carritos sin actividad por más de 1 hora.
-const ABANDONED_CART_TTL_MS = 60 * 60 * 1000;
-
+// El carrito reserva stock real al agregar un ítem. Si el cliente lo abandona sin pagar, este barrido
+// libera lo vencido (TTL explícito en cada reserva). La lista inicial es solo una pista: cada carrito se
+// reclama y se revalida DENTRO de su transacción, así que dos réplicas (o el cron contra un checkout en
+// curso) producen una única liberación o un único consumo, nunca ambos. Tras un reinicio prolongado la
+// primera pasada recupera todo lo vencido.
 @Injectable()
 export class CartCleanupService {
   private readonly logger = new Logger(CartCleanupService.name);
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly inventoryService: InventoryService,
+    private readonly cartService: CartService,
     private readonly control: ControlPrismaService,
   ) {}
 
@@ -25,6 +29,7 @@ export class CartCleanupService {
   // tienda activa a mano para que this.prisma apunte a su schema.
   @Cron('*/15 * * * *')
   async releaseAbandonedCarts(): Promise<void> {
+    if (!backgroundJobsEnabled()) return;
     const tenants = await this.control.tenant.findMany({
       where: { status: 'ACTIVE' },
       select: { id: true, schemaName: true },
@@ -38,43 +43,30 @@ export class CartCleanupService {
     }
   }
 
-  private async releaseForCurrentTenant(): Promise<void> {
-    const cutoff = new Date(Date.now() - ABANDONED_CART_TTL_MS);
-
-    // updatedAt del Cart se toca a propósito en cada addItem/updateItemQuantity (ver CartService):
-    // es la señal de "última actividad" que usamos acá para detectar abandono.
-    const abandonedCarts = await this.prisma.cart.findMany({
-      where: { checkout: false, updatedAt: { lt: cutoff }, cartItems: { some: {} } },
-      include: { cartItems: true },
+  async releaseForCurrentTenant(now = new Date()): Promise<number> {
+    const candidates = await this.prisma.stockReservation.findMany({
+      where: { status: ReservationStatus.ACTIVE, expiresAt: { lt: now }, cartId: { not: null } },
+      select: { cartId: true },
+      distinct: ['cartId'],
     });
 
-    if (abandonedCarts.length === 0) return;
-
     let released = 0;
-    for (const cart of abandonedCarts) {
+    for (const { cartId } of candidates) {
       try {
-        await this.prisma.$transaction(async (tx) => {
-          for (const item of cart.cartItems) {
-            if (item.quantity <= 0) continue;
-
-            if (item.branchId) {
-              await this.inventoryService.increment(tx, item.productId, item.branchId, item.size ?? '', item.quantity);
-            } else {
-              await tx.product.update({
-                where: { id: item.productId },
-                data: { stock: { increment: item.quantity } },
-              });
-            }
-          }
-          await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-        });
-        released += 1;
+        await failpoint('cartCleanup.beforeClaim');
+        released += await withTxRetry(() =>
+          this.prisma.$transaction(async (tx) => {
+            await lockCart(tx, cartId!);
+            return this.cartService.expireLocked(tx, cartId!, now);
+          }),
+        );
       } catch (error) {
         // Un carrito que falla no debe frenar la liberación del resto
-        this.logger.error(`No se pudo liberar el carrito abandonado ${cart.id}`, error as Error);
+        this.logger.error(`No se pudo liberar el carrito abandonado ${cartId}`, error as Error);
       }
     }
 
-    this.logger.log(`Carritos abandonados liberados: ${released}/${abandonedCarts.length}`);
+    if (released > 0) this.logger.log(`Reservas vencidas liberadas: ${released}`);
+    return released;
   }
 }

@@ -30,6 +30,8 @@ export interface PaymentSettingsUpdate {
 
 export interface PaymentOptions {
     card: boolean;
+    // QR de demostración: el servidor lo bloquea fuera de un entorno de pruebas explícito
+    simulatedQr?: boolean;
     bankQr: { instructions: string } | null;
     usdt: { network: UsdtNetwork; walletAddress: string; walletQr: string } | null;
 }

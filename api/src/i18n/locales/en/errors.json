@@ -51,5 +51,20 @@
   "TXID_ALREADY_USED": "That TxID has already been used for another order.",
   "PROOF_NOT_PENDING": "This payment has no proof pending review.",
   "APPEARANCE_IMAGE_TOO_LARGE": "The image exceeds {max} KB.",
-  "INVALID_DASHBOARD_WIDGET": "Widget \"{id}\" is invalid: check its position, size and chart type."
+  "INVALID_DASHBOARD_WIDGET": "Widget \"{id}\" is invalid: check its position, size and chart type.",
+  "OUT_OF_STOCK": "There isn’t enough stock of size {size} at the selected branch.",
+  "CART_VERSION_CONFLICT": "Your cart changed. Please review it and confirm again.",
+  "PRICE_CHANGED": "Your order total changed. Please review it and confirm again.",
+  "ATTEMPT_IN_PROGRESS": "Your purchase is being processed. We’ll check the result shortly.",
+  "PAYMENT_PENDING": "Your payment is still awaiting confirmation.",
+  "RESERVATION_EXPIRED": "Your reservation expired. Please review your cart and try again.",
+  "IDEMPOTENCY_KEY_REUSED": "This purchase key was already used with different data.",
+  "IDEMPOTENCY_KEY_REQUIRED": "Please update the app to continue with your purchase.",
+  "ATTEMPT_NOT_FOUND": "There’s no record of this purchase attempt yet.",
+  "ORDER_ALREADY_PAID": "This order is already paid.",
+  "ORDER_NOT_PAYABLE": "This order can no longer be paid.",
+  "PAYMENT_MISMATCH": "The payment doesn’t match this order.",
+  "PAYMENT_SIMULATION_DISABLED": "This payment method isn’t available.",
+  "INVENTORY_VERSION_CONFLICT": "Stock changed since you read it. Check the current value before adjusting.",
+  "PROVIDER_UNAVAILABLE": "The payment provider isn’t responding. Please try again shortly."
 }

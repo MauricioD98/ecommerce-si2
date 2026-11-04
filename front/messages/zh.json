@@ -38,8 +38,8 @@
     "checkoutSuccessDescription": "你的付款确认",
     "qrConfirmTitle": "二维码付款确认",
     "qrConfirmDescription": "二维码付款确认",
-    "offlineSuccessTitle": "订单已保存",
-    "offlineSuccessDescription": "你的订单已保存在设备上，恢复网络后会自动提交",
+    "offlineSuccessTitle": "草稿已保存",
+    "offlineSuccessDescription": "您的购买尚未完成：联网后请检查并确认",
     "productTitle": "商品详情",
     "productDescription": "查看商品详情",
     "cartTitle": "购物车",
@@ -339,7 +339,10 @@
       "bankQr": "银行二维码",
       "bankQrDescription": "用银行 App 付款并上传凭证",
       "usdt": "USDT",
-      "usdtDescription": "通过 {network} 网络转账"
+      "usdtDescription": "通过 {network} 网络转账",
+      "verifying": "我们正在核实您的购买，无需重复操作。",
+      "storageFailed": "无法在此设备上保存您的购买，因此未发送。请释放空间或检查权限后重试。",
+      "storageFull": "此设备存储空间已满，因此未发送您的购买。请释放空间后重试。"
     },
     "summary": {
       "title": "订单摘要",
@@ -385,11 +388,14 @@
       "title": "付款成功！",
       "orderConfirmed": "你的订单 #<strong>{order}</strong> 已确认。",
       "redirecting": "{seconds} 秒后返回商店...",
-      "backToStore": "返回商店"
+      "backToStore": "返回商店",
+      "pendingTitle": "您的付款正在处理中",
+      "pendingDescription": "付款尚未确认。银行回复后我们会通知您并更新订单，无需再次付款。"
     },
     "offlineSuccess": {
-      "title": "订单已保存在你的设备上！",
-      "description": "恢复网络后会自动提交，无需其他操作，可以放心关闭应用。"
+      "title": "草稿已保存，购买尚未完成",
+      "description": "未预留库存，也未扣款。联网后请检查价格和库存，然后确认购买。",
+      "review": "查看我的草稿"
     },
     "qrConfirm": {
       "loading": "正在加载确认信息...",
@@ -451,6 +457,18 @@
       "submittedTitle": "已收到您的凭证！",
       "submittedText": "店铺将核实付款并确认您的订单。您可以在“我的订单”中查看进度。",
       "viewOrder": "查看我的订单"
+    },
+    "drafts": {
+      "title": "离线保存的草稿",
+      "notice": "草稿不是购买：不预留库存，也不包含付款。检查时您会先看到当前价格和库存，再进行确认。",
+      "empty": "您没有待处理的草稿。",
+      "summary": "{count, plural, other {# 件商品}} · {date}",
+      "legacyWarning": "此草稿由旧版本保存，未关联账户，可能已发送。确认前请先查看您的订单。",
+      "review": "检查并确认",
+      "discard": "放弃",
+      "loadFailed": "无法读取此设备上的草稿。",
+      "reviewFailed": "无法检查此草稿，请重试。",
+      "someUnavailable": "{count, plural, other {# 件商品已不可用}}。"
     }
   },
   "Store": {
@@ -748,7 +766,8 @@
     "searchSale": "无法查找该笔销售。",
     "returnHistory": "无法加载退货记录。",
     "roles": "无法加载角色。",
-    "staff": "无法加载员工。"
+    "staff": "无法加载员工。",
+    "sessionRequired": "请登录以保存调整。"
   },
   "AdminCommon": {
     "previous": "上一页",
@@ -1241,15 +1260,21 @@
       "saleReturn": "销售 / 退货",
       "sale": "销售 #{number}",
       "cashier": "经办人：{name}"
-    }
+    },
+    "conflictRow": "{size} 码：您提议 {proposed}，当前为 {current}。",
+    "conflictApply": "在当前值上应用我的数值",
+    "conflictDiscard": "放弃我的调整"
   },
   "Offline": {
     "syncError": "更新 {name} 的库存时出错",
     "syncSuccess": "已有 {count} 条库存修改与服务器同步！",
-    "orderSendFailed": "无法提交保存在此设备上的订单。",
-    "sending": "正在提交已保存的订单...",
-    "pendingOrders": "此设备上有 {count} 个已保存的订单待提交。",
-    "retry": "重试"
+    "retry": "重试",
+    "verifying": "我们正在核实您的购买…",
+    "pendingDrafts": "{count, plural, other {已保存 # 份草稿：购买尚未完成。}}",
+    "reviewDrafts": "检查",
+    "updateAvailable": "有新版本可用。",
+    "updateNow": "更新",
+    "inventoryNeedsReview": "此调整保存时未包含库存版本：请检查后重新录入。"
   },
   "AdminPos": {
     "title": "收银台",

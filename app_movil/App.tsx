@@ -7,6 +7,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { BranchProvider } from './src/context/BranchContext';
 import { CartProvider } from './src/context/CartContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { CheckoutRecovery } from './src/components/CheckoutRecovery';
 import { initI18n } from './src/i18n';
 
 LogBox.ignoreLogs([
@@ -33,6 +34,7 @@ export default function App() {
           <BranchProvider>
             <CartProvider>
               <StatusBar style="dark" />
+              <CheckoutRecovery />
               <AppNavigator />
             </CartProvider>
           </BranchProvider>

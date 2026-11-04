@@ -35,6 +35,12 @@ export const paymentsApi = {
     return response.data;
   },
 
+  // Medios activos de la tienda. El QR simulado solo existe en entornos de prueba explícitos.
+  getOptions: async (): Promise<{ card: boolean; simulatedQr?: boolean }> => {
+    const response = await apiClient.get<{ data: { card: boolean; simulatedQr?: boolean } }>('/store/payment-options');
+    return response.data.data;
+  },
+
   getByOrderId: async (orderId: string): Promise<PaymentDetails | null> => {
     try {
       const response = await apiClient.get<{ data?: PaymentDetails } | PaymentDetails>(`/payments/order/${orderId}`);

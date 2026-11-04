@@ -9,6 +9,9 @@ export interface OrderItem {
 }
 
 export interface CreateOrderRequest {
+    // Revisión del carrito sobre la que el usuario confirmó y total que aceptó: el servidor los valida
+    cartVersion: number;
+    expectedTotal?: number;
     items: OrderItem[];
     shippingAddress?: string;
     // Ubicación exacta de entrega (solo DELIVERY): se envían juntas

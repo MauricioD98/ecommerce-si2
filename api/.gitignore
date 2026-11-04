@@ -59,3 +59,5 @@ docs
 
 /src/generated/prisma
 /src/generated/control
+
+/dist-acceptance

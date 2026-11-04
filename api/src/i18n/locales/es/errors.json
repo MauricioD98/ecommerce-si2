@@ -51,5 +51,20 @@
   "TXID_ALREADY_USED": "Ese TxID ya se usó en otro pedido.",
   "PROOF_NOT_PENDING": "Este pago no tiene un comprobante pendiente de revisión.",
   "APPEARANCE_IMAGE_TOO_LARGE": "La imagen supera los {max} KB.",
-  "INVALID_DASHBOARD_WIDGET": "El widget \"{id}\" no es válido: revisa su posición, tamaño y tipo de gráfico."
+  "INVALID_DASHBOARD_WIDGET": "El widget \"{id}\" no es válido: revisa su posición, tamaño y tipo de gráfico.",
+  "OUT_OF_STOCK": "No hay stock suficiente de la talla {size} en la sucursal elegida.",
+  "CART_VERSION_CONFLICT": "Tu carrito cambió. Revísalo y confirma de nuevo.",
+  "PRICE_CHANGED": "El total de tu compra cambió. Revísalo y confirma de nuevo.",
+  "ATTEMPT_IN_PROGRESS": "Tu compra se está procesando. Consultaremos el resultado en un momento.",
+  "PAYMENT_PENDING": "Tu pago sigue pendiente de confirmación.",
+  "RESERVATION_EXPIRED": "Tu reserva venció. Revisa tu carrito y vuelve a intentarlo.",
+  "IDEMPOTENCY_KEY_REUSED": "Esta clave de compra ya se usó con otros datos.",
+  "IDEMPOTENCY_KEY_REQUIRED": "Actualiza la aplicación para continuar con tu compra.",
+  "ATTEMPT_NOT_FOUND": "Todavía no hay registro de este intento de compra.",
+  "ORDER_ALREADY_PAID": "Este pedido ya está pagado.",
+  "ORDER_NOT_PAYABLE": "Este pedido ya no se puede pagar.",
+  "PAYMENT_MISMATCH": "El pago no coincide con este pedido.",
+  "PAYMENT_SIMULATION_DISABLED": "Este medio de pago no está disponible.",
+  "INVENTORY_VERSION_CONFLICT": "El stock cambió desde que lo leíste. Revisa el valor actual antes de ajustar.",
+  "PROVIDER_UNAVAILABLE": "El proveedor de pagos no responde. Intenta de nuevo en un momento."
 }

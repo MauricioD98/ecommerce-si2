@@ -184,3 +184,34 @@ model TenantCredential {
   @@index([tenantId])
   @@map("tenant_credentials")
 }
+
+enum InboxStatus {
+  PENDING // recibido, falta aplicar (o reintentar) la transición
+  PROCESSED
+  UNRESOLVED // tienda no resoluble por ahora: se reintenta y se alerta, nunca se descarta
+  DEAD // agotó los reintentos: requiere revisión humana
+}
+
+// Inbox durable de webhooks. Vive en el plano de control porque el evento llega sin tienda: hay que
+// poder guardarlo antes de abrir ningún schema. Protocolo: firma válida → INSERT único → lease →
+// transición idempotente → PROCESSED. Un crash entre medio solo deja un lease vencido que el barrido retoma.
+model ProviderEventInbox {
+  id          String @id @default(uuid()) @db.Uuid
+  provider    String
+  accountId   String @map("account_id")
+  eventId     String @map("event_id")
+  type        String
+  payload     Json
+  status      InboxStatus @default(PENDING)
+  tenantId    String? @map("tenant_id") @db.Uuid
+  attempts    Int @default(0)
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at")
+  leaseUntil  DateTime? @map("lease_until")
+  lastError   String? @map("last_error")
+  createdAt   DateTime @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@unique([provider, accountId, eventId])
+  @@index([status, nextAttemptAt])
+  @@map("provider_event_inbox")
+}

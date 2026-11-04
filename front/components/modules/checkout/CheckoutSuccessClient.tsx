@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Check } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
+import axios from 'axios';
+import { forgetAttemptsOfOrder } from '@/utils/checkoutAttempts';
+import { useAuth } from '@/hooks/useAuth';
 import { useTranslations } from 'next-intl';
 import styles from './checkout.module.scss';
 import { useCart } from '@/hooks/useCart';
@@ -10,7 +13,9 @@ import { PaymentService } from '@/service/api/payment.service';
 import { OrderService } from '@/service/api/order.service';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 
-type Status = 'confirming' | 'success' | 'error';
+type Status = 'confirming' | 'pending' | 'success' | 'error';
+
+const PENDING_POLL_MS = 8000;
 
 // Página a la que Stripe redirige (return_url) o a la que navegamos tras un pago resuelto en la misma página.
 // Confirma el pago de forma idempotente: funciona tanto si el usuario vuelve por una redirección real de
@@ -19,6 +24,7 @@ export default function CheckoutSuccessClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { clearAllCart } = useCart();
+    const { user } = useAuth();
     const t = useTranslations('Checkout.success');
 
     const orderId = searchParams.get('orderId');
@@ -53,6 +59,7 @@ export default function CheckoutSuccessClient() {
                 await PaymentService.confirmPayment({ orderId, paymentIntentId });
                 if (!active) return;
                 clearAllCart();
+                forgetAttemptsOfOrder(user?.id ?? null, orderId).catch(() => undefined);
                 setStatus('success');
 
                 if (typeof window !== 'undefined') {
@@ -73,16 +80,26 @@ export default function CheckoutSuccessClient() {
                     .then((response) => active && setOrderNumber(response.data.id))
                     .catch(() => undefined);
             } catch (error) {
-                if (active) {
-                    setStatus('error');
-                    setMessage(getApiErrorMessage(error, t('confirmFailed')));
+                if (!active) return;
+                // processing / 3DS: el servidor todavía no tiene evidencia del pago. No se muestra compra
+                // pagada ni se vacía el carrito; se vuelve a consultar. Sin respuesta tampoco es un fracaso.
+                const pending =
+                    axios.isAxiosError(error) && (!error.response || error.response.status >= 500 || error.response.data?.code === 'PAYMENT_PENDING');
+                if (pending) {
+                    setStatus('pending');
+                    pollTimer = setTimeout(confirm, PENDING_POLL_MS);
+                    return;
                 }
+                setStatus('error');
+                setMessage(getApiErrorMessage(error, t('confirmFailed')));
             }
         };
 
+        let pollTimer: ReturnType<typeof setTimeout> | undefined;
         confirm();
         return () => {
             active = false;
+            if (pollTimer) clearTimeout(pollTimer);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orderId, paymentIntentId, redirectStatus]);
@@ -114,6 +131,24 @@ export default function CheckoutSuccessClient() {
                     <div className={styles.loadingContainer}>
                         <div className={styles.spinner} />
                         <p className={styles.loadingText}>{t('confirming')}</p>
+                    </div>
+                </div>
+            </section>
+        );
+    }
+
+    if (status === 'pending') {
+        return (
+            <section className={styles.section}>
+                <div className={styles.container}>
+                    <div className={styles.stepContent}>
+                        <div className={styles.success} role="status">
+                            <div className={styles.successIcon}>
+                                <Clock size={56} strokeWidth={2.5} />
+                            </div>
+                            <h2>{t('pendingTitle')}</h2>
+                            <p className={styles.orderId}>{t('pendingDescription')}</p>
+                        </div>
                     </div>
                 </div>
             </section>
