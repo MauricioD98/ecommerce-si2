@@ -13,6 +13,7 @@ import { InventoryService } from '../branches/inventory.service';
 import { StripeConnectService } from './stripe-connect.service';
 import { SubscriptionsService } from '../platform/subscriptions.service';
 import { requireTenant, runInTenant, withTenantParam } from '../../tenancy/tenant-context';
+import { assertPlanFeature } from '../platform/plans';
 
 @Injectable()
 export class PaymentsService {
@@ -77,7 +78,13 @@ export class PaymentsService {
     // plataforma retiene solo su comisión. metadata.tenantId es lo que usa el webhook para saber
     // en qué schema está la orden.
     const { tenantId } = requireTenant();
-    const payout = await this.stripeConnect.getPayoutAccount(tenantId);
+    const legacyId = process.env.LEGACY_TENANT_ID;
+    const isLegacy = Boolean(legacyId && tenantId === legacyId);
+    const isTestKey = Boolean(process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'));
+    const payout = await this.stripeConnect.getPayoutAccountOrNull(tenantId);
+    if (!payout && !isLegacy && !isTestKey) {
+      throw new BadRequestException('Esta tienda todavía no tiene habilitados los pagos con tarjeta');
+    }
 
     const paymentIntent = await this.stripe.paymentIntents.create({
       amount: amountInCents,
@@ -86,10 +93,13 @@ export class PaymentsService {
       automatic_payment_methods: {
         enabled: true,
       },
-      // La tienda figura como comerciante (extracto bancario del cliente, disputas, liquidación)
-      on_behalf_of: payout.accountId,
-      transfer_data: { destination: payout.accountId },
-      application_fee_amount: this.stripeConnect.feeFor(amountInCents, payout.feeBps),
+      ...(payout
+        ? {
+            on_behalf_of: payout.accountId,
+            transfer_data: { destination: payout.accountId },
+            application_fee_amount: this.stripeConnect.feeFor(amountInCents, payout.feeBps),
+          }
+        : {}),
     });
 
     // upsert: reintentar el pago de la misma orden (ej. tarjeta rechazada) reutiliza el registro en vez de chocar
@@ -174,9 +184,9 @@ export class PaymentsService {
       // Todos los PI viven en la misma cuenta de plataforma: sin este chequeo, un PI pagado en otra
       // tienda podría usarse para confirmar una orden de esta.
       const currentTenantId = requireTenant().tenantId;
-      // Excepción transicional: PI de antes del multitenant (sin tenantId ni destino) en la tienda original
+      // Excepción transicional o cobro directo en la tienda original
       const isLegacyIntent =
-        !paymentIntent.metadata?.tenantId &&
+        (!paymentIntent.metadata?.tenantId || paymentIntent.metadata?.tenantId === currentTenantId) &&
         !paymentIntent.transfer_data &&
         currentTenantId === process.env.LEGACY_TENANT_ID;
       if (paymentIntent.metadata?.tenantId !== currentTenantId && !isLegacyIntent) {
@@ -453,6 +463,7 @@ export class PaymentsService {
     };
   }
 
+  // Solo disponible en Plan Pro
   async generateQrPayment(orderId: string, origin?: string): Promise<{
     orderId: string;
     orderNumber: string;
@@ -461,6 +472,7 @@ export class PaymentsService {
     confirmUrl: string;
     status: PaymentStatus;
   }> {
+    assertPlanFeature('qrPayments');
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });

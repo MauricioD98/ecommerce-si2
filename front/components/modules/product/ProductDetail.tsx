@@ -9,12 +9,14 @@ import styles from './product-detail.module.scss'
 import VirtualTryOnModal from './VirtualTryOnModal';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 
 export default function ProductDetail({ product }: { product: Product }) {
 
     const { addProductToCart, items } = useCart();
     const { isAuthenticated } = useAuth();
+    const { features } = useStorePlan();
     const t = useTranslations('Product');
     const router = useRouter();
     const pathname = usePathname();
@@ -103,7 +105,6 @@ export default function ProductDetail({ product }: { product: Product }) {
         }
     };
 
-    // Placeholder: el probador virtual aún no existe. No toca el carrito ni la talla elegida
     // El probador cuesta por segundo generado, así que la sesión se abre solo con el modal montado:
     // desmontarlo corta el WebRTC y apaga la cámara (ver el cleanup de VirtualTryOnModal).
     const handleTryOn = () => {
@@ -211,17 +212,21 @@ export default function ProductDetail({ product }: { product: Product }) {
                         <button className={styles.addToCartButton} onClick={handleAddToCart} disabled={!isInStock}>
                             {isInStock ? t('addToCart') : t('soldOut')}
                         </button>
-                        <button type="button" className={styles.tryOnButton} onClick={handleTryOn}>
-                            <ScanFace size={20} />
-                            {t('tryOn')}
-                            <span className={styles.tryOnBadge}>15s</span>
-                        </button>
+                        {features.virtualTryOn && (
+                            <button type="button" className={styles.tryOnButton} onClick={handleTryOn}>
+                                <ScanFace size={20} />
+                                {t('tryOn')}
+                                <span className={styles.tryOnBadge}>15s</span>
+                            </button>
+                        )}
                         <p className={styles.sku}>SKU: {product.sku}</p>
                     </div>
                 </div>
             </div>
 
-            {isTryOnOpen && <VirtualTryOnModal product={product} onClose={() => setIsTryOnOpen(false)} />}
+            {features.virtualTryOn && isTryOnOpen && (
+                <VirtualTryOnModal product={product} onClose={() => setIsTryOnOpen(false)} />
+            )}
         </section>
 
     );

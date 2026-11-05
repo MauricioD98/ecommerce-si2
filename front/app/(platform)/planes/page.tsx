@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PlatformLanding } from "@/components/modules/platform/PlatformLanding";
+import { PLATFORM_BRAND } from "@/utils/storeName";
 
 // Landing de ventas del SaaS. Solo existe en los hosts de la plataforma: en el dominio propio de
 // una tienda, front/proxy.ts responde 404 (el cliente final no debe ver el SaaS).
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Metadata");
-    return { title: { absolute: t("plansTitle") }, description: t("plansDescription") };
+    const description = t("plansDescription");
+    return {
+        title: { absolute: t("plansTitle") },
+        description,
+        applicationName: PLATFORM_BRAND,
+        openGraph: { siteName: PLATFORM_BRAND, title: t("plansTitle"), description },
+    };
 }
 
 // Next 16: searchParams llega como Promise

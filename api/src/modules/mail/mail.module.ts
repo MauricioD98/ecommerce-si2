@@ -23,7 +23,7 @@ import { MailService } from './mail.service';
         return {
           transport: host ? { host, port, secure, auth: user ? { user, pass } : undefined } : { jsonTransport: true },
           defaults: {
-            from: config.get<string>('MAIL_FROM') ?? '"Stella Femme" <no-reply@stellafemme.com>',
+            from: config.get<string>('MAIL_FROM') ?? '"NovaSoft" <no-reply@novasoft.com>',
           },
         };
       },

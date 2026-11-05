@@ -11,6 +11,10 @@ interface ResolvedTenant {
   id: string;
   slug: string;
   name: string;
+  plan?: string;
+  features?: {
+    mobileApp?: boolean;
+  };
 }
 
 // Se muestra cuando el dispositivo no tiene tienda o el backend la rechazó (TENANT_REQUIRED).
@@ -18,11 +22,11 @@ interface ResolvedTenant {
 // onSelect llega por prop (no useTenant) para no crear un ciclo de imports con TenantContext.
 export const TenantSelectorScreen: React.FC<{
   rejected?: boolean;
-  onSelect: (tenantId: string) => Promise<void>;
+  onSelect: (tenant: { id: string; name: string; slug: string } | string) => Promise<void>;
 }> = ({ rejected = false, onSelect }) => {
   const [slug, setSlug] = useState('');
   const [error, setError] = useState<string | null>(
-    rejected ? 'La tienda guardada ya no está disponible. Elige otra para continuar.' : null
+    rejected ? 'La tienda guardada ya no está disponible o su plan actual no incluye la App Móvil.' : null
   );
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,7 +40,12 @@ export const TenantSelectorScreen: React.FC<{
       const { data } = await apiClient.get<{ data: ResolvedTenant }>(
         `/platform/tenants/resolve/${encodeURIComponent(value)}`
       );
-      await onSelect(data.data.id);
+      if (data.data.features && data.data.features.mobileApp === false) {
+        setError('Esta tienda no tiene habilitada la App Móvil (disponible en el Plan Pro).');
+        setIsLoading(false);
+        return;
+      }
+      await onSelect({ id: data.data.id, name: data.data.name, slug: data.data.slug });
     } catch (err) {
       setError(getErrorMessage(err));
       setIsLoading(false);

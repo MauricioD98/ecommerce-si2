@@ -1,21 +1,23 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Coins, CreditCard, QrCode, RefreshCw, Trash2, Unlink, Upload } from 'lucide-react';
+import { Coins, CreditCard, Lock, QrCode, RefreshCw, Trash2, Unlink, Upload, Wallet as WalletIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import cards from './payment-settings.module.scss';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PaymentSettings, USDT_NETWORKS, UsdtNetwork, paymentSettingsService } from '@/service/api/paymentSettings.service';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
+import { useAdminRole } from '@/hooks/useAdminAccess';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 type Feedback = { type: 'success' | 'error'; text: string } | null;
 
-// Medios de cobro de la tienda: tarjeta (Stripe Connect), QR bancario propio y USDT. Los dos últimos
-// se verifican a mano desde Pedidos. Al volver del formulario de Stripe se vuelve a leer el estado.
+// Medios de cobro de la tienda: tarjeta (Stripe Connect), QR bancario propio, USDT y Billeteras Digitales.
 export default function PaymentSettingsClient() {
     const t = useTranslations('AdminPayments');
     const returnState = useSearchParams().get('connect');
@@ -67,6 +69,7 @@ export default function PaymentSettingsClient() {
                         <StripeCard settings={settings} returnState={returnState} onChange={setSettings} />
                         <QrCard settings={settings} onChange={setSettings} />
                         <UsdtCard settings={settings} onChange={setSettings} />
+                        <WalletCard settings={settings} onChange={setSettings} />
                     </div>
                 )
             )}
@@ -164,6 +167,8 @@ function StripeCard({
 
 function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (s: PaymentSettings) => void }) {
     const t = useTranslations('AdminPayments');
+    const { features } = useStorePlan();
+    const { isSuperAdmin } = useAdminRole();
     const [enabled, setEnabled] = useState(settings.qr.enabled);
     const [instructions, setInstructions] = useState(settings.qr.instructions);
     const [preview, setPreview] = useState<string | null>(null);
@@ -171,11 +176,12 @@ function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (
     const [feedback, setFeedback] = useState<Feedback>(null);
     const fileInput = useRef<HTMLInputElement>(null);
 
+    const qrAllowed = settings.qr.allowed !== false && features.qrPayments;
     const { hasImage } = settings.qr;
 
     // Vista previa del QR guardado; el object URL se libera al cambiar o desmontar
     useEffect(() => {
-        if (!hasImage) return;
+        if (!hasImage || !qrAllowed) return;
         let url: string | null = null;
         let active = true;
         paymentSettingsService
@@ -190,7 +196,46 @@ function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (
             active = false;
             if (url) URL.revokeObjectURL(url);
         };
-    }, [hasImage, settings]);
+    }, [hasImage, qrAllowed, settings]);
+
+    if (!qrAllowed) {
+        return (
+            <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-qr">
+                <div className={cards.cardHeader}>
+                    <h2 id="pay-qr"><QrCode size={18} />{t('qr.title')}</h2>
+                    <span className={`${styles.badge} ${styles.badgeMuted}`}>Plan Pro</span>
+                </div>
+                <p className={styles.cellSub}>{t('qr.description')}</p>
+                <div
+                    style={{
+                        padding: '1rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: '#fafafa',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem',
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>
+                        <Lock size={16} />
+                        Disponible en el Plan Pro
+                    </span>
+                    <p className={styles.cellSub} style={{ margin: 0 }}>
+                        Los cobros mediante QR bancario están incluidos en el <strong>Plan Pro</strong>. Con tu{' '}
+                        <strong>Plan {features.planName}</strong> puedes cobrar con Tarjeta (Stripe), Billeteras Digitales y USDT.
+                    </p>
+                    {isSuperAdmin && (
+                        <div>
+                            <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
+                                Mejorar a Plan Pro
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </section>
+        );
+    }
 
     const run = async (action: () => Promise<void>, success: string) => {
         setBusy(true);
@@ -381,6 +426,151 @@ function UsdtCard({ settings, onChange }: { settings: PaymentSettings; onChange:
 
             <div>
                 <button type="button" className={styles.button} onClick={save} disabled={busy || invalidAddress}>
+                    {busy ? t('saving') : t('save')}
+                </button>
+            </div>
+        </section>
+    );
+}
+
+function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChange: (s: PaymentSettings) => void }) {
+    const t = useTranslations('AdminPayments');
+    const { features } = useStorePlan();
+    const { isSuperAdmin } = useAdminRole();
+    const [enabled, setEnabled] = useState(settings.wallet?.enabled ?? false);
+    const [provider, setProvider] = useState(settings.wallet?.provider ?? 'Airtm / Takenos / Wallbit');
+    const [account, setAccount] = useState(settings.wallet?.account ?? '');
+    const [instructions, setInstructions] = useState(settings.wallet?.instructions ?? '');
+    const [busy, setBusy] = useState(false);
+    const [feedback, setFeedback] = useState<Feedback>(null);
+
+    useEffect(() => {
+        setEnabled(settings.wallet?.enabled ?? false);
+        setProvider(settings.wallet?.provider ?? 'Airtm / Takenos / Wallbit');
+        setAccount(settings.wallet?.account ?? '');
+        setInstructions(settings.wallet?.instructions ?? '');
+    }, [settings.wallet]);
+
+    const walletAllowed = settings.wallet?.allowed !== false && features.digitalWallet;
+
+    if (!walletAllowed) {
+        return (
+            <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-wallet">
+                <div className={cards.cardHeader}>
+                    <h2 id="pay-wallet"><WalletIcon size={18} /> Billeteras Digitales (Airtm, Takenos, Wallbit)</h2>
+                    <span className={`${styles.badge} ${styles.badgeMuted}`}>Plan Growth</span>
+                </div>
+                <p className={styles.cellSub}>
+                    Permite a tus clientes pagar transfiriendo con Airtm, Takenos o Wallbit e informando su número de comprobante o TxID para tu revisión.
+                </p>
+                <div
+                    style={{
+                        padding: '1rem',
+                        borderRadius: '0.5rem',
+                        border: '1px solid var(--border)',
+                        background: '#fafafa',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem',
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>
+                        <Lock size={16} />
+                        Disponible desde el Plan Growth
+                    </span>
+                    <p className={styles.cellSub} style={{ margin: 0 }}>
+                        Los cobros mediante billeteras digitales (Airtm, Takenos, Wallbit) están incluidos a partir del <strong>Plan Growth</strong>. Con tu{' '}
+                        <strong>Plan {features.planName}</strong> puedes cobrar con Tarjeta y QR bancario.
+                    </p>
+                    {isSuperAdmin && (
+                        <div>
+                            <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
+                                Mejorar a Plan Growth
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </section>
+        );
+    }
+
+    const complete = Boolean(account.trim().length > 0);
+
+    const save = async () => {
+        setBusy(true);
+        setFeedback(null);
+        try {
+            onChange(
+                await paymentSettingsService.update({
+                    walletEnabled: enabled && complete,
+                    walletProvider: provider.trim(),
+                    walletAccount: account.trim(),
+                    walletInstructions: instructions.trim(),
+                }),
+            );
+            setFeedback({ type: 'success', text: t('saved') });
+        } catch (err) {
+            setFeedback({ type: 'error', text: getApiErrorMessage(err, t('saveFailed')) });
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-wallet">
+            <div className={cards.cardHeader}>
+                <h2 id="pay-wallet"><WalletIcon size={18} /> Billeteras Digitales (Airtm, Takenos, Wallbit)</h2>
+                <span className={`${styles.badge} ${settings.wallet?.enabled ? styles.badgeSuccess : styles.badgeMuted}`}>
+                    {settings.wallet?.enabled ? t('active') : t('inactive')}
+                </span>
+            </div>
+            <p className={styles.cellSub}>
+                Permite a tus clientes pagar transfiriendo con Airtm, Takenos o Wallbit e informando su número de comprobante o TxID para tu revisión.
+            </p>
+            <FeedbackMessage feedback={feedback} />
+
+            <div className={styles.field}>
+                <label htmlFor="wallet-provider">Billeteras / Proveedores aceptados</label>
+                <input
+                    id="wallet-provider"
+                    className={styles.input}
+                    value={provider}
+                    placeholder="Ej. Airtm, Takenos, Wallbit"
+                    onChange={(e) => setProvider(e.target.value)}
+                />
+            </div>
+
+            <div className={styles.field}>
+                <label htmlFor="wallet-account">Usuario, Correo o Cashtag de cobro</label>
+                <input
+                    id="wallet-account"
+                    className={styles.input}
+                    value={account}
+                    placeholder="Ej. @mitienda o pagos@mitienda.com"
+                    onChange={(e) => setAccount(e.target.value)}
+                />
+            </div>
+
+            <div className={styles.field}>
+                <label htmlFor="wallet-instructions">Instrucciones para el cliente</label>
+                <textarea
+                    id="wallet-instructions"
+                    className={styles.textarea}
+                    rows={3}
+                    value={instructions}
+                    placeholder="Ej. Transfiere el monto a nuestra cuenta indicando tu número de orden en la nota..."
+                    onChange={(e) => setInstructions(e.target.value)}
+                />
+            </div>
+
+            <label className={styles.inlineCheckbox}>
+                <input type="checkbox" checked={enabled} disabled={!complete} onChange={(e) => setEnabled(e.target.checked)} />
+                Habilitar pagos con Billeteras Digitales
+            </label>
+            {!complete && <small className={styles.cellSub}>Ingresa la cuenta o usuario de cobro para poder habilitar este medio.</small>}
+
+            <div>
+                <button type="button" className={styles.button} onClick={save} disabled={busy || (!complete && enabled)}>
                     {busy ? t('saving') : t('save')}
                 </button>
             </div>

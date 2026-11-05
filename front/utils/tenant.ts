@@ -10,6 +10,8 @@
 // Se resuelve una sola vez por carga de página y queda fija: redux-persist y las bases IndexedDB
 // arman su nombre con ella al iniciar. Para cambiar de tienda usar switchTenant(), que recarga.
 
+import { STORE_HINT_COOKIE } from "./storeName";
+
 export const TENANT_HEADER = "x-tenant-id";
 // Código que manda el backend (TenantMiddleware) cuando falta la tienda o no es válida
 export const TENANT_REQUIRED = "TENANT_REQUIRED";
@@ -49,6 +51,12 @@ const normalize = (value: string | null | undefined): string | null => {
 
 const envTenant = () => normalize(process.env.NEXT_PUBLIC_TENANT_ID);
 
+/** Indica si el navegador está operando bajo un dominio personalizado propio de una sola tienda. */
+export function isCustomDomainTenant(): boolean {
+    if (typeof window === "undefined") return false;
+    return normalize(readCookie(DOMAIN_COOKIE)) !== null;
+}
+
 export function getCurrentTenantId(): string | null {
     // En el servidor no hay URL del usuario ni localStorage, y el valor no se cachea entre requests
     if (typeof window === "undefined") return envTenant();
@@ -79,10 +87,16 @@ export function requireTenantId(): string {
     return id;
 }
 
+const persistHintCookie = (tenantId: string): void => {
+    try {
+        document.cookie = `${STORE_HINT_COOKIE}=${tenantId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    } catch {}
+};
+
 // Cambia de tienda y recarga: todo lo que se inicializó con la anterior (store persistido, auth,
 // conexiones IndexedDB) se vuelve a armar con la nueva. Los datos de la otra tienda NO se borran:
 // quedan en su propia base/clave y reaparecen si se vuelve a ella (p. ej. pedidos offline pendientes).
-export async function switchTenant(tenantId: string): Promise<void> {
+export async function switchTenant(tenantId: string, redirectPath?: string): Promise<void> {
     const next = normalize(tenantId);
     if (!next) throw new Error(`ID de tienda inválido: ${tenantId}`);
     if (typeof window === "undefined") return;
@@ -92,12 +106,62 @@ export async function switchTenant(tenantId: string): Promise<void> {
     try {
         localStorage.setItem(STORAGE_KEY, next);
     } catch {}
+    persistHintCookie(next);
 
     // El service worker cachea GET /api/v1/* por URL, sin mirar headers: la misma URL de otra
     // tienda devolvería la respuesta cacheada de esta. Se vacía antes de cambiar.
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_API_CACHE" });
 
-    const url = new URL(window.location.href);
+    const url = redirectPath
+        ? new URL(redirectPath, window.location.origin)
+        : new URL(window.location.href);
+    url.searchParams.delete(QUERY_PARAM);
+    window.location.replace(url.toString());
+}
+
+/**
+ * Guarda una sesión autenticada directamente en la clave de redux-persist de la tienda destino
+ * (`persist:root:<tenantId>`) SIN pisar la sesión ni el carrito de la tienda anterior, cambia la
+ * tienda activa y navega recargando para que Redux rehidrate limpio sobre la tienda destino.
+ */
+export function switchTenantWithAuth(
+    tenantId: string,
+    auth: { accessToken: string; refreshToken: string; user: unknown },
+    redirectPath = "/",
+): void {
+    const next = normalize(tenantId);
+    if (!next) throw new Error(`ID de tienda inválido: ${tenantId}`);
+    if (typeof window === "undefined") return;
+
+    const persistKey = `persist:root:${next}`;
+    try {
+        let existing: Record<string, string> = {};
+        const raw = localStorage.getItem(persistKey);
+        if (raw) {
+            const parsed = JSON.parse(raw) as unknown;
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+                existing = parsed as Record<string, string>;
+            }
+        }
+        const nextPersisted: Record<string, string> = {
+            ...existing,
+            auth: JSON.stringify({
+                accessToken: auth.accessToken,
+                refreshToken: auth.refreshToken,
+                user: auth.user,
+                esAutenticado: true,
+            }),
+            _persist: existing._persist ?? JSON.stringify({ version: -1, rehydrated: true }),
+        };
+        localStorage.setItem(persistKey, JSON.stringify(nextPersisted));
+        localStorage.setItem(STORAGE_KEY, next);
+    } catch {}
+    persistHintCookie(next);
+
+    navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_API_CACHE" });
+
+    const safePath = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/";
+    const url = new URL(safePath, window.location.origin);
     url.searchParams.delete(QUERY_PARAM);
     window.location.replace(url.toString());
 }

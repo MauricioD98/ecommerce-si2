@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Colors, Shadows } from '../../theme/colors';
@@ -22,6 +23,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { register } = useAuth();
+  const { tenantName } = useTenant();
   const [firstName, setFirstName] = useState<string>('');
   const [lastName, setLastName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
@@ -93,7 +95,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.headerBox}>
           <Text style={styles.title}>Crear Cuenta</Text>
           <Text style={styles.subtitle}>
-            Regístrate para comprar y seguir tus pedidos
+            Regístrate en {tenantName || 'la tienda'} para comprar y seguir tus pedidos
           </Text>
         </View>
 

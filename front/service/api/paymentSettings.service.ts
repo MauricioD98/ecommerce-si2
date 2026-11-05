@@ -6,7 +6,7 @@ import { AdminOrder } from "@/types/admin.types";
 
 export type UsdtNetwork = "TRC20" | "ERC20" | "BEP20" | "POLYGON";
 export const USDT_NETWORKS: UsdtNetwork[] = ["TRC20", "ERC20", "BEP20", "POLYGON"];
-export type ManualPaymentMethod = "BANK_QR" | "USDT";
+export type ManualPaymentMethod = "BANK_QR" | "USDT" | "WALLET";
 
 export interface PaymentSettings {
     stripe: {
@@ -16,8 +16,9 @@ export interface PaymentSettings {
         pendingRequirements: number;
         accountId: string | null;
     };
-    qr: { enabled: boolean; hasImage: boolean; instructions: string };
+    qr: { allowed?: boolean; enabled: boolean; hasImage: boolean; instructions: string };
     usdt: { enabled: boolean; network: UsdtNetwork | null; walletAddress: string };
+    wallet: { allowed?: boolean; enabled: boolean; provider: string; account: string; instructions: string };
 }
 
 export interface PaymentSettingsUpdate {
@@ -26,12 +27,19 @@ export interface PaymentSettingsUpdate {
     usdtEnabled?: boolean;
     usdtNetwork?: UsdtNetwork | null;
     usdtWalletAddress?: string;
+    walletEnabled?: boolean;
+    walletProvider?: string;
+    walletAccount?: string;
+    walletInstructions?: string;
 }
 
 export interface PaymentOptions {
     card: boolean;
+    qrAllowed?: boolean;
+    walletAllowed?: boolean;
     bankQr: { instructions: string } | null;
     usdt: { network: UsdtNetwork; walletAddress: string; walletQr: string } | null;
+    wallet: { provider: string; account: string; instructions: string } | null;
 }
 
 const ADMIN = "/admin/settings/payments";

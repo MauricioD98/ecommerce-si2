@@ -14,6 +14,7 @@ import { hasAllBranches } from '../../common/utils/permission.util';
 import { calculateTotals, getBranchPrice, getEmployeeDiscountPercent, round2 } from '../../common/utils/pricing';
 import { DELIVERY_SHIPPING_COST } from '../../common/constants/pricing';
 import { NotificationsService } from '../notifications/notifications.service';
+import { assertPlanFeature } from '../platform/plans';
 
 // Mensaje claro y específico por estado (no un genérico "tu pedido ahora está X")
 const ORDER_STATUS_MESSAGE: Record<OrderStatus, string> = {
@@ -56,8 +57,14 @@ export class OrdersService {
     const { items, shippingAddress, branchId, latitude, longitude, paymentMethod } = createOrderDto;
     const fulfillmentType = createOrderDto.fulfillmentType ?? FulfillmentType.DELIVERY;
     const userId = user.id;
-    if (paymentMethod === PaymentMethod.BANK_QR || paymentMethod === PaymentMethod.USDT) {
-      await this.assertManualMethodEnabled(paymentMethod);
+    if (paymentMethod === PaymentMethod.BANK_QR || paymentMethod === PaymentMethod.QR) {
+      assertPlanFeature('qrPayments');
+    }
+    if (paymentMethod === PaymentMethod.WALLET) {
+      assertPlanFeature('digitalWallet');
+    }
+    if (paymentMethod === PaymentMethod.BANK_QR || paymentMethod === PaymentMethod.USDT || paymentMethod === PaymentMethod.WALLET) {
+      await this.assertManualMethodEnabled(paymentMethod as PaymentMethod);
     }
 
     let targetBranchId = branchId;
@@ -476,12 +483,14 @@ async cancel(
   private async assertManualMethodEnabled(method: PaymentMethod): Promise<void> {
     const settings = await this.prisma.paymentSettings.findUnique({
       where: { id: 'default' },
-      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true },
+      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletAccount: true },
     });
     const enabled =
       method === PaymentMethod.BANK_QR
         ? Boolean(settings?.qrEnabled && settings.qrImageType)
-        : Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress);
+        : method === PaymentMethod.USDT
+        ? Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress)
+        : Boolean(settings?.walletEnabled && settings.walletAccount);
     if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
   }
 

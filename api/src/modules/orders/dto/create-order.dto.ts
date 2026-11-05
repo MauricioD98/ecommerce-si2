@@ -98,6 +98,6 @@ export class CreateOrderDto {
       'Checkout sin Stripe. QR: QR simulado (o pedido offline sincronizado). BANK_QR / USDT: medios manuales de la tienda (solo si están activos en PaymentSettings); el cliente sube luego el comprobante o el TxID. Omitido, el pedido usa STRIPE (default). paymentStatus siempre queda PENDIENTE.',
   })
   @IsOptional()
-  @IsIn(['QR', 'BANK_QR', 'USDT'])
-  paymentMethod?: 'QR' | 'BANK_QR' | 'USDT';
+  @IsIn(['QR', 'BANK_QR', 'USDT', 'WALLET'])
+  paymentMethod?: 'QR' | 'BANK_QR' | 'USDT' | 'WALLET';
 }

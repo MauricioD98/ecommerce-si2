@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import axios from "axios";
 import { CartService } from "@/service/api/cart.service";
 import { OrderService } from "@/service/api/order.service";
-import { CreateOrderRequest, OrderResponse } from "@/types/orders.types";
+import { CreateOrderRequest } from "@/types/orders.types";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 
 export function useOrder() {
@@ -44,17 +44,15 @@ export function useOrder() {
                 setOrder(orderData);
                 return orderData;
             } catch (error) {
-                // Log del payload enviado + el mensaje EXACTO que devuelve NestJS (ej. errores de
-                // class-validator del DTO como "size should not be empty"), no uno genérico.
+                // console.warn evita abrir el overlay de errores de consola de Next.js en desarrollo
+                // cuando el backend rechaza con un error controlado (400/403), mostrando el aviso en la UI.
                 if (axios.isAxiosError(error)) {
-                    console.error("POST /orders falló. Payload enviado:", data, "Respuesta del backend:", error.response?.status, error.response?.data);
+                    console.warn("POST /orders rechazado:", data, "Respuesta:", error.response?.status, error.response?.data);
                 } else {
-                    console.error("Error inesperado al crear la orden:", error);
+                    console.warn("Error inesperado al crear la orden:", error);
                 }
                 const errorMessage = getApiErrorMessage(error, "No se pudo crear el pedido. Inténtalo de nuevo.");
                 setError(errorMessage);
-                // Se relanza con el mensaje real (en vez de devolver null): así el `catch` de
-                // CheckoutClient recibe el motivo exacto en `error.message`, no un texto fijo.
                 throw new Error(errorMessage);
             } finally {
                 setLoading(false);

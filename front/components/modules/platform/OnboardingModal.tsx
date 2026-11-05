@@ -22,9 +22,13 @@ const EMPTY: FormState = { tenantName: "", domain: "", adminEmail: "", adminPass
 // (Onboarding.errors.*), que se traduce al mostrarla.
 type FormError = "tenantName" | "domain" | "email" | "password";
 
-function validate(form: FormState): FormError | null {
+function validate(form: FormState, allowCustomDomain: boolean): FormError | null {
     if (form.tenantName.trim().length < 2) return "tenantName";
-    if (form.domain.trim() && !/^(https?:\/\/)?(www\.)?([a-z0-9-]+\.)+[a-z]{2,}\/?$/i.test(form.domain.trim())) {
+    if (
+        allowCustomDomain &&
+        form.domain.trim() &&
+        !/^(https?:\/\/)?(www\.)?([a-z0-9-]+\.)+[a-z]{2,}\/?$/i.test(form.domain.trim())
+    ) {
         return "domain";
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail.trim())) return "email";
@@ -44,6 +48,9 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
+    // El dominio propio se incluye desde el Plan Growth (Starter usa el enlace de la plataforma).
+    const allowCustomDomain = plan.key !== "starter";
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => e.key === "Escape" && !loading && onClose();
         window.addEventListener("keydown", onKey);
@@ -55,7 +62,7 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
 
     const onSubmit = async (event: FormEvent) => {
         event.preventDefault();
-        const invalid = validate(form);
+        const invalid = validate(form, allowCustomDomain);
         if (invalid) return setError(t(`errors.${invalid}`));
 
         setLoading(true);
@@ -64,7 +71,7 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
             const { url } = await platformService.createCheckout({
                 plan: plan.key,
                 tenantName: form.tenantName.trim(),
-                domain: form.domain.trim() || undefined,
+                domain: allowCustomDomain ? form.domain.trim() || undefined : undefined,
                 adminEmail: form.adminEmail.trim(),
                 adminPassword: form.adminPassword,
             });
@@ -92,21 +99,27 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
                     <input value={form.tenantName} onChange={update("tenantName")} maxLength={80} autoFocus required disabled={loading} />
                 </label>
 
-                <label className={styles.field}>
-                    {/* En un solo span: el label es columna flex y si no "(opcional)" cae en otra línea */}
-                    <span>
-                        {t("domain")} <span className={styles.optional}>{tCommon("optional")}</span>
-                    </span>
-                    <input
-                        value={form.domain}
-                        onChange={update("domain")}
-                        placeholder="boutiquemia.com"
-                        autoCapitalize="none"
-                        spellCheck={false}
-                        disabled={loading}
-                    />
-                    <small>{t("domainHint")}</small>
-                </label>
+                {allowCustomDomain ? (
+                    <label className={styles.field}>
+                        {/* En un solo span: el label es columna flex y si no "(opcional)" cae en otra línea */}
+                        <span>
+                            {t("domain")} <span className={styles.optional}>{tCommon("optional")}</span>
+                        </span>
+                        <input
+                            value={form.domain}
+                            onChange={update("domain")}
+                            placeholder="boutiquemia.com"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                            disabled={loading}
+                        />
+                        <small>{t("domainHint")}</small>
+                    </label>
+                ) : (
+                    <div className={styles.field}>
+                        <small>{t("domainStarterHint")}</small>
+                    </div>
+                )}
 
                 <label className={styles.field}>
                     {t("adminEmail")}

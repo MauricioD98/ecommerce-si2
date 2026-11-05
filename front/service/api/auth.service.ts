@@ -3,7 +3,69 @@ import { apiClient, getApiBaseUrl } from "./axios.config";
 import { TENANT_HEADER, getCurrentTenantId } from "@/utils/tenant";
 import { User, AutoResponse, LoginCredential, RegisterCredential, UpdateProfilePayload } from "@/types/auth.types";
 
+export interface PublicTenant {
+    id: string;
+    slug: string;
+    name: string;
+    plan: string;
+    planName?: string;
+    mobileApp?: boolean;
+}
+
+export interface TenantMatchOption {
+    id: string;
+    slug: string;
+    name: string;
+    plan: string;
+    role: string;
+}
+
+export type TenantDiscoveryLoginResponse =
+    | {
+          isPlatformAdmin?: false;
+          requiresTenantSelection: false;
+          tenant: PublicTenant;
+          auth: AutoResponse;
+      }
+    | {
+          isPlatformAdmin?: false;
+          requiresTenantSelection: true;
+          tenants: TenantMatchOption[];
+      }
+    | {
+          isPlatformAdmin: true;
+          requiresTenantSelection: false;
+          accessToken: string;
+          expiresIn: number;
+          admin: {
+              id: string;
+              email: string;
+              name: string | null;
+          };
+          redirectUrl: string;
+      };
+
+const tenantHeaderConfig = (tenantId?: string) =>
+    tenantId ? { headers: { [TENANT_HEADER]: tenantId } } : undefined;
+
 export const authService = {
+    getPublicTenants: async (): Promise<PublicTenant[]> => {
+        const response = await apiClient.get<{ data: PublicTenant[] }>("/platform/tenants/public");
+        return response.data?.data ?? [];
+    },
+
+    tenantLogin: async (payload: {
+        email: string;
+        password: string;
+        tenantId?: string;
+        preferredTenantId?: string;
+    }): Promise<TenantDiscoveryLoginResponse> => {
+        const response = await apiClient.post<{ data: TenantDiscoveryLoginResponse }>(
+            "/platform/auth/tenant-login",
+            payload,
+        );
+        return response.data.data;
+    },
 
     logout: async (): Promise<void> => {
         try {
@@ -53,29 +115,33 @@ export const authService = {
         await apiClient.patch('/users/me/password', { currentPassword, newPassword });
     },
 
-    login: async (credentials: LoginCredential): Promise<AutoResponse> => {
-        const response = await apiClient.post<AutoResponse>('/auth/login', credentials);
+    login: async (credentials: LoginCredential, tenantId?: string): Promise<AutoResponse> => {
+        const response = await apiClient.post<AutoResponse>('/auth/login', credentials, tenantHeaderConfig(tenantId));
         return response.data;
     },
 
-    register: async (data: RegisterCredential): Promise<AutoResponse> => {
-        const response = await apiClient.post<AutoResponse>('/auth/register', data);
+    register: async (data: RegisterCredential, tenantId?: string): Promise<AutoResponse> => {
+        const response = await apiClient.post<AutoResponse>('/auth/register', data, tenantHeaderConfig(tenantId));
         return response.data;
     },
 
     // El backend responde igual exista o no el correo (no revela qué cuentas existen). Lanza el error si falla la red
-    forgotPassword: async (email: string): Promise<void> => {
-        await apiClient.post('/auth/forgot-password', { email: email.trim() });
+    forgotPassword: async (email: string, tenantId?: string): Promise<void> => {
+        await apiClient.post('/auth/forgot-password', { email: email.trim() }, tenantHeaderConfig(tenantId));
     },
 
     // Comprueba el código de 6 dígitos sin consumirlo. Lanza el error si es incorrecto o venció
-    verifyOtp: async (email: string, otp: string): Promise<void> => {
-        await apiClient.post('/auth/verify-otp', { email: email.trim(), otp: String(otp).trim() });
+    verifyOtp: async (email: string, otp: string, tenantId?: string): Promise<void> => {
+        await apiClient.post('/auth/verify-otp', { email: email.trim(), otp: String(otp).trim() }, tenantHeaderConfig(tenantId));
     },
 
     // Cambia la contraseña con el código de 6 dígitos del correo. Lanza el error (código inválido/vencido, contraseña débil)
-    resetPassword: async (email: string, otp: string, newPassword: string): Promise<void> => {
+    resetPassword: async (email: string, otp: string, newPassword: string, tenantId?: string): Promise<void> => {
         // otp siempre como texto y sin espacios: "001234" no debe perder los ceros
-        await apiClient.post('/auth/reset-password', { email: email.trim(), otp: String(otp).trim(), newPassword });
+        await apiClient.post(
+            '/auth/reset-password',
+            { email: email.trim(), otp: String(otp).trim(), newPassword },
+            tenantHeaderConfig(tenantId),
+        );
     },
 }

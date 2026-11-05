@@ -1,3 +1,4 @@
+import { assertPlanFeature } from '../platform/plans';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus, PaymentMethod, PaymentProofStatus, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,7 +8,7 @@ import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from './payments.service';
 import { UploadedImage, detectImageType, isValidTxId } from './payment-settings.service';
 
-const MANUAL_METHODS: PaymentMethod[] = [PaymentMethod.BANK_QR, PaymentMethod.USDT];
+const MANUAL_METHODS: PaymentMethod[] = [PaymentMethod.BANK_QR, PaymentMethod.USDT, PaymentMethod.WALLET];
 
 /**
  * Pagos manuales (QR bancario y USDT): el cliente informa el pago y la tienda lo verifica desde
@@ -44,12 +45,14 @@ export class PaymentProofsService {
 
     const settings = await this.prisma.paymentSettings.findUnique({
       where: { id: 'default' },
-      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true },
+      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletAccount: true },
     });
     const enabled =
       method === PaymentMethod.BANK_QR
         ? Boolean(settings?.qrEnabled && settings.qrImageType)
-        : Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress);
+        : method === PaymentMethod.USDT
+        ? Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress)
+        : Boolean(settings?.walletEnabled && settings.walletAccount);
     if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
 
     if (method === PaymentMethod.BANK_QR && !image) {
@@ -65,6 +68,20 @@ export class PaymentProofsService {
         select: { id: true },
       });
       if (reused) throw new BadRequestException(i18nMessage('errors.TXID_ALREADY_USED'));
+    }
+    if (method === PaymentMethod.BANK_QR) {
+      assertPlanFeature('qrPayments');
+    }
+    if (method === PaymentMethod.WALLET) {
+      assertPlanFeature('digitalWallet');
+      if (!txId || txId.length < 3) {
+        throw new BadRequestException('El ID o número de referencia de la transferencia es obligatorio');
+      }
+      const reused = await this.prisma.paymentProof.findFirst({
+        where: { txId: { equals: txId, mode: 'insensitive' }, orderId: { not: orderId }, status: { not: PaymentProofStatus.RECHAZADO } },
+        select: { id: true },
+      });
+      if (reused) throw new BadRequestException('Este ID de transacción ya fue utilizado para otro pedido');
     }
 
     // Al reemplazar un comprobante sin imagen nueva (USDT) no se conserva la imagen anterior

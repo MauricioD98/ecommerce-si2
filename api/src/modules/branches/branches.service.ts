@@ -5,12 +5,25 @@ import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { hasAllBranches } from '../../common/utils/permission.util';
+import { currentPlanFeatures } from '../platform/plans';
 
 @Injectable()
 export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createBranchDto: CreateBranchDto): Promise<Branch> {
+    const features = currentPlanFeatures();
+    if (features.maxBranches !== null) {
+      const currentCount = await this.prisma.branch.count();
+      if (currentCount >= features.maxBranches) {
+        throw new ForbiddenException(
+          `Tu plan ${features.planName} permite crear hasta ${features.maxBranches} ${
+            features.maxBranches === 1 ? 'sucursal' : 'sucursales'
+          }. Actualiza tu plan en Suscripción para agregar más sucursales.`,
+        );
+      }
+    }
+
     const branch = await this.prisma.branch.create({ data: createBranchDto });
     const products = await this.prisma.product.findMany({ select: { id: true, sizes: true } });
     if (products.length > 0) {
@@ -73,11 +86,26 @@ export class BranchesService {
   }
 
   async update(id: string, updateBranchDto: UpdateBranchDto, actor: AuthUser): Promise<Branch> {
-    await this.findOne(id);
+    const existing = await this.findOne(id);
 
     // Activar/desactivar una sucursal requiere alcance global
     if (updateBranchDto.isActive !== undefined && !hasAllBranches(actor)) {
       throw new ForbiddenException('Only a user with access to all branches can activate or deactivate a branch');
+    }
+
+    // Si se reactiva una sucursal tras un downgrade de plan, se respeta el tope del plan actual
+    if (updateBranchDto.isActive === true && !existing.isActive) {
+      const features = currentPlanFeatures();
+      if (features.maxBranches !== null) {
+        const activeCount = await this.prisma.branch.count({ where: { isActive: true } });
+        if (activeCount >= features.maxBranches) {
+          throw new ForbiddenException(
+            `Tu plan ${features.planName} permite mantener hasta ${features.maxBranches} ${
+              features.maxBranches === 1 ? 'sucursal activa' : 'sucursales activas'
+            }. Actualiza tu plan en Suscripción.`,
+          );
+        }
+      }
     }
 
     return await this.prisma.branch.update({

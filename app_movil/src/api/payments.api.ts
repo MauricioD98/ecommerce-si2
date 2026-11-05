@@ -35,6 +35,23 @@ export const paymentsApi = {
     return response.data;
   },
 
+  submitProof: async (
+    orderId: string,
+    method: string,
+    input: { txId?: string; file?: any },
+  ): Promise<{ success: boolean; data: any; message: string }> => {
+    const formData = new FormData();
+    formData.append('method', method);
+    if (input.txId) formData.append('txId', input.txId.trim());
+    if (input.file) formData.append('file', input.file as any);
+    const response = await apiClient.post<{ success: boolean; data: any; message: string }>(
+      `/orders/${orderId}/payment-proof`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
   getByOrderId: async (orderId: string): Promise<PaymentDetails | null> => {
     try {
       const response = await apiClient.get<{ data?: PaymentDetails } | PaymentDetails>(`/payments/order/${orderId}`);

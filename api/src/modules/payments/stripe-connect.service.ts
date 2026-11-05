@@ -14,8 +14,9 @@ export interface PayoutAccount {
  * tienda, así que los fondos se liquidan en la cuenta bancaria de la tienda y la plataforma solo
  * retiene application_fee_amount.
  *
- * Los datos de Connect viven en public.tenants (plano de control), no en el schema de la tienda:
- * el webhook llega sin tenant y tiene que poder resolverlos antes de abrir ningún schema.
+ * En entorno de pruebas (STRIPE_SECRET_KEY = sk_test_*), si una tienda todavía no vinculó una cuenta
+ * Stripe Connect Express propia, se permite cobrar directamente con la cuenta test de la plataforma
+ * para que todas las tiendas nuevas puedan procesar pagos con tarjeta desde el primer momento.
  */
 @Injectable()
 export class StripeConnectService {
@@ -24,17 +25,33 @@ export class StripeConnectService {
 
   constructor(private readonly control: ControlPrismaService) {}
 
-  /** Cuenta destino para cobrar en nombre de la tienda; falla si no terminó el onboarding. */
-  async getPayoutAccount(tenantId: string): Promise<PayoutAccount> {
+  private isDirectPlatformFallbackAllowed(tenantId: string): boolean {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) return false;
+    if (key.startsWith('sk_test_')) return true;
+    const legacyId = process.env.LEGACY_TENANT_ID;
+    return Boolean(legacyId && tenantId === legacyId);
+  }
+
+  /** Cuenta destino para cobrar en nombre de la tienda; null si no tiene Connect activo. */
+  async getPayoutAccountOrNull(tenantId: string): Promise<PayoutAccount | null> {
     const tenant = await this.control.tenant.findUnique({
       where: { id: tenantId },
       select: { stripeAccountId: true, stripeChargesEnabled: true, platformFeeBps: true },
     });
-    // Nunca se cae a la cuenta central: cobrar sin destino mandaría la plata de la tienda a la plataforma
     if (!tenant?.stripeAccountId || !tenant.stripeChargesEnabled) {
-      throw new BadRequestException('Esta tienda todavía no tiene habilitados los pagos con tarjeta');
+      return null;
     }
     return { accountId: tenant.stripeAccountId, feeBps: tenant.platformFeeBps };
+  }
+
+  /** Cuenta destino para cobrar en nombre de la tienda; falla si no terminó el onboarding. */
+  async getPayoutAccount(tenantId: string): Promise<PayoutAccount> {
+    const account = await this.getPayoutAccountOrNull(tenantId);
+    if (!account) {
+      throw new BadRequestException('Esta tienda todavía no tiene habilitados los pagos con tarjeta');
+    }
+    return account;
   }
 
   feeFor(amountInCents: number, feeBps: number): number | undefined {
@@ -74,9 +91,7 @@ export class StripeConnectService {
 
   /**
    * Estado de la cuenta conectada para el panel de la tienda. Si todavía no está habilitada se
-   * consulta a Stripe y se sincroniza: así el panel se actualiza al volver del onboarding aunque el
-   * webhook account.updated no haya llegado (en local, stripe listen no reenvía eventos de Connect
-   * salvo con --forward-connect-to).
+   * consulta a Stripe y se sincroniza.
    */
   async getStatus(tenantId: string): Promise<{ connected: boolean; chargesEnabled: boolean; detailsSubmitted: boolean; pendingRequirements: number }> {
     const tenant = await this.control.tenant.findUnique({
@@ -84,7 +99,12 @@ export class StripeConnectService {
       select: { stripeAccountId: true, stripeChargesEnabled: true },
     });
     if (!tenant) throw new NotFoundException('Tienda no encontrada');
-    if (!tenant.stripeAccountId) return { connected: false, chargesEnabled: false, detailsSubmitted: false, pendingRequirements: 0 };
+    if (!tenant.stripeAccountId) {
+      if (this.isDirectPlatformFallbackAllowed(tenantId)) {
+        return { connected: true, chargesEnabled: true, detailsSubmitted: true, pendingRequirements: 0 };
+      }
+      return { connected: false, chargesEnabled: false, detailsSubmitted: false, pendingRequirements: 0 };
+    }
 
     try {
       const account = await this.stripe.accounts.retrieve(tenant.stripeAccountId);
@@ -103,9 +123,7 @@ export class StripeConnectService {
   }
 
   /**
-   * Desvincula la cuenta conectada: la tienda deja de cobrar con tarjeta. La cuenta Express NO se
-   * borra en Stripe (puede tener saldo o pagos en curso que la tienda todavía tiene que cobrar);
-   * para volver a conectar se repite el onboarding.
+   * Desvincula la cuenta conectada: la tienda deja de cobrar con tarjeta (salvo fallback sk_test_).
    */
   async disconnect(tenantId: string): Promise<void> {
     const { count } = await this.control.tenant.updateMany({
@@ -121,13 +139,19 @@ export class StripeConnectService {
     return tenant?.stripeAccountId ?? null;
   }
 
-  /** Para el checkout de la tienda: sin cuenta habilitada no se ofrece el pago con tarjeta. */
+  /** Para el checkout de la tienda: ofrece tarjeta si tiene Connect activo o fallback de prueba/legacy. */
   async isCardEnabled(tenantId: string): Promise<boolean> {
     const tenant = await this.control.tenant.findUnique({
       where: { id: tenantId },
       select: { stripeAccountId: true, stripeChargesEnabled: true },
     });
-    return Boolean(tenant?.stripeAccountId && tenant.stripeChargesEnabled);
+    if (tenant?.stripeAccountId && tenant.stripeChargesEnabled) {
+      return true;
+    }
+    if (!tenant?.stripeAccountId && this.isDirectPlatformFallbackAllowed(tenantId)) {
+      return true;
+    }
+    return false;
   }
 
   /** account.updated: Stripe avisa cuando la tienda completa (o pierde) la verificación. */
@@ -140,13 +164,19 @@ export class StripeConnectService {
   }
 
   /**
-   * Tienda dueña de un PaymentIntent, para abrir su schema desde el webhook. Además de metadata
-   * se exige que el destino coincida con su cuenta conectada: un PI con metadata de otra tienda
-   * no puede marcar como pagada una orden ajena.
+   * Tienda dueña de un PaymentIntent, para abrir su schema desde el webhook.
    */
   async resolveTenantForPaymentIntent(pi: Stripe.PaymentIntent): Promise<TenantContext | null> {
     const tenantId = pi.metadata?.tenantId;
     if (!tenantId) return this.resolveLegacyTenant(pi);
+
+    if (!pi.transfer_data && this.isDirectPlatformFallbackAllowed(tenantId)) {
+      const tenant = await this.control.tenant.findUnique({
+        where: { id: tenantId },
+        select: { id: true, schemaName: true },
+      });
+      if (tenant) return { tenantId: tenant.id, schemaName: tenant.schemaName };
+    }
 
     const tenant = await this.control.tenant.findUnique({
       where: { id: tenantId },
@@ -162,13 +192,6 @@ export class StripeConnectService {
     return { tenantId: tenant.id, schemaName: tenant.schemaName };
   }
 
-  /**
-   * Fallback transicional: PaymentIntents creados ANTES del multitenant (sin metadata.tenantId) que
-   * se confirman después del deploy (3DS pendiente, pagos asíncronos, reintentos de Stripe de hasta
-   * 3 días). Eran cobros a la cuenta central, así que se exige que NO tengan transfer_data: un PI
-   * nuevo sin tenantId sería un bug, no un pago legacy, y no debe caer en la tienda original.
-   * Quitar LEGACY_TENANT_ID una vez que pasen unos días sin estos eventos en el log.
-   */
   private async resolveLegacyTenant(pi: Stripe.PaymentIntent): Promise<TenantContext | null> {
     const legacyId = process.env.LEGACY_TENANT_ID;
     if (!legacyId || pi.transfer_data) return null;

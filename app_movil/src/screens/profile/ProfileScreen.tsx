@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { LanguageSelector } from '../../components/LanguageSelector';
@@ -32,6 +33,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user, logout, refreshUser } = useAuth();
+  const { clearTenant, tenantName } = useTenant();
   const { t } = useTranslation();
 
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
@@ -56,6 +58,23 @@ export const ProfileScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             await logout();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleExitStore = () => {
+    Alert.alert(
+      'Cambiar de Tienda',
+      '¿Deseas salir de esta tienda? Se cerrará tu sesión actual y podrás buscar otra tienda por nombre.',
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: 'Salir de la Tienda',
+          style: 'destructive',
+          onPress: async () => {
+            await clearTenant();
           },
         },
       ]
@@ -138,6 +157,23 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.menuTextContainer}>
               <Text style={styles.menuTitle}>{t('profile.editProfile')}</Text>
               <Text style={styles.menuDesc}>{t('profile.editProfileDesc')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={handleExitStore}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: '#EDE9FE' }]}>
+              <Ionicons name="storefront-outline" size={20} color={Colors.primary} />
+            </View>
+            <View style={styles.menuTextContainer}>
+              <Text style={styles.menuTitle}>{tenantName ? `Tienda: ${tenantName}` : 'Cambiar de Tienda'}</Text>
+              <Text style={styles.menuDesc}>Salir de esta tienda y buscar otra por nombre</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
           </TouchableOpacity>

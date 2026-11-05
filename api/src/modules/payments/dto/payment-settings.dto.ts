@@ -31,13 +31,36 @@ export class UpdatePaymentSettingsDto {
   @IsString()
   @MaxLength(100)
   usdtWalletAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  walletEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Proveedor de billetera digital (AIRTM, TAKENOS, WALLBIT, etc.)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  walletProvider?: string;
+
+  @ApiPropertyOptional({ description: 'Correo, usuario o cashtag de la cuenta de billetera digital' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  walletAccount?: string;
+
+  @ApiPropertyOptional({ description: 'Instrucciones para transferir con la billetera digital' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  walletInstructions?: string;
 }
 
 export class SubmitPaymentProofDto {
   // El cliente puede haber cambiado de medio después de crear el pedido (p. ej. empezó con tarjeta)
-  @ApiProperty({ enum: [PaymentMethod.BANK_QR, PaymentMethod.USDT] })
-  @IsIn([PaymentMethod.BANK_QR, PaymentMethod.USDT])
-  method: 'BANK_QR' | 'USDT';
+  @ApiProperty({ enum: [PaymentMethod.BANK_QR, PaymentMethod.USDT, PaymentMethod.WALLET] })
+  @IsIn([PaymentMethod.BANK_QR, PaymentMethod.USDT, PaymentMethod.WALLET])
+  method: 'BANK_QR' | 'USDT' | 'WALLET';
 
   @ApiPropertyOptional({ description: 'Hash de la transacción USDT (obligatorio en USDT)' })
   @IsOptional()

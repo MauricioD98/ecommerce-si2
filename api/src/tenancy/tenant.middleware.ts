@@ -1,10 +1,12 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { ControlPrismaService } from './control-prisma.service';
 import { TenantContext, tenantStorage } from './tenant-context';
 import { TenantResolutionCache } from './tenant-resolution-cache.service';
+import { getPlanFeatures } from '../modules/platform/plans';
 
 export const TENANT_HEADER = 'x-tenant-id';
+export const CLIENT_PLATFORM_HEADER = 'x-client-platform';
 export const TENANT_REQUIRED = 'TENANT_REQUIRED';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -48,6 +50,15 @@ export class TenantMiddleware implements NestMiddleware {
       const lookup = this.extract(req);
       if (!lookup) throw this.reject();
       ctx = await this.resolve(lookup);
+
+      // Si la petición proviene de la App Móvil (x-client-platform: mobile), se exige Plan Pro.
+      if (req.header(CLIENT_PLATFORM_HEADER)?.trim().toLowerCase() === 'mobile') {
+        if (!getPlanFeatures(ctx.plan).mobileApp) {
+          throw new ForbiddenException(
+            'Esta tienda no cuenta con App Móvil habilitada en su plan actual (disponible en el Plan Pro).',
+          );
+        }
+      }
     } catch (err) {
       return next(err);
     }
@@ -82,11 +93,13 @@ export class TenantMiddleware implements NestMiddleware {
 
     const tenant = await this.control.tenant.findUnique({
       where: lookup.by === 'id' ? { id: lookup.value } : { slug: lookup.value },
-      select: { id: true, schemaName: true, status: true },
+      select: { id: true, schemaName: true, status: true, plan: true },
     });
 
     const ctx =
-      tenant?.status === 'ACTIVE' ? { tenantId: tenant.id, schemaName: tenant.schemaName } : null;
+      tenant?.status === 'ACTIVE'
+        ? { tenantId: tenant.id, schemaName: tenant.schemaName, plan: tenant.plan }
+        : null;
     this.cache.set(key, ctx);
 
     if (!ctx) throw this.reject();

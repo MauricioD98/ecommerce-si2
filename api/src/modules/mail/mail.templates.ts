@@ -21,12 +21,14 @@ export const sanitizeCampaignHtml = (html: string): string =>
 const button = (label: string, url: string): string =>
   `<p style="margin:24px 0;"><a href="${escapeHtml(url)}" style="background:#000;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block;">${escapeHtml(label)}</a></p>`;
 
-// brand/footer: los correos de la plataforma SaaS (alta de tienda, contacto) no van con la marca
-// de una tienda ni dicen "tienes una cuenta en STELLA FEMME".
+export const platformBrand = () => process.env.PLATFORM_NAME || 'NovaSoft';
+
+// brand/footer: los correos de la plataforma SaaS (alta de tienda, contacto) van con la marca NovaSoft;
+// los correos de cada tienda van con el nombre de la propia tienda.
 export const layout = (
   title: string,
   content: string,
-  { brand = 'STELLA FEMME', footer = 'Recibiste este correo porque tienes una cuenta en STELLA FEMME.' } = {},
+  { brand = 'STELLA FEMME', footer = `Recibiste este correo porque tienes una cuenta en ${brand}.` } = {},
 ): string => `<!DOCTYPE html>
 <html lang="es">
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
@@ -47,30 +49,35 @@ export const layout = (
 </body>
 </html>`;
 
-export const welcomeEmail = (name: string, storeUrl: string) =>
+export const welcomeEmail = (name: string, storeUrl: string, storeName = 'Stella Femme') =>
   layout(
     `¡Bienvenido, ${name}!`,
-    `<p>Tu cuenta en STELLA FEMME ya está lista. Explora el catálogo, elige tu sucursal y compra con retiro en tienda o envío a domicilio.</p>${button('Ir a la tienda', storeUrl)}`,
+    `<p>Tu cuenta en ${escapeHtml(storeName)} ya está lista. Explora el catálogo, elige tu sucursal y compra con retiro en tienda o envío a domicilio.</p>${button('Ir a la tienda', storeUrl)}`,
+    { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.` },
   );
 
-export const resetPasswordEmail = (name: string, otp: string) =>
+export const resetPasswordEmail = (name: string, otp: string, storeName = 'Stella Femme') =>
   layout(
     'Tu código de recuperación',
     `<p>Hola ${escapeHtml(name)}, usa este código para restablecer tu contraseña:</p>
      <p style="text-align:center;margin:24px 0;font-size:36px;font-weight:800;letter-spacing:0.4em;padding-left:0.4em;">${escapeHtml(otp)}</p>
      <p style="color:#6b7280;font-size:13px;">El código vence en 10 minutos. Si no fuiste tú, ignora este correo: tu contraseña no cambiará.</p>`,
+    { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.` },
   );
 
-export const invoiceEmail = (name: string, orderNumber: string, total: string) =>
+export const invoiceEmail = (name: string, orderNumber: string, total: string, storeName = 'Stella Femme') =>
   layout(
     'Gracias por tu compra',
     `<p>Hola ${escapeHtml(name)}, recibimos el pago de tu pedido <strong>#${escapeHtml(orderNumber)}</strong> por <strong>${escapeHtml(total)}</strong>.</p>
      <p>Adjuntamos tu factura en PDF.</p>`,
+    { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque realizaste una compra en ${storeName}.` },
   );
 
-export const campaignEmail = (subject: string, htmlBody: string) => layout(subject, sanitizeCampaignHtml(htmlBody));
-
-const platformBrand = () => process.env.PLATFORM_NAME || 'Stella Commerce';
+export const campaignEmail = (subject: string, htmlBody: string, storeName = 'Stella Femme') =>
+  layout(subject, sanitizeCampaignHtml(htmlBody), {
+    brand: storeName.toUpperCase(),
+    footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.`,
+  });
 
 // Al dueño de una tienda recién creada por el alta self-service (webhook checkout.session.completed)
 export const tenantWelcomeEmail = (params: {
@@ -102,5 +109,5 @@ export const contactEmail = (params: { name: string; email: string; message: str
         <strong>Email:</strong> ${escapeHtml(params.email)}${params.ip ? `<br/><strong>IP:</strong> ${escapeHtml(params.ip)}` : ''}</p>
      <div style="white-space:pre-wrap;border-left:3px solid #e5e7eb;padding-left:12px;">${escapeHtml(params.message)}</div>
      <p style="color:#6b7280;font-size:13px;">Responder a este correo le escribe directamente al remitente.</p>`,
-    { brand: platformBrand(), footer: 'Mensaje enviado desde la landing de la plataforma.' },
+    { brand: platformBrand(), footer: `Mensaje enviado desde la landing de ${platformBrand()}.` },
   );

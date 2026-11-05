@@ -324,6 +324,8 @@ enum PaymentMethod {
   BANK_QR
   // Transferencia USDT a la wallet de la tienda: el cliente informa el TxID y la tienda lo verifica
   USDT
+  // Billetera digital P2P (Airtm, Takenos, Wallbit)
+  WALLET
 }
 
 enum UsdtNetwork {
@@ -353,6 +355,11 @@ model PaymentSettings {
   usdtEnabled Boolean @default(false)
   usdtNetwork UsdtNetwork?
   usdtWalletAddress String?
+
+  walletEnabled Boolean @default(false)
+  walletProvider String?
+  walletAccount String?
+  walletInstructions String?
 
   updatedAt DateTime @updatedAt
 

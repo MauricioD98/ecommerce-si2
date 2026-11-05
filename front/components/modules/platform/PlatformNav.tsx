@@ -7,12 +7,13 @@ import styles from "./landing.module.scss";
 // landing y selector de idioma. No es el Header de la tienda (carrito, sucursal…).
 export function PlatformNav() {
     const t = useTranslations("Landing");
+    const tHeader = useTranslations("Header");
 
     return (
         <header className={styles.nav}>
             <div className={styles.navInner}>
                 <Link href="/planes" className={styles.brand}>
-                    STELLA FEMME
+                    NovaSoft
                 </Link>
                 <nav className={styles.navLinks} aria-label={t("nav.label")}>
                     <Link href="/planes#funciones">{t("nav.features")}</Link>
@@ -22,6 +23,9 @@ export function PlatformNav() {
                 </nav>
                 <div className={styles.navActions}>
                     <LanguageSwitcher />
+                    <Link href="/auth/login" className={styles.navLogin}>
+                        {tHeader("login")}
+                    </Link>
                     <Link href="/planes#precios" className={styles.navCta}>
                         {t("nav.cta")}
                     </Link>

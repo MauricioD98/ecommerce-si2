@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import PlatformAdminClient from "@/components/modules/platform-admin/PlatformAdminClient";
+import { PLATFORM_BRAND } from "@/utils/storeName";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("Metadata");
+    const description = t("platformAdminDescription");
     // Panel interno: fuera de los buscadores
-    return { title: { absolute: t("platformAdminTitle") }, description: t("platformAdminDescription"), robots: { index: false, follow: false } };
+    return {
+        title: { absolute: t("platformAdminTitle") },
+        description,
+        applicationName: PLATFORM_BRAND,
+        openGraph: { siteName: PLATFORM_BRAND, title: t("platformAdminTitle"), description },
+        robots: { index: false, follow: false },
+    };
 }
 
 // Plano de control del SaaS (Super Admin de la plataforma, no de una tienda). Va en su propio grupo

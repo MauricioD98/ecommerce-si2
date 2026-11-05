@@ -15,7 +15,7 @@
     align-items: center;
     gap: 0.75rem;
     width: 100%;
-    max-width: 380px;
+    max-width: 420px;
     padding: 2.25rem 2rem;
     text-align: center;
     background: #fff;
@@ -30,7 +30,7 @@
     }
 
     p {
-        font-size: 0.9375rem;
+        font-size: 0.9rem;
         line-height: 1.5;
     }
 
@@ -40,9 +40,61 @@
     }
 }
 
+.storeList {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 210px;
+    overflow-y: auto;
+    margin-top: 0.25rem;
+}
+
+.storeOption {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 0.9rem;
+    background: #fafafa;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+    color: var(--foreground);
+    transition: all 0.15s ease;
+
+    &:hover:not(:disabled) {
+        background: #f0f0f0;
+        border-color: #000;
+    }
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+}
+
+.storeOptionInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+.storeOptionName {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #111;
+}
+
+.storeOptionSlug {
+    font-size: 0.75rem;
+    color: #666;
+}
+
 .input {
     width: 100%;
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
     padding: 0.625rem 0.875rem;
     border: 1px solid var(--border);
     border-radius: 0.5rem;

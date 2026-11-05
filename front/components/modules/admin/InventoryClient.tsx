@@ -7,6 +7,7 @@ import styles from './admin-table.module.scss';
 import { InventoryRow, useInventory } from '@/hooks/useInventory';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useAdminRole } from '@/hooks/useAdminAccess';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { useReturnHistory } from '@/hooks/useReturns';
 import { useOfflineInventorySync } from '@/hooks/useOfflineInventorySync';
 import { getApiErrorMessage } from '@/service/api/error.utils';
@@ -19,6 +20,8 @@ const toDraft = (value: number | null): string => (value != null ? String(value)
 interface InventoryRowEditorProps {
     row: InventoryRow;
     isGlobal: boolean;
+    canMultiBranch: boolean;
+    canViewReturns: boolean;
     branchName?: string;
     onSave: (productId: string, payload: SetInventoryPayload, productName?: string) => Promise<{ isOffline: boolean } | void>;
     onApplyToAll: (productId: string, discount: ProductDiscountPayload) => Promise<void>;
@@ -27,7 +30,17 @@ interface InventoryRowEditorProps {
     isPendingSync?: boolean;
 }
 
-function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, onViewReturns, isPendingSync }: InventoryRowEditorProps) {
+function InventoryRowEditor({
+    row,
+    isGlobal,
+    canMultiBranch,
+    canViewReturns,
+    branchName,
+    onSave,
+    onApplyToAll,
+    onViewReturns,
+    isPendingSync,
+}: InventoryRowEditorProps) {
     const { product } = row;
     const t = useTranslations('AdminInventory');
     const tc = useTranslations('AdminCommon');
@@ -184,33 +197,34 @@ function InventoryRowEditor({ row, isGlobal, branchName, onSave, onApplyToAll, o
                     ))}
                 </div>
             </td>
-            {/* Mermas: unidades devueltas en mal estado. Van aparte del stock vendible (no se pueden
-                vender) y solo se muestran para auditoría o para dar de baja la prenda. */}
-            <td>
-                {row.damagedStock === 0 ? (
-                    <span className={styles.cellSub}>—</span>
-                ) : (
-                    <div className={styles.cellMain}>
-                        <span className={`${styles.badge} ${styles.badgeDanger}`}>{t('damagedCount', { count: row.damagedStock })}</span>
-                        <span className={styles.cellSub}>
-                            {row.sizes
-                                .filter((size) => (size.damagedStock ?? 0) > 0)
-                                .map((size) => `${size.size}: ${size.damagedStock}`)
-                                .join(' · ')}
-                        </span>
-                    </div>
-                )}
-                <button type="button" className={styles.linkButton} onClick={() => onViewReturns(product.id)}>
-                    {t('viewReturns')}
-                </button>
-            </td>
+            {/* Mermas: disponible cuando el plan incluye devoluciones (Growth / Pro). */}
+            {canViewReturns && (
+                <td>
+                    {row.damagedStock === 0 ? (
+                        <span className={styles.cellSub}>—</span>
+                    ) : (
+                        <div className={styles.cellMain}>
+                            <span className={`${styles.badge} ${styles.badgeDanger}`}>{t('damagedCount', { count: row.damagedStock })}</span>
+                            <span className={styles.cellSub}>
+                                {row.sizes
+                                    .filter((size) => (size.damagedStock ?? 0) > 0)
+                                    .map((size) => `${size.size}: ${size.damagedStock}`)
+                                    .join(' · ')}
+                            </span>
+                        </div>
+                    )}
+                    <button type="button" className={styles.linkButton} onClick={() => onViewReturns(product.id)}>
+                        {t('viewReturns')}
+                    </button>
+                </td>
+            )}
             <td>
                 <div className={styles.actions}>
                     {message && !isDirty && <span className={`${styles.badge} ${styles.badgeSuccess}`}>{message}</span>}
                     <button type="button" className={styles.button} onClick={handleSave} disabled={!isDirty || isSaving}>
                         {isSaving ? tc('saving') : tc('save')}
                     </button>
-                    {isGlobal && (
+                    {isGlobal && canMultiBranch && (
                         <button type="button" className={styles.buttonSecondary} onClick={handleApplyToAll} disabled={isSaving}>
                             {t('applyToAll')}
                         </button>
@@ -325,6 +339,7 @@ const formatDate = (value: string, locale: string) =>
 
 export default function InventoryClient() {
     const { isGlobal, branchId: ownBranchId } = useAdminRole();
+    const { features } = useStorePlan();
     const { branches, isLoading: branchesLoading } = useAdminBranches();
     const t = useTranslations('AdminInventory');
     const tc = useTranslations('AdminCommon');
@@ -334,8 +349,12 @@ export default function InventoryClient() {
     // Prenda cuyo historial se está viendo (se fija al pulsar "Ver devoluciones" en su fila)
     const [returnsProductId, setReturnsProductId] = useState<string | undefined>(undefined);
 
+    const canViewReturns = features.returns;
+    const canMultiBranch = features.multiBranchInventory;
+    const effectiveTab = canViewReturns ? activeTab : 'stock';
+
     // SUPERADMIN elige la sucursal; ADMIN_SUCURSAL queda fijo en la suya
-    const branchId = isGlobal ? chosenBranchId ?? branches[0]?.id ?? null : ownBranchId;
+    const branchId = isGlobal && canMultiBranch ? chosenBranchId ?? branches[0]?.id ?? null : isGlobal ? branches[0]?.id ?? null : ownBranchId;
     const branchName = branches.find((branch) => branch.id === branchId)?.name;
 
     const { rows, isLoading, error, saveInventory, applyDiscountToAllBranches } = useInventory(branchId);
@@ -353,6 +372,7 @@ export default function InventoryClient() {
         : rows;
 
     const viewProductReturns = (productId: string) => {
+        if (!canViewReturns) return;
         setReturnsProductId(productId);
         setActiveTab('returns');
     };
@@ -364,14 +384,14 @@ export default function InventoryClient() {
         <div className={styles.page}>
             <div className={styles.pageHeader}>
                 <div>
-                    <h1>{isGlobal ? t('title') : t('titleOwn')}</h1>
+                    <h1>{isGlobal && canMultiBranch ? t('title') : t('titleOwn')}</h1>
                     <p>
-                        {isGlobal ? t('subtitleGlobal') : t('subtitleOwn', { branch: branchName ?? t('yourBranch') })}
+                        {isGlobal && canMultiBranch ? t('subtitleGlobal') : t('subtitleOwn', { branch: branchName ?? t('yourBranch') })}
                     </p>
                 </div>
 
                 <div className={styles.toolbar}>
-                    {isGlobal && (
+                    {isGlobal && canMultiBranch && (
                         <select
                             className={styles.input}
                             value={branchId ?? ''}
@@ -384,7 +404,7 @@ export default function InventoryClient() {
                             ))}
                         </select>
                     )}
-                    {activeTab === 'stock' && (
+                    {effectiveTab === 'stock' && (
                         <input
                             className={styles.input}
                             value={search}
@@ -431,26 +451,28 @@ export default function InventoryClient() {
                 </div>
             )}
 
-            <div className={styles.tabs}>
-                <button
-                    type="button"
-                    className={`${styles.tab} ${activeTab === 'stock' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('stock')}
-                >
-                    {t('tabStock')}
-                </button>
-                <button
-                    type="button"
-                    className={`${styles.tab} ${activeTab === 'returns' ? styles.tabActive : ''}`}
-                    onClick={() => setActiveTab('returns')}
-                >
-                    {totalDamaged > 0 ? t('tabReturnsCount', { count: totalDamaged }) : t('tabReturns')}
-                </button>
-            </div>
+            {canViewReturns && (
+                <div className={styles.tabs}>
+                    <button
+                        type="button"
+                        className={`${styles.tab} ${effectiveTab === 'stock' ? styles.tabActive : ''}`}
+                        onClick={() => setActiveTab('stock')}
+                    >
+                        {t('tabStock')}
+                    </button>
+                    <button
+                        type="button"
+                        className={`${styles.tab} ${effectiveTab === 'returns' ? styles.tabActive : ''}`}
+                        onClick={() => setActiveTab('returns')}
+                    >
+                        {totalDamaged > 0 ? t('tabReturnsCount', { count: totalDamaged }) : t('tabReturns')}
+                    </button>
+                </div>
+            )}
 
             {error && <div className={styles.errorMessage}>{error}</div>}
 
-            {activeTab === 'returns' ? (
+            {effectiveTab === 'returns' ? (
                 <ReturnsAuditPanel
                     branchId={branchId}
                     productId={returnsProductId}
@@ -475,7 +497,7 @@ export default function InventoryClient() {
                                     <th>{t('salePrice')}</th>
                                     <th>{t('discountPct')}</th>
                                     <th>{t('stockBySize')}</th>
-                                    <th>{t('damaged')}</th>
+                                    {canViewReturns && <th>{t('damaged')}</th>}
                                     <th className={styles.numeric}>{tc('actions')}</th>
                                 </tr>
                             </thead>
@@ -485,6 +507,8 @@ export default function InventoryClient() {
                                         key={`${branchId}-${row.product.id}`}
                                         row={row}
                                         isGlobal={isGlobal}
+                                        canMultiBranch={canMultiBranch}
+                                        canViewReturns={canViewReturns}
                                         branchName={branchName}
                                         onSave={saveInventory}
                                         onApplyToAll={applyDiscountToAllBranches}

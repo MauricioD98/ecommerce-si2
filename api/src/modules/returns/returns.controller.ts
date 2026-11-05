@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } f
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/decorators/guards/permissions.guard';
+import { PlanFeatureGuard } from '../../common/decorators/guards/plan-feature.guard';
 import { AnyPermission, Permissions } from '../../common/decorators/permissions.decorator';
+import { RequirePlanFeature } from '../../common/decorators/plan-feature.decorator';
 import { Permission } from '../../common/constants/permissions';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
@@ -19,9 +21,8 @@ import {
 @ApiBearerAuth('JWT-auth')
 // Los permisos van por ruta, no a nivel de clase: procesar una devolución exige PROCESS_RETURNS, pero
 // el historial es un reporte de inventario y también lo necesita quien administra el stock.
-// (PermissionsGuard resuelve PERMISSIONS_KEY con getAllAndOverride: un @Permissions de clase ganaría
-// sobre el @AnyPermission del método, así que no se pone ninguno de clase.)
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PlanFeatureGuard)
+@RequirePlanFeature('returns')
 @Controller('returns')
 export class ReturnsController {
   constructor(private readonly returnsService: ReturnsService) {}
@@ -36,7 +37,7 @@ export class ReturnsController {
       'más los pedidos web sin sucursal asignada.',
   })
   @ApiResponse({ status: 200, description: 'Ventas que coinciden con la búsqueda', type: [ReturnableOrderDto] })
-  @ApiResponse({ status: 403, description: 'El rol no tiene el permiso PROCESS_RETURNS' })
+  @ApiResponse({ status: 403, description: 'El rol no tiene el permiso PROCESS_RETURNS o el plan no incluye devoluciones' })
   async searchOrder(
     @Query() query: SearchOrderDto,
     @GetUser() staff: AuthUser,
@@ -58,7 +59,7 @@ export class ReturnsController {
   @ApiBody({ type: ProcessReturnDto })
   @ApiResponse({ status: 201, description: 'Devolución registrada', type: ReturnResponseDto })
   @ApiResponse({ status: 400, description: 'Se intentó devolver más de lo vendido, o la venta no es reembolsable' })
-  @ApiResponse({ status: 403, description: 'La venta pertenece a otra sucursal' })
+  @ApiResponse({ status: 403, description: 'La venta pertenece a otra sucursal o el plan no incluye devoluciones' })
   @ApiResponse({ status: 404, description: 'Venta no encontrada' })
   async process(@Body() dto: ProcessReturnDto, @GetUser() staff: AuthUser): Promise<ReturnResponseDto> {
     return await this.returnsService.process(staff, dto);

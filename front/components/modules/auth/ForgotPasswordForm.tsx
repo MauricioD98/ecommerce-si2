@@ -1,11 +1,14 @@
-'use client'
-import styles from "./auth-form.module.scss"
-import { FormEvent, useState } from "react";
+'use client';
+
+import styles from "./auth-form.module.scss";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle, Eye, EyeOff, Info } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { authService } from "@/service/api/auth.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
+import { usePublicTenants } from "@/hooks/usePublicTenants";
+import { getCurrentTenantId } from "@/utils/tenant";
 
 const OTP_LENGTH = 6;
 
@@ -22,7 +25,9 @@ const PASSWORD_REQUIREMENTS = [
 export default function ForgotPasswordForm() {
     const router = useRouter();
     const t = useTranslations("Auth");
+    const { tenants, currentTenantId, isCustomDomain } = usePublicTenants();
 
+    const [selectedTenantId, setSelectedTenantId] = useState<string>("");
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [email, setEmail] = useState("");
     const [otp, setOtp] = useState("");
@@ -37,6 +42,19 @@ export default function ForgotPasswordForm() {
     const [info, setInfo] = useState<string | null>(null);
     const [done, setDone] = useState(false);
 
+    useEffect(() => {
+        if (selectedTenantId) return;
+        if (currentTenantId) {
+            setSelectedTenantId(currentTenantId);
+        } else if (tenants.length > 0) {
+            setSelectedTenantId(tenants[0].id);
+        }
+    }, [currentTenantId, tenants, selectedTenantId]);
+
+    const effectiveTenantId = isCustomDomain
+        ? getCurrentTenantId() ?? undefined
+        : selectedTenantId || getCurrentTenantId() || undefined;
+
     const allRequirementsMet = PASSWORD_REQUIREMENTS.every((req) => req.test(password));
     const passwordsMatch = password === confirmPassword;
     const confirmMismatch = confirmPassword.length > 0 && !passwordsMatch;
@@ -48,7 +66,7 @@ export default function ForgotPasswordForm() {
         setOtpError(null);
         setInfo(null);
         try {
-            await authService.forgotPassword(email);
+            await authService.forgotPassword(email, effectiveTenantId);
             return true;
         } catch (err) {
             setError(getApiErrorMessage(err, t("forgot.sendFailed")));
@@ -84,7 +102,7 @@ export default function ForgotPasswordForm() {
         setError(null);
         setInfo(null);
         try {
-            await authService.verifyOtp(email, otp);
+            await authService.verifyOtp(email, otp, effectiveTenantId);
             setStep(3);
         } catch (err) {
             setOtpError(getApiErrorMessage(err, t("forgot.invalidCode")));
@@ -101,7 +119,7 @@ export default function ForgotPasswordForm() {
         setIsLoading(true);
         setError(null);
         try {
-            await authService.resetPassword(email, otp, password);
+            await authService.resetPassword(email, otp, password, effectiveTenantId);
             setDone(true);
             // Se deja ver el aviso un momento y se sale del formulario hacia el login
             setTimeout(() => router.push("/auth/login"), 1800);
@@ -158,6 +176,24 @@ export default function ForgotPasswordForm() {
                             </p>
                             <form className={styles.form} onSubmit={handleEmailSubmit}>
                                 {errorBox}
+                                {!isCustomDomain && tenants.length > 0 && (
+                                    <div className={styles.field}>
+                                        <label htmlFor="forgotTenant">Tienda</label>
+                                        <select
+                                            id="forgotTenant"
+                                            className={styles.selectInput}
+                                            value={selectedTenantId}
+                                            onChange={(e) => setSelectedTenantId(e.target.value)}
+                                            disabled={isLoading}
+                                        >
+                                            {tenants.map((tenant) => (
+                                                <option key={tenant.id} value={tenant.id}>
+                                                    {tenant.name} (/{tenant.slug})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className={styles.field}>
                                     <label htmlFor="email">{t("email")}</label>
                                     <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t("emailPlaceholder")} required autoComplete="email" />

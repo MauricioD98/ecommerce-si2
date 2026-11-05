@@ -16,8 +16,10 @@ export interface TenantSubscription {
 }
 
 export const subscriptionService = {
-    get: async (): Promise<TenantSubscription> => {
-        const { data } = await apiClient.get<{ data: TenantSubscription }>("/subscription");
+    get: async (sessionId?: string | null): Promise<TenantSubscription> => {
+        const { data } = await apiClient.get<{ data: TenantSubscription }>("/subscription", {
+            params: sessionId ? { session_id: sessionId } : undefined,
+        });
         return data.data;
     },
 

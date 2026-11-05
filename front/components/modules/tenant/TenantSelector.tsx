@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { Loader2, Store } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { ChevronRight, Loader2, Store } from "lucide-react";
 import { apiClient } from "@/service/api/axios.config";
+import { authService, PublicTenant } from "@/service/api/auth.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { switchTenant } from "@/utils/tenant";
 import styles from "./tenant-selector.module.scss";
@@ -13,12 +14,26 @@ interface ResolvedTenant {
     name: string;
 }
 
-// Pide el identificador público de la tienda (slug, el mismo del subdominio), lo resuelve contra
-// GET /platform/tenants/resolve/:slug y cambia de tienda (switchTenant recarga la página).
+// Permite elegir cualquiera de las tiendas activas en 1 clic o ingresar su slug manualmente,
+// y cambia de tienda (switchTenant recarga la página).
 export function TenantSelector() {
     const [slug, setSlug] = useState("");
+    const [tenants, setTenants] = useState<PublicTenant[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        authService
+            .getPublicTenants()
+            .then((list) => setTenants(list))
+            .catch(() => undefined);
+    }, []);
+
+    const handlePickStore = async (tenantId: string) => {
+        setLoading(true);
+        setError(null);
+        await switchTenant(tenantId);
+    };
 
     const onSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -43,7 +58,32 @@ export function TenantSelector() {
             <form className={styles.card} onSubmit={onSubmit}>
                 <Store size={36} strokeWidth={1.75} />
                 <h1 id="tenant-selector-title">¿En qué tienda quieres comprar?</h1>
-                <p>Escribe el nombre de la tienda tal como aparece en su enlace (por ejemplo, <code>mi-tienda</code>).</p>
+
+                {tenants.length > 0 && (
+                    <div className={styles.storeList}>
+                        {tenants.map((tenant) => (
+                            <button
+                                key={tenant.id}
+                                type="button"
+                                className={styles.storeOption}
+                                onClick={() => handlePickStore(tenant.id)}
+                                disabled={loading}
+                            >
+                                <span className={styles.storeOptionInfo}>
+                                    <span className={styles.storeOptionName}>{tenant.name}</span>
+                                    <span className={styles.storeOptionSlug}>/{tenant.slug}</span>
+                                </span>
+                                <ChevronRight size={18} />
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                <p>
+                    {tenants.length > 0
+                        ? "O escribe el nombre/identificador de otra tienda:"
+                        : <>Escribe el nombre de la tienda tal como aparece en su enlace (por ejemplo, <code>mi-tienda</code>).</>}
+                </p>
 
                 <input
                     className={styles.input}
@@ -53,7 +93,7 @@ export function TenantSelector() {
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
-                    autoFocus
+                    autoFocus={tenants.length === 0}
                     disabled={loading}
                 />
                 {error && <span className={styles.error}>{error}</span>}

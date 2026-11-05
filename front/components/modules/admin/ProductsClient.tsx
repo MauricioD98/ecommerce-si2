@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Lock, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
@@ -9,6 +10,7 @@ import ProductFormModal from './ProductFormModal';
 import { useAdminProducts, useCategoryOptions, useCollectionOptions } from '@/hooks/useAdminProducts';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { ProductPayload } from '@/types/admin.types';
 import { Product } from '@/types/product.types';
@@ -18,6 +20,7 @@ export default function ProductsClient() {
     const t = useTranslations('AdminProducts');
     const tc = useTranslations('AdminCommon');
     const locale = useLocale();
+    const { features } = useStorePlan();
     const [page, setPage] = useState(1);
     const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
@@ -25,7 +28,7 @@ export default function ProductsClient() {
 
     // Sin alcance global (adminSuc), el stock de la tabla se muestra para su propia sucursal;
     // superAdmin ("todas las sucursales") sigue viendo la tabla sin columna de stock, como hasta ahora
-    const { isGlobal, branchId: ownBranchId } = useAdminRole();
+    const { isGlobal, isSuperAdmin, branchId: ownBranchId } = useAdminRole();
     const { branches } = useAdminBranches();
     const activeBranchName = branches.find((branch) => branch.id === ownBranchId)?.name;
 
@@ -47,6 +50,9 @@ export default function ProductsClient() {
     const [busyId, setBusyId] = useState<string | null>(null);
     // Producto esperando confirmación de archivado (null = no hay diálogo abierto)
     const [confirmingDelete, setConfirmingDelete] = useState<Product | null>(null);
+
+    const canShowQuota = features.maxProducts !== null && !showArchived && !search;
+    const limitReached = canShowQuota && meta.total >= features.maxProducts!;
 
     const handleSearchChange = (value: string) => {
         setSearchInput(value);
@@ -97,6 +103,11 @@ export default function ProductsClient() {
                             {t.rich('branchNotice', { branch: activeBranchName ?? t('yourBranch'), strong: (chunks) => <strong>{chunks}</strong> })}
                         </p>
                     )}
+                    {canShowQuota && !isLoading && (
+                        <p className={styles.branchNotice}>
+                            Productos activos: <strong>{meta.total} / {features.maxProducts}</strong> (Plan {features.planName})
+                        </p>
+                    )}
                 </div>
                 <div className={styles.toolbar}>
                     <input
@@ -117,12 +128,47 @@ export default function ProductsClient() {
                         />
                         {t('showArchived')}
                     </label>
-                    <button type="button" className={styles.button} onClick={() => setEditing(null)}>
+                    <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => setEditing(null)}
+                        disabled={limitReached}
+                        title={
+                            limitReached
+                                ? `El Plan ${features.planName} permite hasta ${features.maxProducts} productos activos`
+                                : undefined
+                        }
+                    >
                         <Plus size={16} />
                         {t('new')}
                     </button>
                 </div>
             </div>
+
+            {limitReached && !isLoading && (
+                <div
+                    className={styles.tableCard}
+                    style={{
+                        padding: '0.875rem 1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        flexWrap: 'wrap',
+                        marginBottom: '1rem',
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <Lock size={16} />
+                        Alcanzaste el límite de <strong>{features.maxProducts} productos activos</strong> del Plan {features.planName}. Mejora a Growth o Pro para tener catálogo ilimitado.
+                    </span>
+                    {isSuperAdmin && (
+                        <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
+                            Mejorar plan
+                        </Link>
+                    )}
+                </div>
+            )}
 
             {(error || actionError) && <div className={styles.errorMessage}>{error ?? actionError}</div>}
 

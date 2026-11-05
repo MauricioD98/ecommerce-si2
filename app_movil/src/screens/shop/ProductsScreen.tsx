@@ -26,6 +26,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { EmptyState } from '../../components/EmptyState';
 import { useCart } from '../../context/CartContext';
 import { useBranch } from '../../context/BranchContext';
+import { useTenant } from '../../context/TenantContext';
 import { Colors } from '../../theme/colors';
 import { getErrorMessage } from '../../api/client';
 
@@ -35,6 +36,7 @@ export const ProductsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { addToCart, itemCount } = useCart();
   const { branches, selectedBranchId, selectedBranch, selectBranch, isLoadingBranches } = useBranch();
+  const { tenantName } = useTenant();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -96,8 +98,8 @@ export const ProductsScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       {/* Top Bar with Brand & Cart shortcut */}
       <View style={styles.topBar}>
-        <View>
-          <Text style={styles.brandTitle}>Catálogo</Text>
+        <View style={{ flex: 1, marginRight: 12 }}>
+          <Text style={styles.brandTitle} numberOfLines={1}>{tenantName || 'Catálogo'}</Text>
           <Text style={styles.brandSubtitle}>Explora nuestros productos</Text>
         </View>
 

@@ -18,7 +18,7 @@ export interface CreateOrderRequest {
     branchId?: string;
     // CreateOrderDto acepta QR, BANK_QR o USDT. Para Stripe se omite (STRIPE es el default del
     // esquema); mandar "STRIPE" aquí da 400.
-    paymentMethod?: "QR" | "BANK_QR" | "USDT";
+    paymentMethod?: "QR" | "BANK_QR" | "USDT" | "WALLET";
 }
 
 export interface OrderItemDetail {
@@ -35,7 +35,7 @@ export interface OrderItemDetail {
 // Comprobante de un pago manual (QR bancario / USDT); la imagen se pide aparte
 export interface PaymentProofSummary {
     status: "PENDIENTE" | "APROBADO" | "RECHAZADO";
-    method: "BANK_QR" | "USDT";
+    method: "BANK_QR" | "USDT" | "WALLET";
     txId: string | null;
     hasImage: boolean;
     createdAt: string;

@@ -9,6 +9,7 @@ import { PLANS, type PlanKey } from '@/components/modules/platform/plans';
 import { subscriptionService, type TenantSubscription } from '@/service/api/subscription.service';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { intlLocale } from '@/i18n/config';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
 
 // Color del badge por estado de Stripe; el texto es AdminSubscription.statuses.<estado>
 const STATUS_CLASSES = {
@@ -31,8 +32,10 @@ const POLL_ATTEMPTS = 10;
 export default function SubscriptionClient() {
     const searchParams = useSearchParams();
     const checkoutResult = searchParams.get('checkout');
+    const sessionId = searchParams.get('session_id');
     const t = useTranslations('AdminSubscription');
     const locale = useLocale();
+    const { refreshStoreInfo } = useStorePlan();
 
     const [subscription, setSubscription] = useState<TenantSubscription | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -43,9 +46,10 @@ export default function SubscriptionClient() {
 
     const load = useCallback(async () => {
         try {
-            const data = await subscriptionService.get();
+            const data = await subscriptionService.get(sessionId);
             setSubscription(data);
             setError(null);
+            refreshStoreInfo();
             return data;
         } catch (err) {
             setError(getApiErrorMessage(err, t('loadFailed')));
@@ -55,14 +59,14 @@ export default function SubscriptionClient() {
         }
         // t solo cambia con el idioma: no hace falta recrear load por eso
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [sessionId, refreshStoreInfo]);
 
     useEffect(() => {
         load();
     }, [load]);
 
     // ?checkout=success solo dice que el usuario volvió de Stripe, no que pagó: lo que vale es el
-    // estado que el backend recibió por el webhook firmado
+    // estado que el backend recibió por el webhook firmado (o verificó directo con session_id)
     useEffect(() => {
         if (!isConfirming) return;
         if (subscription?.active || attempts.current >= POLL_ATTEMPTS) {

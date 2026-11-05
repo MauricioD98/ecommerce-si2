@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 export interface TenantContext {
   tenantId: string;
   schemaName: string;
+  plan?: string;
 }
 
 declare global {

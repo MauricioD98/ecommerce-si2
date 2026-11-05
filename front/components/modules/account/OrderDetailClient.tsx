@@ -29,7 +29,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     // de enviarlo): se puede enviar desde acá
     const awaitingProof = Boolean(
         order &&
-            (order.paymentMethod === 'BANK_QR' || order.paymentMethod === 'USDT') &&
+            (order.paymentMethod === 'BANK_QR' || order.paymentMethod === 'USDT' || order.paymentMethod === 'WALLET') &&
             order.status === 'PENDIENTE' &&
             order.paymentStatus === 'PENDIENTE' &&
             !order.paymentProof,
@@ -40,7 +40,7 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
     }, [awaitingProof]);
     const manualMethod = order?.paymentMethod as ManualPaymentMethod | undefined;
     const methodAvailable =
-        manualMethod === 'BANK_QR' ? Boolean(paymentOptions?.bankQr) : manualMethod === 'USDT' ? Boolean(paymentOptions?.usdt) : false;
+        manualMethod === 'BANK_QR' ? Boolean(paymentOptions?.bankQr) : manualMethod === 'USDT' ? Boolean(paymentOptions?.usdt) : manualMethod === 'WALLET' ? Boolean(paymentOptions?.wallet) : false;
 
     return (
         <section className={accountStyles.page}>

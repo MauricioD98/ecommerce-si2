@@ -42,6 +42,20 @@ const SUBSCRIPTION_BADGE: Record<string, string> = {
     paused: tableStyles.badgeMuted,
 };
 
+const PLAN_BADGE: Record<string, string> = {
+    starter: tableStyles.badgeInfo,
+    growth: tableStyles.badgeSuccess,
+    pro: tableStyles.badgeWarning,
+};
+
+const PLAN_LABEL: Record<string, string> = {
+    starter: 'Starter',
+    growth: 'Growth',
+    pro: 'Pro',
+    free: 'Gratuito',
+    legacy: 'Legacy',
+};
+
 const readStoredSession = (): StoredSession | null => {
     try {
         const parsed = JSON.parse(sessionStorage.getItem(SESSION_STORAGE) ?? 'null');
@@ -242,7 +256,7 @@ export default function PlatformAdminClient() {
     return (
         <div className={styles.shell}>
             <header className={styles.topbar}>
-                <span className={styles.brand}>STELLA FEMME · {t('brandSuffix')}</span>
+                <span className={styles.brand}>NovaSoft · {t('brandSuffix')}</span>
                 <div className={styles.topbarActions}>
                     <span className={tableStyles.cellSub}>{session.email}</span>
                     <LanguageSwitcher />
@@ -337,7 +351,9 @@ export default function PlatformAdminClient() {
                                                 </td>
                                                 <td>{tenant.ownerEmail ?? <span className={tableStyles.cellSub}>{t('noOwner')}</span>}</td>
                                                 <td>
-                                                    <span className={tableStyles.badge}>{tenant.plan}</span>
+                                                    <span className={`${tableStyles.badge} ${PLAN_BADGE[tenant.plan?.toLowerCase()] ?? tableStyles.badgeMuted}`}>
+                                                        {PLAN_LABEL[tenant.plan?.toLowerCase()] ?? tenant.plan}
+                                                    </span>
                                                 </td>
                                                 <td>
                                                     {subscription ? (

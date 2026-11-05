@@ -6,7 +6,9 @@ import { DynamicReportDto } from './dto/dynamic-report.dto';
 import { DynamicReportResultDto, SalesOverviewDto, TopProductDto } from './dto/report-response.dto';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/decorators/guards/permissions.guard';
+import { PlanFeatureGuard } from '../../common/decorators/guards/plan-feature.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { RequirePlanFeature } from '../../common/decorators/plan-feature.decorator';
 import { Permission } from '../../common/constants/permissions';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
@@ -37,8 +39,10 @@ export class ReportsController {
 
   @Post('dynamic')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(PlanFeatureGuard)
+  @RequirePlanFeature('aiReports')
   @ApiOperation({
-    summary: 'Dynamic report from a natural-language question (Gemini Text-to-SQL)',
+    summary: 'Dynamic report from a natural-language question (AI Text-to-SQL — Plan Pro)',
     description:
       'La IA genera un SELECT que se valida y se ejecuta con un rol de solo lectura sobre vistas del esquema "reporting", ' +
       'que ya aplican el filtro de sucursal del usuario.',
@@ -46,7 +50,7 @@ export class ReportsController {
   @ApiBody({ type: DynamicReportDto })
   @ApiResponse({ status: 200, type: DynamicReportResultDto })
   @ApiResponse({ status: 400, description: 'The generated query could not be executed' })
-  @ApiResponse({ status: 403, description: 'The generated query is not allowed' })
+  @ApiResponse({ status: 403, description: 'The generated query is not allowed or plan lacks aiReports' })
   @ApiResponse({ status: 503, description: 'AI not configured or unavailable' })
   async dynamic(@GetUser() user: AuthUser, @Body() dto: DynamicReportDto): Promise<DynamicReportResultDto> {
     return await this.reportsService.runDynamicReport(user, dto.prompt);

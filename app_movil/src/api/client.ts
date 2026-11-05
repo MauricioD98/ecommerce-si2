@@ -7,6 +7,7 @@ import { getCurrentLanguage } from '../i18n';
 export const ACCESS_TOKEN_KEY = '@access_token';
 export const REFRESH_TOKEN_KEY = '@refresh_token';
 export const USER_DATA_KEY = '@user_data';
+export const CLIENT_PLATFORM_HEADER = 'x-client-platform';
 
 const apiClient = axios.create({
   baseURL: getCurrentApiBaseUrl(),
@@ -14,6 +15,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
+    [CLIENT_PLATFORM_HEADER]: 'mobile',
   },
 });
 
@@ -31,6 +33,7 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   // nombre/descripción de los productos. Se lee en cada petición para que el cambio aplique ya.
   if (config.headers) {
     config.headers['Accept-Language'] = getCurrentLanguage();
+    config.headers[CLIENT_PLATFORM_HEADER] = 'mobile';
   }
 
   // Se resuelve en cada petición (no al crear el cliente) para que un cambio de tienda aplique
@@ -141,6 +144,7 @@ apiClient.interceptors.response.use(
           {
             headers: {
               Authorization: `Bearer ${refreshToken}`,
+              [CLIENT_PLATFORM_HEADER]: 'mobile',
               ...(tenantId ? { [TENANT_HEADER]: tenantId } : {}),
             },
           }

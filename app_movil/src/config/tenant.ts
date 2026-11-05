@@ -9,6 +9,8 @@ import { appStorage } from '../utils/storage';
 
 export const TENANT_HEADER = 'x-tenant-id';
 export const TENANT_ID_KEY = '@tenant_id';
+export const TENANT_NAME_KEY = '@tenant_name';
+export const TENANT_SLUG_KEY = '@tenant_slug';
 // Código que manda el backend (TenantMiddleware) cuando falta la tienda o no es válida
 export const TENANT_REQUIRED = 'TENANT_REQUIRED';
 
@@ -31,6 +33,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // undefined = todavía no se leyó AsyncStorage; null = no hay tienda elegida
 let currentTenantId: string | null | undefined;
+let currentTenantName: string | null | undefined;
+let currentTenantSlug: string | null | undefined;
 
 export const normalizeTenantId = (value: string | null | undefined): string | null => {
   const v = value?.trim().toLowerCase();
@@ -47,6 +51,20 @@ export const getTenantId = async (): Promise<string | null> => {
   return currentTenantId;
 };
 
+export const getTenantName = async (): Promise<string | null> => {
+  if (currentTenantName !== undefined) return currentTenantName;
+  const saved = await appStorage.getItem(TENANT_NAME_KEY);
+  currentTenantName = saved ?? null;
+  return currentTenantName;
+};
+
+export const getTenantSlug = async (): Promise<string | null> => {
+  if (currentTenantSlug !== undefined) return currentTenantSlug;
+  const saved = await appStorage.getItem(TENANT_SLUG_KEY);
+  currentTenantSlug = saved ?? null;
+  return currentTenantSlug;
+};
+
 export const setTenantId = async (tenantId: string | null): Promise<void> => {
   const next = tenantId === null ? null : normalizeTenantId(tenantId);
   if (tenantId !== null && !next) {
@@ -57,5 +75,20 @@ export const setTenantId = async (tenantId: string | null): Promise<void> => {
     await appStorage.setItem(TENANT_ID_KEY, next);
   } else {
     await appStorage.removeItem(TENANT_ID_KEY);
+  }
+};
+
+export const setTenantDetails = async (name: string | null, slug: string | null): Promise<void> => {
+  currentTenantName = name;
+  currentTenantSlug = slug;
+  if (name) {
+    await appStorage.setItem(TENANT_NAME_KEY, name);
+  } else {
+    await appStorage.removeItem(TENANT_NAME_KEY);
+  }
+  if (slug) {
+    await appStorage.setItem(TENANT_SLUG_KEY, slug);
+  } else {
+    await appStorage.removeItem(TENANT_SLUG_KEY);
   }
 };

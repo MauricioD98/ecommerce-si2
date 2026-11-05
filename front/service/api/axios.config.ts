@@ -134,8 +134,10 @@ apiClient.interceptors.response.use(
         }
 
         const originalRequest = error.config;
-        // Los endpoints /auth/* (login, registro...) manejan sus 401 por su cuenta: no se refresca ni se redirige
-        const isAuthRequest = originalRequest?.url?.startsWith("/auth/");
+        // Los endpoints /auth/* y /platform/auth/* (login, registro...) manejan sus 401 por su cuenta
+        const isAuthRequest =
+            originalRequest?.url?.startsWith("/auth/") ||
+            originalRequest?.url?.startsWith("/platform/auth/");
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
             originalRequest._retry = true;
 

@@ -1,8 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ISendMailOptions, MailerService } from '@nestjs-modules/mailer';
-import { campaignEmail, contactEmail, invoiceEmail, resetPasswordEmail, tenantWelcomeEmail, welcomeEmail } from './mail.templates';
-import { withTenantParam } from '../../tenancy/tenant-context';
+import {
+  campaignEmail,
+  contactEmail,
+  invoiceEmail,
+  platformBrand,
+  resetPasswordEmail,
+  tenantWelcomeEmail,
+  welcomeEmail,
+} from './mail.templates';
+import { tenantStorage, withTenantParam } from '../../tenancy/tenant-context';
+import { ControlPrismaService } from '../../tenancy/control-prisma.service';
 
 export interface CampaignRecipient {
   email: string;
@@ -19,12 +28,34 @@ export class MailService {
   constructor(
     private readonly mailer: MailerService,
     private readonly config: ConfigService,
+    private readonly control: ControlPrismaService,
   ) {}
 
   // Lleva ?tenant=<id>: quien abre el link desde el correo puede no tener la tienda guardada en ese
   // navegador (otro dispositivo, otro cliente de correo) y sin ella el front no puede llamar a la API.
   private get frontendUrl(): string {
     return withTenantParam(this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000');
+  }
+
+  private async currentStoreName(): Promise<string> {
+    const tenantId = tenantStorage.getStore()?.tenantId;
+    if (!tenantId) return 'Stella Femme';
+    try {
+      const tenant = await this.control.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true },
+      });
+      return tenant?.name?.trim() || 'Stella Femme';
+    } catch {
+      return 'Stella Femme';
+    }
+  }
+
+  private storeFromHeader(brandName: string): string | undefined {
+    const smtpUser = this.config.get<string>('SMTP_USER');
+    if (!smtpUser) return undefined;
+    const safeBrand = brandName.replace(/["\r\n]+/g, ' ').trim();
+    return `"${safeBrand}" <${smtpUser}>`;
   }
 
   private async send(options: ISendMailOptions): Promise<boolean> {
@@ -43,24 +74,28 @@ export class MailService {
     }
   }
 
-  sendWelcome(to: string, firstName?: string | null): Promise<boolean> {
+  async sendWelcome(to: string, firstName?: string | null): Promise<boolean> {
+    const storeName = await this.currentStoreName();
     return this.send({
       to,
-      subject: '¡Bienvenido a Stella Femme!',
-      html: welcomeEmail(firstName || 'cliente', this.frontendUrl),
+      from: this.storeFromHeader(storeName),
+      subject: `¡Bienvenido a ${storeName}!`,
+      html: welcomeEmail(firstName || 'cliente', this.frontendUrl, storeName),
     });
   }
 
   // `otp` es el código de 6 dígitos (solo viaja en el correo)
-  sendPasswordReset(to: string, firstName: string | null | undefined, otp: string): Promise<boolean> {
+  async sendPasswordReset(to: string, firstName: string | null | undefined, otp: string): Promise<boolean> {
     // Sin SMTP el correo no sale: en desarrollo el código se muestra en el log para poder probar el flujo
     if (!this.config.get<string>('SMTP_HOST') && !this.config.get<string>('SMTP_USER') && process.env.NODE_ENV !== 'production') {
       this.logger.warn(`[DEV] Código de recuperación para ${to}: ${otp}`);
     }
+    const storeName = await this.currentStoreName();
     return this.send({
       to,
-      subject: 'Tu código para restablecer la contraseña de Stella Femme',
-      html: resetPasswordEmail(firstName || 'cliente', otp),
+      from: this.storeFromHeader(storeName),
+      subject: `Tu código para restablecer la contraseña de ${storeName}`,
+      html: resetPasswordEmail(firstName || 'cliente', otp, storeName),
     });
   }
 
@@ -70,10 +105,13 @@ export class MailService {
     loginUrl: string;
     domain?: string | null;
   }): Promise<boolean> {
-    const platformHost = new URL(this.config.get<string>('PLATFORM_URL') ?? this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000').host;
+    const platformHost = new URL(
+      this.config.get<string>('PLATFORM_URL') ?? this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000',
+    ).host;
     return this.send({
       to: params.to,
-      subject: `Tu tienda ${params.tenantName} está lista`,
+      from: this.storeFromHeader(platformBrand()),
+      subject: `Tu tienda ${params.tenantName} está lista en ${platformBrand()}`,
       html: tenantWelcomeEmail({ ...params, adminEmail: params.to, platformHost }),
     });
   }
@@ -88,14 +126,15 @@ export class MailService {
     }
     return this.send({
       to,
+      from: this.storeFromHeader(platformBrand()),
       replyTo: { name: params.name, address: params.email },
       // Sin saltos de línea en el asunto: evita inyección de headers con un nombre manipulado
-      subject: `Contacto: ${params.name.replace(/[\r\n]+/g, ' ').slice(0, 80)}`,
+      subject: `[${platformBrand()}] Contacto: ${params.name.replace(/[\r\n]+/g, ' ').slice(0, 80)}`,
       html: contactEmail(params),
     });
   }
 
-  sendInvoice(params: {
+  async sendInvoice(params: {
     to: string;
     firstName?: string | null;
     orderNumber: string;
@@ -103,10 +142,12 @@ export class MailService {
     pdf: Buffer;
     filename: string;
   }): Promise<boolean> {
+    const storeName = await this.currentStoreName();
     return this.send({
       to: params.to,
+      from: this.storeFromHeader(storeName),
       subject: `Tu factura del pedido #${params.orderNumber}`,
-      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`),
+      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`, storeName),
       attachments: [{ filename: params.filename, content: params.pdf, contentType: 'application/pdf' }],
     });
   }
@@ -132,13 +173,17 @@ export class MailService {
     subject: string,
     htmlBody: string,
   ): Promise<{ sent: number; failed: number }> {
-    const html = this.tagStoreLinks(campaignEmail(subject, htmlBody));
+    const storeName = await this.currentStoreName();
+    const from = this.storeFromHeader(storeName);
+    const html = this.tagStoreLinks(campaignEmail(subject, htmlBody, storeName));
     let sent = 0;
     let failed = 0;
 
     for (let i = 0; i < recipients.length; i += this.CAMPAIGN_BATCH_SIZE) {
       const batch = recipients.slice(i, i + this.CAMPAIGN_BATCH_SIZE);
-      const results = await Promise.all(batch.map((recipient) => this.send({ to: recipient.email, subject, html })));
+      const results = await Promise.all(
+        batch.map((recipient) => this.send({ to: recipient.email, from, subject, html })),
+      );
       sent += results.filter(Boolean).length;
       failed += results.filter((ok) => !ok).length;
     }

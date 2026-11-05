@@ -18,7 +18,7 @@ const EDITABLE_STATUSES: OrderStatus[] = ['PENDIENTE', 'PROCESANDO', 'ENVIADO', 
 const PROOF_BADGE = { PENDIENTE: styles.badgeWarning, APROBADO: styles.badgeSuccess, RECHAZADO: styles.badgeDanger } as const;
 
 // Claves de traducción conocidas; un valor nuevo del backend cae en "other" en vez de romper la tabla
-const METHOD_KEYS = ['STRIPE', 'CASH', 'PHYSICAL_CARD', 'QR', 'BANK_QR', 'USDT'] as const;
+const METHOD_KEYS = ['STRIPE', 'CASH', 'PHYSICAL_CARD', 'QR', 'BANK_QR', 'USDT', 'WALLET'] as const;
 const PAYMENT_KEYS = ['PENDIENTE', 'COMPLETADO', 'FALLIDO', 'REEMBOLSADO'] as const;
 const methodKey = (value: string) => ((METHOD_KEYS as readonly string[]).includes(value) ? (value as (typeof METHOD_KEYS)[number]) : 'other');
 const paymentKey = (value: string) => ((PAYMENT_KEYS as readonly string[]).includes(value) ? (value as (typeof PAYMENT_KEYS)[number]) : 'other');
@@ -330,7 +330,7 @@ function ProofModal({
                         ) : (
                             <div className={styles.loadingState}>{t('loading')}</div>
                         ))}
-                    <small className={styles.cellSub}>{proof.method === 'USDT' ? t('proof.usdtHint') : t('proof.qrHint')}</small>
+                    <small className={styles.cellSub}>{proof.method === 'USDT' ? t('proof.usdtHint') : proof.method === 'WALLET' ? 'Verifica en tu cuenta de billetera (Airtm, Takenos o Wallbit) que los fondos hayan ingresado antes de aprobar el pedido.' : t('proof.qrHint')}</small>
 
                     <div className={styles.modalFooter}>
                         <button type="button" className={styles.buttonDanger} onClick={onReject} disabled={busy}>

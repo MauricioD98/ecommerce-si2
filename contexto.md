@@ -42,7 +42,7 @@ Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos aut
 | Probador virtual | `@decartai/sdk` 0.2.3 · modelo realtime `lucy-vton-latest`. El token efímero ahora lo firma **la API** (`POST /try-on/session`) con la key de la tienda |
 | Chatbot | Widget Botpress Webchat v3.7 en el front + endpoint público `GET /chatbot/products` en la API |
 | Tareas programadas (back) | `@nestjs/schedule` — cron de liberación de carritos abandonados |
-| App móvil | **Expo ~57.0.24**, **React Native 0.86.3**, React 19.2.3, React Navigation 7, AsyncStorage, **`i18next` + `react-i18next` + `expo-localization`** |
+| App móvil | **Expo ~58.0.0**, **React Native 0.88.1**, React 19.3.0, React Navigation 7, AsyncStorage, **`i18next` + `react-i18next` + `expo-localization`** |
 | Infra | Docker (`api/Dockerfile`, `front/Dockerfile`, `docker-compose.yml`) · deploy real en **Azure Container Apps** con BD **Neon** |
 
 **Reglas de producto que hay que respetar**

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Lock, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import AdminModal from './AdminModal';
 import { useAdminBranches } from '@/hooks/useAdminBranches';
 import { useAdminRole } from '@/hooks/useAdminAccess';
+import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { Branch } from '@/types/branch.types';
 import { BranchPayload } from '@/types/admin.types';
@@ -184,7 +186,8 @@ function BranchFormModal({ branch, canToggleActive, onClose, onSubmit }: BranchF
 }
 
 export default function BranchesClient() {
-    const { isGlobal } = useAdminRole();
+    const { isGlobal, isSuperAdmin } = useAdminRole();
+    const { features } = useStorePlan();
     const t = useTranslations('AdminBranches');
     const tc = useTranslations('AdminCommon');
     const { branches, isLoading, error, createBranch, updateBranch, deleteBranch } = useAdminBranches();
@@ -192,6 +195,9 @@ export default function BranchesClient() {
     const [editing, setEditing] = useState<Branch | null | undefined>(undefined);
     const [actionError, setActionError] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
+
+    const activeBranchesCount = branches.filter((branch) => branch.isActive).length;
+    const limitReached = features.maxBranches !== null && activeBranchesCount >= features.maxBranches;
 
     const handleSubmit = async (payload: BranchPayload) => {
         if (editing) {
@@ -221,15 +227,59 @@ export default function BranchesClient() {
                 <div>
                     <h1>{t('title')}</h1>
                     <p>{isGlobal ? t('subtitleGlobal') : t('subtitleOwn')}</p>
+                    {features.maxBranches !== null && !isLoading && (
+                        <p className={styles.branchNotice}>
+                            Sucursales activas: <strong>{activeBranchesCount} / {features.maxBranches}</strong> (Plan {features.planName})
+                        </p>
+                    )}
                 </div>
                 {/* Crear sucursales requiere el permiso ALL_BRANCHES */}
                 {isGlobal && (
-                    <button type="button" className={styles.button} onClick={() => setEditing(null)}>
+                    <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => setEditing(null)}
+                        disabled={limitReached}
+                        title={
+                            limitReached
+                                ? `El Plan ${features.planName} permite hasta ${features.maxBranches} ${features.maxBranches === 1 ? 'sucursal activa' : 'sucursales activas'}`
+                                : undefined
+                        }
+                    >
                         <Plus size={16} />
                         {t('new')}
                     </button>
                 )}
             </div>
+
+            {isGlobal && limitReached && !isLoading && (
+                <div
+                    className={styles.tableCard}
+                    style={{
+                        padding: '0.875rem 1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '1rem',
+                        flexWrap: 'wrap',
+                        marginBottom: '1rem',
+                    }}
+                >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+                        <Lock size={16} />
+                        Tu <strong>Plan {features.planName}</strong> incluye hasta{' '}
+                        <strong>
+                            {features.maxBranches} {features.maxBranches === 1 ? 'sucursal activa' : 'sucursales activas'}
+                        </strong>
+                        . Mejora tu plan para agregar más sucursales.
+                    </span>
+                    {isSuperAdmin && (
+                        <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
+                            Mejorar plan
+                        </Link>
+                    )}
+                </div>
+            )}
 
             {(error || actionError) && <div className={styles.errorMessage}>{error ?? actionError}</div>}
 

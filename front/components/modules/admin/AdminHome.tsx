@@ -7,12 +7,13 @@ import styles from './admin-layout.module.scss';
 import tableStyles from './admin-table.module.scss';
 import { getAdminLinks } from './adminNav';
 import { useAdminRole } from '@/hooks/useAdminAccess';
-import { useStoreName } from '@/providers/StoreInfoProvider';
+import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
 
 export default function AdminHome() {
     const { user, isGlobal, isSuperAdmin, can } = useAdminRole();
     const t = useTranslations('AdminShell');
     const storeName = useStoreName();
+    const { features } = useStorePlan();
     const tNav = useTranslations('AdminNav');
 
     return (
@@ -25,10 +26,13 @@ export default function AdminHome() {
                         {isGlobal ? t('manageAll', { store: storeName }) : t('manageOwn')}
                     </p>
                 </div>
+                <span className={`${tableStyles.badge} ${tableStyles.badgeInfo}`}>
+                    Plan {features.planName}
+                </span>
             </div>
 
             <div className={styles.homeGrid}>
-                {getAdminLinks(can, isGlobal, isSuperAdmin).map(({ href, label, icon: Icon }) => (
+                {getAdminLinks(can, isGlobal, isSuperAdmin, features).map(({ href, label, icon: Icon }) => (
                     <Link key={href} href={href} className={styles.homeCard}>
                         <Icon size={24} />
                         {tNav(label)}

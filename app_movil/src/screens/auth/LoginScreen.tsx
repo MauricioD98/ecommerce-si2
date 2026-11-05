@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Colors, Shadows } from '../../theme/colors';
@@ -31,6 +32,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { login } = useAuth();
+  const { clearTenant, tenantName } = useTenant();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -95,6 +97,17 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       >
         <View style={styles.topActionsBar}>
           <TouchableOpacity
+            style={styles.changeStoreBtn}
+            onPress={() => clearTenant()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="storefront-outline" size={16} color={Colors.primary} />
+            <Text style={styles.changeStoreText} numberOfLines={1}>
+              {tenantName ? `Tienda: ${tenantName}` : 'Cambiar Tienda'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.settingsBtn}
             onPress={() => {
               getApiBaseUrl().then((url) => {
@@ -112,7 +125,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.logoBadge}>
             <Ionicons name="bag-handle" size={40} color={Colors.primary} />
           </View>
-          <Text style={styles.appTitle}>Stella Femme</Text>
+          <Text style={styles.appTitle}>{tenantName || 'Tienda'}</Text>
           <Text style={styles.subtitle}>Inicia sesión para gestionar tus compras</Text>
         </View>
 
@@ -267,8 +280,26 @@ const styles = StyleSheet.create({
   },
   topActionsBar: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  changeStoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.sm,
+  },
+  changeStoreText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
   },
   settingsBtn: {
     width: 40,

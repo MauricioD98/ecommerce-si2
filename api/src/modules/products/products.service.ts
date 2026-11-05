@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { Prisma, Category, Collection, Product } from '@prisma/client';
@@ -12,43 +12,53 @@ import { hasAllBranches } from '../../common/utils/permission.util';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { currentLanguage, localizeProduct, normalizeTranslations, readTranslations } from './product-translations';
+import { assertPlanFeature, currentPlanFeatures } from '../platform/plans';
 
 @Injectable()
 export class ProductsService {
+  constructor(
+    private prisma: PrismaService,
+    private inventoryService: InventoryService,
+  ) {}
 
-    constructor(
-      private prisma: PrismaService,
-      private inventoryService: InventoryService,
-    ) {}
+  // Create product
+  async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<ProductResponseDto> {
+    const features = currentPlanFeatures();
+    if (features.maxProducts !== null) {
+      const activeCount = await this.prisma.product.count({ where: { isActive: true } });
+      if (activeCount >= features.maxProducts) {
+        throw new ForbiddenException(
+          `Tu plan ${features.planName} permite hasta ${features.maxProducts} productos activos. Actualiza al plan Growth o Pro para productos ilimitados.`,
+        );
+      }
+    }
 
-// Create product
-async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<ProductResponseDto> {
-  const existingSku = await this.prisma.product.findUnique({
-    where: { sku: createProductDto.sku},
-  });
-  if (existingSku) {
-    throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: createProductDto.sku }));
-  }
-  const category = await this.prisma.category.findUnique({
-    where: { id: createProductDto.categoryId },
-  });
-  if (!category) {
-    throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: createProductDto.categoryId }));
-  }
+    const existingSku = await this.prisma.product.findUnique({
+      where: { sku: createProductDto.sku },
+    });
+    if (existingSku) {
+      throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: createProductDto.sku }));
+    }
+    const category = await this.prisma.category.findUnique({
+      where: { id: createProductDto.categoryId },
+    });
+    if (!category) {
+      throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: createProductDto.categoryId }));
+    }
 
-  // Exclusividad de sucursal: nunca se confía en lo que mande el cliente para esto. Sin
-  // ALL_BRANCHES, el producto SIEMPRE queda en la sucursal propia del usuario (se ignora
-  // cualquier branchId que haya mandado); con ALL_BRANCHES, se respeta lo enviado (null = global).
-  const branchId = hasAllBranches(actor) ? (createProductDto.branchId ?? null) : actor.branchId;
-  if (!hasAllBranches(actor) && !branchId) {
-    throw new BadRequestException(i18nMessage('errors.USER_WITHOUT_BRANCH'));
-  }
+    // Exclusividad de sucursal: nunca se confía en lo que mande el cliente para esto. Sin
+    // ALL_BRANCHES, el producto SIEMPRE queda en la sucursal propia del usuario (se ignora
+    // cualquier branchId que haya mandado); con ALL_BRANCHES, se respeta lo enviado (null = global).
+    const branchId = hasAllBranches(actor) ? (createProductDto.branchId ?? null) : actor.branchId;
+    if (!hasAllBranches(actor) && !branchId) {
+      throw new BadRequestException(i18nMessage('errors.USER_WITHOUT_BRANCH'));
+    }
 
-  // collectionIds no es un campo escalar de Product: se conecta aparte vía relación m2m
-  const { collectionIds, translations, ...productData } = createProductDto;
+    // collectionIds no es un campo escalar de Product: se conecta aparte vía relación m2m
+    const { collectionIds, translations, ...productData } = createProductDto;
 
-  // El catálogo es global: el producto nace con stock 0 en todas las sucursales hasta que se asigne en el inventario
-  const product = await this.prisma.product.create({
+    // El catálogo es global: el producto nace con stock 0 en todas las sucursales hasta que se asigne en el inventario
+    const product = await this.prisma.product.create({
       data: {
         ...productData,
         branchId,
@@ -59,11 +69,11 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
           ? { collections: { connect: collectionIds.map((id) => ({ id })) } }
           : {}),
       },
-      include:{
-        category:true,
-        collections:true,
+      include: {
+        category: true,
+        collections: true,
         _count: { select: { orderItems: true } },
-      }
+      },
     });
 
     if (product.sizes.length > 0) {
@@ -75,7 +85,7 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
             productId: product.id,
             size,
             stock: 10,
-          }))
+          })),
         );
         await this.prisma.productInventory.createMany({
           data: inventoryData,
@@ -91,385 +101,336 @@ async create(createProductDto: CreateProductDto, actor: AuthUser): Promise<Produ
     }
 
     return this.formatProduct(product);
- }
-
-
-async findAll(queryDto: QueryProductDto): Promise<{
-  data: ProductResponseDto[];
-  meta: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}> {
-  const {
-    category,
-    isActive,
-    search,
-    branchId,
-    inStockOnly,
-    collectionSlug,
-    sizes,
-    colors,
-    minPrice,
-    maxPrice,
-    page = 1,
-    limit = 10,
-  } = queryDto;
-
-  const where: Prisma.ProductWhereInput = {};
-
-if (category) {
-  where.categoryId = category;
-}
-
-if (isActive !== undefined) {
-  where.isActive = isActive;
-}
-
-if (search) {
-  const matches: Prisma.ProductWhereInput[] = [
-    { name: { contains: search, mode: 'insensitive' } },
-    { description: { contains: search, mode: 'insensitive' } },
-  ];
-  // Quien navega en inglés busca "dress", no "vestido": se busca también en la traducción de su
-  // idioma. Los filtros JSON de Prisma no tienen modo insensible a mayúsculas: es coincidencia exacta.
-  const language = currentLanguage();
-  if (language !== 'es') {
-    matches.push(
-      { translations: { path: [language, 'name'], string_contains: search } },
-      { translations: { path: [language, 'description'], string_contains: search } },
-    );
   }
-  where.OR = matches;
-}
 
-// Colección (ej. "otono-invierno"): un producto puede estar en varias, alcanza con que matchee una
-if (collectionSlug) {
-  where.collections = { some: { slug: collectionSlug } };
-}
+  async findAll(queryDto: QueryProductDto): Promise<{
+    data: ProductResponseDto[];
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }> {
+    const {
+      category,
+      isActive,
+      search,
+      branchId,
+      inStockOnly,
+      collectionSlug,
+      sizes,
+      colors,
+      minPrice,
+      maxPrice,
+      page = 1,
+      limit = 10,
+    } = queryDto;
 
-// Talla/color: coincide si el producto tiene AL MENOS UNA de las solicitadas
-if (sizes && sizes.length > 0) {
-  where.sizes = { hasSome: sizes };
-}
+    const where: Prisma.ProductWhereInput = {};
 
-if (colors && colors.length > 0) {
-  where.colors = { hasSome: colors };
-}
-
-if (minPrice !== undefined || maxPrice !== undefined) {
-  where.price = {
-    ...(minPrice !== undefined ? { gte: new Prisma.Decimal(minPrice) } : {}),
-    ...(maxPrice !== undefined ? { lte: new Prisma.Decimal(maxPrice) } : {}),
-  };
-}
-
-// Catálogo del POS: solo productos con stock físico en esa sucursal
-if (branchId && inStockOnly) {
-  where.inventories = { some: { branchId, stock: { gt: 0 } } };
-}
-
-// Exclusividad de sucursal: con branchId se ven los productos globales (branchId null) más los
-// exclusivos de ESA sucursal; nunca los exclusivos de otra. Sin branchId (nadie eligió sucursal
-// todavía, o el panel admin global sin filtrar) no se filtra: se ve todo, como antes.
-// Va en `AND` (no en `OR`, que ya lo puede estar usando el filtro de `search` arriba): Prisma
-// combina claves del mismo nivel de `where` con AND implícito, así que esto queda como
-// "(nombre o descripción coincide) AND (global o de esta sucursal)".
-if (branchId) {
-  where.AND = [{ OR: [{ branchId: null }, { branchId }] }];
-}
-
-const total = await this.prisma.product.count({ where });
-
-const products = await this.prisma.product.findMany({
-  where,
-  skip: (page - 1) * limit,
-  take: limit,
-  orderBy: { createdAt: 'desc' },
-  include: { category: true, collections: true, _count: { select: { orderItems: true } } },
-});
-
-// Con sucursal, el stock y el descuento salen de su registro de inventario
-const inventoryMap = branchId
-  ? await this.inventoryService.getInventoryMap(products.map((p) => p.id), branchId)
-  : null;
-
-return {
-  data: products.map((product) =>
-    this.formatProduct(
-      product,
-      inventoryMap ? { inventory: inventoryMap[product.id] ?? null } : undefined,
-    ),
-  ),
-  meta: {
-  total,
-  page,
-  limit,
-  totalPages: Math.ceil(total / limit),
-},
-};
-
-}
-
-async findOne(id: string, branchId?: string): Promise<ProductResponseDto> {
-  const product = await this.prisma.product.findUnique({
-    where: { id },
-    include:{
-      category:true,
-      collections:true,
-      _count: { select: { orderItems: true } },
+    if (category) {
+      where.categoryId = category;
     }
-  });
 
-  if (!product) {
-    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
-  }
+    if (isActive !== undefined) {
+      where.isActive = isActive;
+    }
 
-  if (!branchId) {
-    return this.formatProduct(product);
-  }
+    if (search) {
+      const matches: Prisma.ProductWhereInput[] = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+      // Quien navega en inglés busca "dress", no "vestido": se busca también en la traducción de su
+      // idioma. Los filtros JSON de Prisma no tienen modo insensible a mayúsculas: es coincidencia exacta.
+      const language = currentLanguage();
+      if (language !== 'es') {
+        matches.push(
+          { translations: { path: [language, 'name'], string_contains: search } },
+          { translations: { path: [language, 'description'], string_contains: search } },
+        );
+      }
+      where.OR = matches;
+    }
 
-  const inventory = await this.inventoryService.getInventory(id, branchId);
-  return this.formatProduct(product, { inventory });
-}
-/*
-async update(
-  id: string,
-  updateProductDto: UpdateProductDto,
-): Promise<ProductResponseDto> {
-  const existingProduct = await this.prisma.product.findUnique({
-    where: { id },
-  });
+    // Colección (ej. "otono-invierno"): un producto puede estar en varias, alcanza con que matchee una
+    if (collectionSlug) {
+      where.collections = { some: { slug: collectionSlug } };
+    }
 
-  if (!existingProduct) {
-    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
-  }
+    // Talla/color: coincide si el producto tiene AL MENOS UNA de las solicitadas
+    if (sizes && sizes.length > 0) {
+      where.sizes = { hasSome: sizes };
+    }
 
-  if (updateProductDto.sku && updateProductDto.sku !== existingProduct.sku) {
-  const skuTaken = await this.prisma.product.findUnique({
-    where: { sku: updateProductDto.sku },
-  });
+    if (colors && colors.length > 0) {
+      where.colors = { hasSome: colors };
+    }
 
-  if (skuTaken) {
-    throw new ConflictException(
-      `Product with SKU ${updateProductDto.sku} already exists`,
-    );
-  }
- }
- const updateData: any = { ...updateProductDto };
-if (updateProductDto && updateProductDto.price !== undefined) {
-  updateData.price = new Prisma.Decimal(updateProductDto.price);
-}
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      where.price = {
+        ...(minPrice !== undefined ? { gte: new Prisma.Decimal(minPrice) } : {}),
+        ...(maxPrice !== undefined ? { lte: new Prisma.Decimal(maxPrice) } : {}),
+      };
+    }
 
-  const updatedProduct = await this.prisma.product.update({
-  where: { id },
-  data: updateData,
-  include: {
-    category: true,
-  },
-});
-return this.formatProduct(updatedProduct);
-}*/
-async update(
-  id: string,
-  updateProductDto: UpdateProductDto,
-  actor: AuthUser,
-): Promise<ProductResponseDto> {
-  // 1. Verificar si el producto existe
-  const existingProduct = await this.prisma.product.findUnique({
-    where: { id },
-  });
+    // Catálogo del POS: solo productos con stock físico en esa sucursal
+    if (branchId && inStockOnly) {
+      where.inventories = { some: { branchId, stock: { gt: 0 } } };
+    }
 
-  if (!existingProduct) {
-    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
-  }
+    // Exclusividad de sucursal: con branchId se ven los productos globales (branchId null) más los
+    // exclusivos de ESA sucursal; nunca los exclusivos de otra.
+    if (branchId) {
+      where.AND = [{ OR: [{ branchId: null }, { branchId }] }];
+    }
 
-  // Igual que en create(): sin ALL_BRANCHES no se puede reasignar la exclusividad de sucursal a
-  // otra que no sea la propia (si mandó branchId, se fuerza a la suya; el resto del payload sigue
-  // como estaba)
-  if (updateProductDto.branchId !== undefined && !hasAllBranches(actor)) {
-    updateProductDto.branchId = actor.branchId ?? undefined;
-  }
+    const total = await this.prisma.product.count({ where });
 
-  // 2. Validar SKU si se modifica
-  if (updateProductDto.sku && updateProductDto.sku !== existingProduct.sku) {
-    const skuTaken = await this.prisma.product.findUnique({
-      where: { sku: updateProductDto.sku },
+    const products = await this.prisma.product.findMany({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: { category: true, collections: true, _count: { select: { orderItems: true } } },
     });
 
-    if (skuTaken) {
-      throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: updateProductDto.sku }));
-    }
-  }
+    // Con sucursal, el stock y el descuento salen de su registro de inventario
+    const inventoryMap = branchId
+      ? await this.inventoryService.getInventoryMap(products.map((p) => p.id), branchId)
+      : null;
 
-  // 3. Validar CategoryId ANTES de actualizar en base de datos
-  if (updateProductDto.categoryId) {
-    const categoryExists = await this.prisma.category.findUnique({
-      where: { id: updateProductDto.categoryId },
-    });
-
-    if (!categoryExists) {
-      throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: updateProductDto.categoryId }));
-    }
-  }
-
-  // 4. Preparar payload para Prisma (collectionIds no es un campo escalar: se maneja aparte)
-  const { collectionIds, translations, ...rest } = updateProductDto;
-  const updateData: Prisma.ProductUpdateInput = { ...rest };
-
-  // translations: reemplaza el objeto completo (el admin manda los 4 idiomas juntos)
-  if (translations !== undefined) {
-    updateData.translations = normalizeTranslations(translations) as Prisma.InputJsonValue;
-  }
-
-  if (updateProductDto.price !== undefined) {
-    updateData.price = new Prisma.Decimal(updateProductDto.price);
-  }
-
-  // collectionIds: reemplaza la lista completa de colecciones del producto (incluir [] la vacía)
-  if (collectionIds !== undefined) {
-    updateData.collections = { set: collectionIds.map((collectionId) => ({ id: collectionId })) };
-  }
-
-  // 5. Ejecutar la actualización
-  const updatedProduct = await this.prisma.product.update({
-    where: { id },
-    data: updateData,
-    include: {
-      category: true,
-      collections: true,
-      _count: { select: { orderItems: true } },
-    },
-  });
-
-  return this.formatProduct(updatedProduct);
-}
-
-async updateStock(id: string, quantity: number): Promise<ProductResponseDto> {
-  const product = await this.prisma.product.findUnique({
-    where: { id },
-  });
-
-  if (!product) {
-    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
-  }
-
-  const newStock = product.stock + quantity;
-
-  if (newStock < 0) {
-  throw new BadRequestException('Insufficient stock');
-  }
-
-  const updatedProduct = await this.prisma.product.update({
-  where: { id },
-  data: { stock: newStock },
-  include: {
-    category: true,
-  },
-});
-  return this.formatProduct(updatedProduct);
-}
-
-
-// Soft delete: archivar, nunca borrar la fila.
-//
-// Dos razones. La primera es técnica: un producto queda referenciado por ventas (order_items),
-// carritos (cart_items) y devoluciones (return_items), y ninguna de esas relaciones declara
-// `onDelete`, así que Prisma las protege con Restrict. Un delete físico de un producto ya vendido
-// falla con error de llave foránea. La segunda es de negocio y pesa más: esas filas son el histórico
-// contable. Si se borra el producto, los reportes de ventas pierden la referencia y una devolución
-// sobre una venta vieja se queda sin a qué producto apuntar.
-//
-// `isActive: false` es exactamente el filtro que ya usan el catálogo web, la caja y el carrito, así
-// que archivar saca el producto de circulación sin tocar nada del pasado.
-async remove(id: string): Promise<{ message: string; data: ProductResponseDto }> {
-  const existing = await this.prisma.product.findUnique({
-    where: { id },
-    select: { id: true, isActive: true },
-  });
-
-  if (!existing) {
-    throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
-  }
-
-  // Idempotente: archivar algo ya archivado no es un error, el resultado buscado ya se cumple
-  if (!existing.isActive) {
     return {
-      message: 'El producto ya estaba archivado',
-      data: await this.findOne(id),
+      data: products.map((product) =>
+        this.formatProduct(
+          product,
+          inventoryMap ? { inventory: inventoryMap[product.id] ?? null } : undefined,
+        ),
+      ),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
-  const archived = await this.prisma.product.update({
-    where: { id },
-    data: { isActive: false },
-    include: {
-      category: true,
-      collections: true,
-      _count: { select: { orderItems: true } },
-    },
-  });
+  async findOne(id: string, branchId?: string): Promise<ProductResponseDto> {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        collections: true,
+        _count: { select: { orderItems: true } },
+      },
+    });
 
-  return {
-    message: 'Producto archivado: ya no aparece en la tienda ni en la caja',
-    data: this.formatProduct(archived),
-  };
-}
+    if (!product) {
+      throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
+    }
 
+    if (!branchId) {
+      return this.formatProduct(product);
+    }
 
+    const inventory = await this.inventoryService.getInventory(id, branchId);
+    return this.formatProduct(product, { inventory });
+  }
 
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+    actor: AuthUser,
+  ): Promise<ProductResponseDto> {
+    // 1. Verificar si el producto existe
+    const existingProduct = await this.prisma.product.findUnique({
+      where: { id },
+    });
 
+    if (!existingProduct) {
+      throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
+    }
 
-
- // SUPERADMIN: aplica el mismo descuento a un producto en todas las sucursales
- async applyDiscountToAllBranches(
-  productId: string,
-  dto: BulkDiscountDto,
-): Promise<{ updatedBranches: number }> {
-  return await this.inventoryService.applyDiscountToAllBranches(productId, dto);
-}
-
-// Sin contexto de sucursal no hay descuento ni stock de sucursal: el descuento vive en ProductInventory
- private formatProduct(
-  product: Product & {category: Category; collections?: Collection[]; _count?: { orderItems: number }},
-  context?: { inventory: InventoryAggregate | null },
- ): ProductResponseDto {
-  const inventory = context?.inventory ?? null;
-  const translations = readTranslations(product.translations);
-  const locale = currentLanguage();
-  const localized = localizeProduct({ name: product.name, description: product.description }, translations, locale);
-  const hasDiscount =
-    inventory != null &&
-    (inventory.discountPrice != null || inventory.discountPercentage != null);
-
-  return {
-    ...product,
-    // name/description para mostrar; base* + translations para el formulario de edición del admin
-    // (si editara el name ya traducido, pisaría el texto base en español con otro idioma)
-    name: localized.name,
-    description: localized.description,
-    baseName: product.name,
-    baseDescription: product.description,
-    translations,
-    locale,
-    price: Number(product.price),
-    effectivePrice: getBranchPrice(product, inventory),
-    branchStock: context ? (inventory?.stock ?? 0) : null,
-    stockBySize: context ? (inventory?.sizes ?? []) : null,
-    discount: hasDiscount
-      ? {
-          discountPrice: inventory.discountPrice != null ? Number(inventory.discountPrice) : null,
-          discountPercentage: inventory.discountPercentage,
+    // Si se desarchiva un producto en un plan con tope (Starter: 200), se verifica el cupo
+    if (updateProductDto.isActive === true && !existingProduct.isActive) {
+      const features = currentPlanFeatures();
+      if (features.maxProducts !== null) {
+        const activeCount = await this.prisma.product.count({ where: { isActive: true } });
+        if (activeCount >= features.maxProducts) {
+          throw new ForbiddenException(
+            `Tu plan ${features.planName} permite hasta ${features.maxProducts} productos activos. Actualiza al plan Growth o Pro para productos ilimitados.`,
+          );
         }
-      : null,
-    category: product.category.name,
-    sizes: product.sizes as ProductResponseDto['sizes'],
-    colors: product.colors,
-    collections: (product.collections ?? []).map((c) => ({ id: c.id, name: c.name, slug: c.slug })),
-    orderCount: product._count?.orderItems ?? 0,
-  };
-}
+      }
+    }
 
+    // Igual que en create(): sin ALL_BRANCHES no se puede reasignar la exclusividad de sucursal a
+    // otra que no sea la propia
+    if (updateProductDto.branchId !== undefined && !hasAllBranches(actor)) {
+      updateProductDto.branchId = actor.branchId ?? undefined;
+    }
+
+    // 2. Validar SKU si se modifica
+    if (updateProductDto.sku && updateProductDto.sku !== existingProduct.sku) {
+      const skuTaken = await this.prisma.product.findUnique({
+        where: { sku: updateProductDto.sku },
+      });
+
+      if (skuTaken) {
+        throw new ConflictException(i18nMessage('errors.SKU_TAKEN', { sku: updateProductDto.sku }));
+      }
+    }
+
+    // 3. Validar CategoryId ANTES de actualizar en base de datos
+    if (updateProductDto.categoryId) {
+      const categoryExists = await this.prisma.category.findUnique({
+        where: { id: updateProductDto.categoryId },
+      });
+
+      if (!categoryExists) {
+        throw new BadRequestException(i18nMessage('errors.CATEGORY_NOT_FOUND', { id: updateProductDto.categoryId }));
+      }
+    }
+
+    // 4. Preparar payload para Prisma (collectionIds no es un campo escalar: se maneja aparte)
+    const { collectionIds, translations, ...rest } = updateProductDto;
+    const updateData: Prisma.ProductUpdateInput = { ...rest };
+
+    // translations: reemplaza el objeto completo (el admin manda los 4 idiomas juntos)
+    if (translations !== undefined) {
+      updateData.translations = normalizeTranslations(translations) as Prisma.InputJsonValue;
+    }
+
+    if (updateProductDto.price !== undefined) {
+      updateData.price = new Prisma.Decimal(updateProductDto.price);
+    }
+
+    // collectionIds: reemplaza la lista completa de colecciones del producto (incluir [] la vacía)
+    if (collectionIds !== undefined) {
+      updateData.collections = { set: collectionIds.map((collectionId) => ({ id: collectionId })) };
+    }
+
+    // 5. Ejecutar la actualización
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: updateData,
+      include: {
+        category: true,
+        collections: true,
+        _count: { select: { orderItems: true } },
+      },
+    });
+
+    return this.formatProduct(updatedProduct);
+  }
+
+  async updateStock(id: string, quantity: number): Promise<ProductResponseDto> {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+    });
+
+    if (!product) {
+      throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
+    }
+
+    const newStock = product.stock + quantity;
+
+    if (newStock < 0) {
+      throw new BadRequestException('Insufficient stock');
+    }
+
+    const updatedProduct = await this.prisma.product.update({
+      where: { id },
+      data: { stock: newStock },
+      include: {
+        category: true,
+      },
+    });
+    return this.formatProduct(updatedProduct);
+  }
+
+  // Soft delete: archivar, nunca borrar la fila.
+  async remove(id: string): Promise<{ message: string; data: ProductResponseDto }> {
+    const existing = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true, isActive: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
+    }
+
+    // Idempotente: archivar algo ya archivado no es un error, el resultado buscado ya se cumple
+    if (!existing.isActive) {
+      return {
+        message: 'El producto ya estaba archivado',
+        data: await this.findOne(id),
+      };
+    }
+
+    const archived = await this.prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+      include: {
+        category: true,
+        collections: true,
+        _count: { select: { orderItems: true } },
+      },
+    });
+
+    return {
+      message: 'Producto archivado: ya no aparece en la tienda ni en la caja',
+      data: this.formatProduct(archived),
+    };
+  }
+
+  // SUPERADMIN: aplica el mismo descuento a un producto en todas las sucursales
+  async applyDiscountToAllBranches(
+    productId: string,
+    dto: BulkDiscountDto,
+  ): Promise<{ updatedBranches: number }> {
+    assertPlanFeature('multiBranchInventory');
+    return await this.inventoryService.applyDiscountToAllBranches(productId, dto);
+  }
+
+  // Sin contexto de sucursal no hay descuento ni stock de sucursal: el descuento vive en ProductInventory
+  private formatProduct(
+    product: Product & { category: Category; collections?: Collection[]; _count?: { orderItems: number } },
+    context?: { inventory: InventoryAggregate | null },
+  ): ProductResponseDto {
+    const inventory = context?.inventory ?? null;
+    const translations = readTranslations(product.translations);
+    const locale = currentLanguage();
+    const localized = localizeProduct({ name: product.name, description: product.description }, translations, locale);
+    const hasDiscount =
+      inventory != null &&
+      (inventory.discountPrice != null || inventory.discountPercentage != null);
+
+    return {
+      ...product,
+      name: localized.name,
+      description: localized.description,
+      baseName: product.name,
+      baseDescription: product.description,
+      translations,
+      locale,
+      price: Number(product.price),
+      effectivePrice: getBranchPrice(product, inventory),
+      branchStock: context ? (inventory?.stock ?? 0) : null,
+      stockBySize: context ? (inventory?.sizes ?? []) : null,
+      discount: hasDiscount
+        ? {
+            discountPrice: inventory.discountPrice != null ? Number(inventory.discountPrice) : null,
+            discountPercentage: inventory.discountPercentage,
+          }
+        : null,
+      category: product.category.name,
+      sizes: product.sizes as ProductResponseDto['sizes'],
+      colors: product.colors,
+      collections: (product.collections ?? []).map((c) => ({ id: c.id, name: c.name, slug: c.slug })),
+      orderCount: product._count?.orderItems ?? 0,
+    };
+  }
 }

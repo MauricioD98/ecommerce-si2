@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
 import { PlatformController } from './platform.controller';
 import { PlatformAuthController } from './platform-auth.controller';
 import { SubscriptionsController } from './subscriptions.controller';
@@ -14,7 +15,7 @@ import { InternalKeyGuard } from './guards/internal-key.guard';
 // de MailModule (@Global). SubscriptionsService se exporta para el webhook de Stripe (PaymentsModule).
 // JwtModule sin config: PlatformAuthService pasa secret y audience en cada sign/verify.
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), AuthModule],
   controllers: [PlatformController, PlatformAuthController, SubscriptionsController, TenantSubscriptionController, ContactController],
   providers: [PlatformAuthService, PlatformAdminGuard, InternalKeyGuard, SubscriptionsService],
   exports: [SubscriptionsService],

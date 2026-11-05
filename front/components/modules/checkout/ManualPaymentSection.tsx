@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Copy, Upload } from 'lucide-react';
+import { CheckCircle2, Copy, Upload, Wallet as WalletIcon } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import qrStyles from './qr-payment.module.scss';
 import styles from './manual-payment.module.scss';
@@ -22,8 +22,8 @@ interface ManualPaymentSectionProps {
     onSubmitted?: (orderId: string) => void;
 }
 
-// Pago manual con los datos de la tienda: QR bancario (el cliente sube el comprobante) o USDT (informa
-// el TxID). El pedido queda pendiente con el stock reservado hasta que la tienda lo aprueba en Pedidos.
+// Pago manual con los datos de la tienda: QR bancario, USDT o Billetera Digital (Airtm, Takenos, Wallbit).
+// El pedido queda pendiente con el stock reservado hasta que la tienda lo aprueba en Pedidos.
 export default function ManualPaymentSection({ method, options, amount, ensureOrder, onSubmitted }: ManualPaymentSectionProps) {
     const t = useTranslations('Checkout.manual');
     const locale = useLocale();
@@ -53,7 +53,6 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
             active = false;
             if (url) URL.revokeObjectURL(url);
         };
-        // t solo cambia con el idioma
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [method]);
 
@@ -66,13 +65,14 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
     };
 
     const copyAddress = async () => {
-        if (!options.usdt) return;
+        const textToCopy = method === 'WALLET' ? options.wallet?.account : options.usdt?.walletAddress;
+        if (!textToCopy) return;
         try {
-            await navigator.clipboard.writeText(options.usdt.walletAddress);
+            await navigator.clipboard.writeText(textToCopy);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch {
-            // Sin permiso de portapapeles: la dirección igual se puede seleccionar a mano
+            // Sin permiso de portapapeles
         }
     };
 
@@ -85,7 +85,11 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
         try {
             const orderId = await ensureOrder();
             if (!orderId) throw new Error(t('orderFailed'));
-            await paymentSettingsService.submitProof(orderId, method, method === 'BANK_QR' ? { file } : { txId });
+            await paymentSettingsService.submitProof(
+                orderId,
+                method,
+                method === 'BANK_QR' ? { file } : { txId, file: file || undefined },
+            );
             setSubmittedOrderId(orderId);
             onSubmitted?.(orderId);
         } catch (err) {
@@ -108,29 +112,58 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
         );
     }
 
+    const title =
+        method === 'BANK_QR'
+            ? t('qrTitle')
+            : method === 'WALLET'
+            ? (t('walletTitle') || 'Transfiere desde tu billetera digital')
+            : t('usdtTitle');
+
+    const subtitle =
+        method === 'BANK_QR'
+            ? t('qrSubtitle')
+            : method === 'WALLET'
+            ? (t('walletSubtitle') || 'Transfiere el monto a nuestra cuenta e ingresa la referencia de la transferencia.')
+            : t('usdtSubtitle');
+
     return (
         <div className={qrStyles.qrContainer}>
-            <h3 className={qrStyles.title}>{method === 'BANK_QR' ? t('qrTitle') : t('usdtTitle')}</h3>
-            <p className={qrStyles.subtitle}>{method === 'BANK_QR' ? t('qrSubtitle') : t('usdtSubtitle')}</p>
+            <h3 className={qrStyles.title}>{title}</h3>
+            <p className={qrStyles.subtitle}>{subtitle}</p>
 
-            <div className={qrStyles.qrFrame}>
-                {method === 'BANK_QR' ? (
-                    qrUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- object URL local
+            {method === 'BANK_QR' && (
+                <div className={qrStyles.qrFrame}>
+                    {qrUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={qrUrl} alt={t('qrAlt')} className={styles.qrImage} />
                     ) : (
                         <div className={styles.qrPlaceholder}><div className={qrStyles.spinner} /></div>
-                    )
-                ) : (
-                    // eslint-disable-next-line @next/next/no-img-element -- data URL generado por la API
-                    <img src={options.usdt!.walletQr} alt={t('walletQrAlt')} className={qrStyles.qrImage} />
-                )}
-            </div>
+                    )}
+                </div>
+            )}
+
+            {method === 'USDT' && options.usdt && (
+                <div className={qrStyles.qrFrame}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={options.usdt.walletQr} alt={t('walletQrAlt')} className={qrStyles.qrImage} />
+                </div>
+            )}
+
+            {method === 'WALLET' && (
+                <div className={qrStyles.qrFrame} style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: '#f8fafc', borderRadius: '1rem', border: '1px dashed #cbd5e1' }}>
+                    <WalletIcon size={44} color="#6366f1" />
+                    <span style={{ fontWeight: 700, fontSize: '1rem', color: '#1e293b' }}>
+                        {options.wallet?.provider || 'Airtm / Takenos / Wallbit'}
+                    </span>
+                    <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Transferencia P2P entre billeteras</span>
+                </div>
+            )}
 
             <div className={qrStyles.amountBox}>
                 <p className={qrStyles.label}>{t('amount')}</p>
                 <p className={qrStyles.value}>{formatMoney(amount, locale)}</p>
                 {method === 'USDT' && <p className={styles.hint}>{t('usdtAmountHint')}</p>}
+                {method === 'WALLET' && <p className={styles.hint}>Transfiere este monto exacto a la cuenta indicada a continuación.</p>}
             </div>
 
             {method === 'BANK_QR' && options.bankQr?.instructions && (
@@ -156,8 +189,29 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
                 </div>
             )}
 
+            {method === 'WALLET' && options.wallet && (
+                <div className={styles.walletBox}>
+                    <p className={styles.label}>Billeteras aceptadas</p>
+                    <p className={styles.network}>{options.wallet.provider}</p>
+                    <p className={styles.label}>Cuenta o Usuario de cobro</p>
+                    <div className={styles.walletRow}>
+                        <code className={styles.wallet}>{options.wallet.account}</code>
+                        <button type="button" className={styles.copyButton} onClick={copyAddress} aria-label="Copiar cuenta">
+                            <Copy size={16} />
+                            {copied ? t('copied') : t('copy')}
+                        </button>
+                    </div>
+                    {options.wallet.instructions && (
+                        <div className={styles.instructions} style={{ marginTop: '0.75rem' }}>
+                            <p className={styles.label}>{t('instructions')}</p>
+                            <p className={styles.preformatted}>{options.wallet.instructions}</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
             <div className={styles.proofForm}>
-                {method === 'BANK_QR' ? (
+                {method === 'BANK_QR' && (
                     <>
                         <input
                             ref={fileInput}
@@ -172,7 +226,9 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
                         </button>
                         <p className={styles.hint}>{file ? file.name : t('receiptHint')}</p>
                     </>
-                ) : (
+                )}
+
+                {method === 'USDT' && (
                     <label className={styles.txField}>
                         <span className={styles.label}>{t('txId')}</span>
                         <input
@@ -187,6 +243,39 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
                         />
                         <span className={styles.hint}>{t('txIdHint')}</span>
                     </label>
+                )}
+
+                {method === 'WALLET' && (
+                    <>
+                        <label className={styles.txField}>
+                            <span className={styles.label}>ID o Referencia de la transferencia</span>
+                            <input
+                                className={styles.txInput}
+                                value={txId}
+                                maxLength={100}
+                                spellCheck={false}
+                                autoComplete="off"
+                                required
+                                placeholder="Ej. AIRTM-982341, TK-123456, WB-987654"
+                                onChange={(e) => setTxId(e.target.value)}
+                            />
+                            <span className={styles.hint}>Ingresa el código o número de referencia de la transferencia.</span>
+                        </label>
+                        <div style={{ marginTop: '0.5rem' }}>
+                            <input
+                                ref={fileInput}
+                                type="file"
+                                accept={IMAGE_TYPES.join(',')}
+                                hidden
+                                onChange={(e) => pickFile(e.target.files?.[0])}
+                            />
+                            <button type="button" className={styles.uploadButton} onClick={() => fileInput.current?.click()}>
+                                <Upload size={16} />
+                                {file ? t('changeReceipt') : 'Adjuntar comprobante (opcional)'}
+                            </button>
+                            <p className={styles.hint}>{file ? file.name : t('receiptHint')}</p>
+                        </div>
+                    </>
                 )}
 
                 {error && <div className={qrStyles.errorBox}>{error}</div>}

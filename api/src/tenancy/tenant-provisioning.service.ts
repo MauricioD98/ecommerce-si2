@@ -15,6 +15,7 @@ import { TenantMigrationService } from './tenant-migration.service';
 import { TenantPrismaService } from './tenant-prisma.service';
 import { TenantSecretsService } from './tenant-secrets.service';
 import * as webpush from 'web-push';
+import { getPlanFeatures } from '../modules/platform/plans';
 
 export interface CreateTenantInput {
   name: string;
@@ -165,6 +166,8 @@ export class TenantProvisioningService {
       await this.control.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS ${quoteIdent(schemaName)}`);
       await this.migrator.deploy(schemaName);
       await this.seedBaseData(schemaName, owner);
+      await this.seedPaymentSettings(schemaName, tenantId);
+      await this.seedAppearanceSettings(schemaName);
       await this.ensureWebPushKeys(tenantId, `mailto:${owner.email}`);
 
       return await this.control.tenant.update({
@@ -237,6 +240,66 @@ export class TenantProvisioningService {
       await this.secrets.set(tenantId, 'WEBPUSH', { publicKey, privateKey, subject });
     } catch (e: any) {
       this.logger.error(`No se pudo generar el par VAPID de ${tenantId}: ${e.message}`);
+    }
+  }
+
+  
+  /**
+   * Inicializa la configuración de pagos de la tienda según su plan.
+   * Si el plan incluye billeteras digitales (Growth, Pro, Legacy), se habilitan por defecto
+   * para permitir cobros y pruebas simuladas inmediatas.
+   */
+  async seedPaymentSettings(schemaName: string, tenantId: string): Promise<void> {
+    try {
+      const tenant = await this.control.tenant.findUnique({
+        where: { id: tenantId },
+        select: { plan: true, slug: true },
+      });
+      if (!tenant) return;
+
+      const features = getPlanFeatures(tenant.plan);
+      const db = this.tenants.forSchema(schemaName);
+
+      if (features.digitalWallet) {
+        const defaultAccount = `@${tenant.slug} / pagos@${tenant.slug}.com`;
+        const defaultProvider = 'Airtm / Takenos / Wallbit';
+        const defaultInstructions =
+          'Transfiere el monto desde tu cuenta Airtm, Takenos o Wallbit a nuestro usuario/correo. Luego ingresa el ID de transacción o referencia de la transferencia.';
+
+        await db.paymentSettings.upsert({
+          where: { id: 'default' },
+          create: {
+            id: 'default',
+            walletEnabled: true,
+            walletProvider: defaultProvider,
+            walletAccount: defaultAccount,
+            walletInstructions: defaultInstructions,
+          },
+          update: {
+            walletEnabled: true,
+            walletProvider: defaultProvider,
+            walletAccount: defaultAccount,
+            walletInstructions: defaultInstructions,
+          },
+        });
+        this.logger.log(`${schemaName}: Billetera digital configurada y habilitada por defecto (Plan ${tenant.plan})`);
+      }
+    } catch (e: any) {
+      this.logger.warn(`No se pudo inicializar la configuración de pagos de ${tenantId}: ${e.message}`);
+    }
+  }
+
+  async seedAppearanceSettings(schemaName: string): Promise<void> {
+    try {
+      const db = this.tenants.forSchema(schemaName);
+      await db.storeAppearance.upsert({
+        where: { id: 'default' },
+        create: { id: 'default' },
+        update: {},
+      });
+      this.logger.log(`${schemaName}: Configuración de apariencia inicializada por defecto`);
+    } catch (e: any) {
+      this.logger.warn(`No se pudo inicializar la apariencia de ${schemaName}: ${e.message}`);
     }
   }
 

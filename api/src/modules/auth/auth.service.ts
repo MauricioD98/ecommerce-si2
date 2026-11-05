@@ -34,11 +34,14 @@ export class AuthService {
 
     async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
         const { email, password, firstName, lastName, phone } = registerDto;
+        const normalizedEmail = email.trim().toLowerCase();
 
         try {
             // Verificación temprana (evita hashear la contraseña de balde). La restricción única de la BD
             // sigue siendo la garantía real: si dos registros llegan a la vez, se captura P2002 más abajo
-            const existingUser = await this.prisma.user.findUnique({ where: { email } });
+            const existingUser = await this.prisma.user.findFirst({
+                where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+            });
             if (existingUser) {
                 throw new ConflictException(i18nMessage('errors.EMAIL_TAKEN'));
             }
@@ -52,7 +55,7 @@ export class AuthService {
             const hashedPassword = await bcrypt.hash(password, this.SALT_ROUNDS);
             const user = await this.prisma.user.create({
                 data: {
-                    email,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     firstName,
                     lastName,
@@ -245,11 +248,40 @@ export class AuthService {
         });
     }
 
+    /** Registra un intento fallido en el tenant actual; devuelve true si la cuenta acaba de bloquearse. */
+    async recordFailedLoginAttempt(user: { id: string; loginAttempts: number; lockedUntil: Date | null }): Promise<boolean> {
+        // Si un bloqueo anterior ya venció, el conteo empieza de cero
+        const attempts = (user.lockedUntil ? 0 : user.loginAttempts) + 1;
+        const lock = attempts >= this.LOGIN_MAX_ATTEMPTS;
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: lock
+                ? { loginAttempts: 0, lockedUntil: new Date(Date.now() + this.LOGIN_LOCK_MS) }
+                : { loginAttempts: attempts, lockedUntil: null },
+        });
+        return lock;
+    }
+
+    /** Emite tokens y limpia bloqueos previos para un usuario ya autenticado en el tenant actual. */
+    async issueSessionForUser(user: UserWithRole & { loginAttempts: number; lockedUntil: Date | null }): Promise<AuthResponseDto> {
+        if (user.loginAttempts > 0 || user.lockedUntil) {
+            await this.prisma.user.update({ where: { id: user.id }, data: { loginAttempts: 0, lockedUntil: null } });
+        }
+
+        const tokens = await this.generateTokens(user);
+        await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+        return {
+            ...tokens,
+            user: toUserResponse(user),
+        };
+    }
+
     async login (loginDto: LoginDto): Promise<AuthResponseDto>{
         const {email,password}=loginDto
 
-        const user = await this.prisma.user.findUnique({
-            where:{email},
+        const user = await this.prisma.user.findFirst({
+            where:{ email: { equals: email.trim(), mode: 'insensitive' } },
             select: { ...USER_SELECT, password: true, loginAttempts: true, lockedUntil: true },
         });
 
@@ -264,15 +296,7 @@ export class AuthService {
 
         if(!user || !(await bcrypt.compare(password , user.password))){
             if (user) {
-                // Si un bloqueo anterior ya venció, el conteo empieza de cero
-                const attempts = (user.lockedUntil ? 0 : user.loginAttempts) + 1;
-                const lock = attempts >= this.LOGIN_MAX_ATTEMPTS;
-                await this.prisma.user.update({
-                    where: { id: user.id },
-                    data: lock
-                        ? { loginAttempts: 0, lockedUntil: new Date(Date.now() + this.LOGIN_LOCK_MS) }
-                        : { loginAttempts: attempts, lockedUntil: null },
-                });
+                const lock = await this.recordFailedLoginAttempt(user);
                 if (lock) {
                     throw new HttpException(
                         i18nMessage('errors.ACCOUNT_LOCKED'),
@@ -283,16 +307,6 @@ export class AuthService {
             throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'))
         }
 
-        if (user.loginAttempts > 0 || user.lockedUntil) {
-            await this.prisma.user.update({ where: { id: user.id }, data: { loginAttempts: 0, lockedUntil: null } });
-        }
-
-        const tokens = await this.generateTokens(user);
-        await this.updateRefreshToken(user.id, tokens.refreshToken);
-
-        return{
-            ...tokens,
-            user: toUserResponse(user),
-        };
+        return this.issueSessionForUser(user);
     }
 }

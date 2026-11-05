@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { GetUser } from '../../common/decorators/get-user.decorator';
+import { assertPlanFeature, currentPlanFeatures } from '../platform/plans';
 import { NotificationsService } from './notifications.service';
 import { SubscribePushDto } from './dto/subscribe-push.dto';
 
@@ -14,15 +15,19 @@ export class NotificationsController {
 
   @Get('vapid-public-key')
   @ApiOperation({ summary: 'Obtener la llave pública VAPID para suscribirse a notificaciones push' })
-  @ApiOkResponse({ description: 'Llave pública VAPID de la tienda actual (null si la tienda no tiene push configurado)' })
+  @ApiOkResponse({ description: 'Llave pública VAPID de la tienda actual (null si la tienda o su plan no tienen push)' })
   getVapidPublicKey() {
+    if (!currentPlanFeatures().campaigns) {
+      return { publicKey: null };
+    }
     return this.notificationsService.getPublicKey();
   }
 
   @Post('subscribe')
-  @ApiOperation({ summary: 'Registrar o actualizar la suscripción push del dispositivo actual' })
+  @ApiOperation({ summary: 'Registrar o actualizar la suscripción push del dispositivo actual (Plan Pro)' })
   @ApiOkResponse({ description: 'Suscripción guardada correctamente' })
   subscribe(@GetUser('id') userId: string, @Body() dto: SubscribePushDto) {
+    assertPlanFeature('campaigns');
     return this.notificationsService.subscribe(userId, dto);
   }
 }

@@ -3,10 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { PlatformLoginDto } from './dto/platform-login.dto';
+import { TenantDiscoveryLoginDto } from './dto/tenant-discovery-login.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import { PlatformAuthService } from './platform-auth.service';
 
-// Login de los administradores del SaaS (/plataforma). Va bajo /platform, excluido de TenantMiddleware.
+// Login de los administradores del SaaS (/plataforma) y descubrimiento multi-tienda de usuarios.
+// Va bajo /platform, excluido de TenantMiddleware.
 @ApiTags('platform')
 @Controller('platform/auth')
 export class PlatformAuthController {
@@ -21,6 +23,24 @@ export class PlatformAuthController {
   async login(@Body() dto: PlatformLoginDto) {
     const data = await this.auth.login(dto.email, dto.password);
     return { success: true, data, message: 'Sesión iniciada' };
+  }
+
+  @Post('tenant-login')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Login de tienda con detección automática del tenant por credenciales' })
+  async tenantLogin(@Body() dto: TenantDiscoveryLoginDto) {
+    const data = await this.auth.tenantLogin(dto);
+    return {
+      success: true,
+      data,
+      message: data.isPlatformAdmin
+        ? 'Sesión de plataforma iniciada'
+        : data.requiresTenantSelection
+          ? 'Selecciona una tienda para continuar'
+          : 'Sesión iniciada',
+    };
   }
 
   @Get('me')

@@ -1,8 +1,8 @@
 // Nombre de la tienda: lo que el cliente ve como "marca" (header, panel, recibos, títulos). La marca de
-// la plataforma ("Stella Femme") queda solo para las páginas del SaaS (/planes, /plataforma).
+// la plataforma ("NovaSoft") queda solo para las páginas del SaaS (/planes, /plataforma).
 // Archivo sin imports de Next: lo usan tanto el provider del cliente como utils/storeName.server.ts.
 
-export const PLATFORM_BRAND = "Stella Femme";
+export const PLATFORM_BRAND = "NovaSoft";
 
 // La escribe StoreInfoProvider: es la tienda que el navegador eligió (?tenant=, localStorage), que el
 // servidor no puede ver. Solo sirve para mostrar el nombre en títulos y manifest: no autoriza nada

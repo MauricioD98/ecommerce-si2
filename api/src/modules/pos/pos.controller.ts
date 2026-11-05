@@ -2,7 +2,9 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/decorators/guards/permissions.guard';
+import { PlanFeatureGuard } from '../../common/decorators/guards/plan-feature.guard';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { RequirePlanFeature } from '../../common/decorators/plan-feature.decorator';
 import { Permission } from '../../common/constants/permissions';
 import { GetUser } from '../../common/decorators/get-user.decorator';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
@@ -12,7 +14,8 @@ import { PosCheckoutResponseDto } from './dto/pos-receipt.dto';
 
 @ApiTags('pos')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, PlanFeatureGuard)
+@RequirePlanFeature('pos')
 @Controller('pos')
 export class PosController {
   constructor(private readonly posService: PosService) {}
@@ -56,7 +59,7 @@ export class PosController {
   @ApiBody({ type: PosCheckoutDto })
   @ApiResponse({ status: 201, description: 'Venta registrada', type: PosCheckoutResponseDto })
   @ApiResponse({ status: 400, description: 'Stock insuficiente o datos inválidos' })
-  @ApiResponse({ status: 403, description: 'El rol no tiene el permiso USE_POS' })
+  @ApiResponse({ status: 403, description: 'El rol no tiene el permiso USE_POS o el plan no incluye POS' })
   async checkout(@Body() dto: PosCheckoutDto, @GetUser() cashier: AuthUser): Promise<PosCheckoutResponseDto> {
     return await this.posService.checkout(cashier, dto);
   }

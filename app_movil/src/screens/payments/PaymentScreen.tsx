@@ -21,6 +21,7 @@ import { Button } from '../../components/Button';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Colors, Shadows } from '../../theme/colors';
 import { useCart } from '../../context/CartContext';
+import { useTenant } from '../../context/TenantContext';
 import { getErrorMessage } from '../../api/client';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
@@ -28,12 +29,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
   const { fetchCart, clearCartLocal } = useCart();
+  const { tenantName, tenantSlug } = useTenant();
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
     const val = Number(amount);
     return isNaN(val) || val <= 0 ? 0 : val;
   });
-  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'qr'>('stripe');
+  const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'qr' | 'wallet'>('stripe');
+  const [walletProvider, setWalletProvider] = useState<'Airtm' | 'Takenos' | 'Wallbit'>('Airtm');
+  const [walletTxId, setWalletTxId] = useState<string>('');
+  const [isSubmittingWallet, setIsSubmittingWallet] = useState<boolean>(false);
   const [clientSecret, setClientSecret] = useState<string>('');
   const [paymentIntentId, setPaymentIntentId] = useState<string>('');
   const [isLoadingIntent, setIsLoadingIntent] = useState<boolean>(true);
@@ -184,6 +189,30 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
+  const handleSubmitWalletProof = async () => {
+    if (!walletTxId.trim()) {
+      Alert.alert('Referencia requerida', 'Por favor ingresa el código o ID de la transferencia.');
+      return;
+    }
+
+    try {
+      setIsSubmittingWallet(true);
+      await paymentsApi.submitProof(orderId, 'WALLET', { txId: walletTxId.trim() });
+      setTransactionRef(walletTxId.trim());
+      setIsSuccess(true);
+      try {
+        clearCartLocal();
+        await fetchCart();
+      } catch {
+        // Ignorar
+      }
+    } catch (err) {
+      Alert.alert('Error al registrar comprobante', getErrorMessage(err));
+    } finally {
+      setIsSubmittingWallet(false);
+    }
+  };
+
   const handleProcessPayment = async () => {
     if (!paymentIntentId) {
       Alert.alert('Error', 'No se ha inicializado la intención de pago.');
@@ -223,29 +252,32 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.successIconCircle}>
             <Ionicons name="checkmark-circle" size={80} color={Colors.success} />
           </View>
-          <Text style={styles.successTitle}>¡Pago Exitoso!</Text>
+          <Text style={styles.successTitle}>
+            {selectedMethod === 'wallet' ? '¡Comprobante Enviado!' : '¡Pago Exitoso!'}
+          </Text>
           <Text style={styles.successDesc}>
-            Tu pago por un monto de Bs {currentAmount.toFixed(2)} ha sido procesado
-            satisfactoriamente con {selectedMethod === 'qr' ? 'código QR' : 'Stripe'}. Tu pedido ya está en preparación.
+            {selectedMethod === 'wallet'
+              ? `Tu comprobante de pago por Bs ${currentAmount.toFixed(2)} mediante ${walletProvider} ha sido registrado. La tienda verificará la transferencia para procesar tu pedido.`
+              : `Tu pago por un monto de Bs ${currentAmount.toFixed(2)} ha sido procesado satisfactoriamente con ${selectedMethod === 'qr' ? 'código QR' : 'Stripe'}. Tu pedido ya está en preparación.`}
           </Text>
 
           <View style={styles.receiptCard}>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Método</Text>
               <Text style={styles.receiptValue}>
-                {selectedMethod === 'qr' ? 'QR Simple' : 'Tarjeta Stripe'}
+                {selectedMethod === 'wallet' ? `Billetera (${walletProvider})` : selectedMethod === 'qr' ? 'QR Simple' : 'Tarjeta Stripe'}
               </Text>
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Referencia</Text>
               <Text style={styles.receiptValue} numberOfLines={1}>
-                {transactionRef || (selectedMethod === 'qr' ? 'QR-PAGO' : 'STRIPE-OK')}
+                {transactionRef || (selectedMethod === 'qr' ? 'QR-PAGO' : selectedMethod === 'wallet' ? walletTxId : 'STRIPE-OK')}
               </Text>
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Estado en BD</Text>
-              <Text style={[styles.receiptValue, { color: Colors.success }]}>
-                Aprobado (Procesando)
+              <Text style={[styles.receiptValue, { color: selectedMethod === 'wallet' ? Colors.warning : Colors.success }]}>
+                {selectedMethod === 'wallet' ? 'Pendiente de Aprobación' : 'Aprobado (Procesando)'}
               </Text>
             </View>
           </View>
@@ -295,7 +327,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.amountValue}>Bs ${currentAmount.toFixed(2)}</Text>
           <View style={styles.stripeBadge}>
             <Ionicons name="shield-checkmark" size={14} color={Colors.primary} />
-            <Text style={styles.stripeBadgeText}>Pago Seguro Stella Femme</Text>
+            <Text style={styles.stripeBadgeText}>Pago Seguro {tenantName || 'Tienda'}</Text>
           </View>
         </View>
 
@@ -338,6 +370,26 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               ]}
             >
               QR Simple
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.methodTab, selectedMethod === 'wallet' && styles.methodTabActive]}
+            onPress={() => setSelectedMethod('wallet')}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="wallet-outline"
+              size={18}
+              color={selectedMethod === 'wallet' ? Colors.primary : Colors.textMuted}
+            />
+            <Text
+              style={[
+                styles.methodTabText,
+                selectedMethod === 'wallet' && styles.methodTabTextActive,
+              ]}
+            >
+              Billetera P2P
             </Text>
           </TouchableOpacity>
         </View>
@@ -418,7 +470,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               />
             </View>
           </>
-        ) : (
+        ) : selectedMethod === 'qr' ? (
           /* QR Payment Section */
           <View style={styles.qrCard}>
             <Text style={styles.qrTitle}>Escanea para pagar</Text>
@@ -465,6 +517,69 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                 style={{ marginTop: 16 }}
               />
             )}
+          </View>
+        ) : (
+          <View style={styles.walletCard}>
+            <Text style={styles.walletTitle}>Billetera Digital (Airtm, Takenos, Wallbit)</Text>
+            <Text style={styles.walletSubtitle}>
+              Selecciona tu plataforma, transfiere el monto exacto a nuestra cuenta y registra el ID de la transacción para su aprobación.
+            </Text>
+
+            <View style={styles.providerRow}>
+              {(['Airtm', 'Takenos', 'Wallbit'] as const).map((prov) => (
+                <TouchableOpacity
+                  key={prov}
+                  style={[styles.providerPill, walletProvider === prov && styles.providerPillActive]}
+                  onPress={() => setWalletProvider(prov)}
+                >
+                  <Text style={[styles.providerText, walletProvider === prov && styles.providerTextActive]}>
+                    {prov}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.accountBox}>
+              <View style={styles.accountRow}>
+                <Text style={styles.accountLabel}>Cuenta de Destino ({walletProvider}):</Text>
+                <Text style={styles.accountValue}>
+                  {walletProvider === 'Airtm'
+                    ? `pagos@${tenantSlug || 'tienda'}.com`
+                    : walletProvider === 'Takenos'
+                    ? `@${tenantSlug || 'tienda'}`
+                    : `${tenantSlug || 'tienda'}.wallbit`}
+                </Text>
+              </View>
+              <View style={styles.accountRow}>
+                <Text style={styles.accountLabel}>Monto a transferir:</Text>
+                <Text style={[styles.accountValue, { color: Colors.primary, fontWeight: '700' }]}>
+                  Bs {currentAmount.toFixed(2)}
+                </Text>
+              </View>
+              <Text style={styles.accountNote}>
+                💡 Realiza la transferencia en tu app de {walletProvider} y copia el ID o código de referencia.
+              </Text>
+            </View>
+
+            <View style={styles.walletForm}>
+              <Input
+                label="ID de Transacción / Código de Referencia"
+                value={walletTxId}
+                onChangeText={setWalletTxId}
+                placeholder={`Ej. ${walletProvider.toUpperCase()}-849201`}
+                icon="receipt-outline"
+              />
+
+              <Button
+                title="Registrar y Enviar Comprobante"
+                onPress={handleSubmitWalletProof}
+                isLoading={isSubmittingWallet}
+                variant="primary"
+                size="lg"
+                style={styles.walletSubmitBtn}
+                icon={<Ionicons name="send-outline" size={18} color={Colors.textWhite} />}
+              />
+            </View>
           </View>
         )}
       </ScrollView>
@@ -517,6 +632,88 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  walletCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadows.sm,
+  },
+  walletTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  walletSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  providerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  providerPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.surfaceSubtle,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  providerPillActive: {
+    backgroundColor: Colors.primaryLight,
+    borderColor: Colors.primary,
+  },
+  providerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  providerTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  accountBox: {
+    backgroundColor: Colors.surfaceSubtle,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  accountLabel: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  accountValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  accountNote: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  walletForm: {
+    marginTop: 4,
+  },
+  walletSubmitBtn: {
+    marginTop: 14,
   },
   creditCard: {
     backgroundColor: '#1E1B4B', // Deep indigo/slate

@@ -66,12 +66,29 @@ export class StoreAppearanceService {
 
   /** Configuración actual; si la tienda nunca la guardó, se crea con los valores por defecto. */
   async get() {
-    return this.prisma.storeAppearance.upsert({
+    const existing = await this.prisma.storeAppearance.findUnique({
       where: { id: APPEARANCE_ID },
-      create: { id: APPEARANCE_ID },
-      update: {},
       select: PUBLIC_SELECT,
     });
+    if (existing) return existing;
+
+    try {
+      return await this.prisma.storeAppearance.upsert({
+        where: { id: APPEARANCE_ID },
+        create: { id: APPEARANCE_ID },
+        update: {},
+        select: PUBLIC_SELECT,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const row = await this.prisma.storeAppearance.findUnique({
+          where: { id: APPEARANCE_ID },
+          select: PUBLIC_SELECT,
+        });
+        if (row) return row;
+      }
+      throw error;
+    }
   }
 
   /** Vitrina pública: solo lee (cada visita pasa por acá); sin fila, los mismos valores por defecto. */
@@ -102,12 +119,23 @@ export class StoreAppearanceService {
             ? Prisma.DbNull
             : dto.socialLinks.map(({ platform, url }) => ({ platform, url: url.trim() })),
     };
-    return this.prisma.storeAppearance.upsert({
-      where: { id: APPEARANCE_ID },
-      create: { id: APPEARANCE_ID, ...(data as Prisma.StoreAppearanceCreateInput) },
-      update: data,
-      select: PUBLIC_SELECT,
-    });
+    try {
+      return await this.prisma.storeAppearance.upsert({
+        where: { id: APPEARANCE_ID },
+        create: { id: APPEARANCE_ID, ...(data as Prisma.StoreAppearanceCreateInput) },
+        update: data,
+        select: PUBLIC_SELECT,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return await this.prisma.storeAppearance.update({
+          where: { id: APPEARANCE_ID },
+          data,
+          select: PUBLIC_SELECT,
+        });
+      }
+      throw error;
+    }
   }
 
   /** Logo, favicon o fondo subido desde el panel: se valida por sus bytes y se guarda como data URL. */
@@ -119,11 +147,22 @@ export class StoreAppearanceService {
     const type = detectImageType(file);
     const dataUrl = `data:${type};base64,${file!.buffer.toString('base64')}`;
     const field = IMAGE_FIELDS[kind];
-    return this.prisma.storeAppearance.upsert({
-      where: { id: APPEARANCE_ID },
-      create: { id: APPEARANCE_ID, [field]: dataUrl },
-      update: { [field]: dataUrl },
-      select: PUBLIC_SELECT,
-    });
+    try {
+      return await this.prisma.storeAppearance.upsert({
+        where: { id: APPEARANCE_ID },
+        create: { id: APPEARANCE_ID, [field]: dataUrl },
+        update: { [field]: dataUrl },
+        select: PUBLIC_SELECT,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        return await this.prisma.storeAppearance.update({
+          where: { id: APPEARANCE_ID },
+          data: { [field]: dataUrl },
+          select: PUBLIC_SELECT,
+        });
+      }
+      throw error;
+    }
   }
 }

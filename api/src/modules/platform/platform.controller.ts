@@ -4,7 +4,9 @@ import {
   ConflictException,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   NotFoundException,
@@ -25,13 +27,14 @@ import { Prisma } from '../../generated/control/client';
 import { ControlPrismaService } from '../../tenancy/control-prisma.service';
 import { TenantProvisioningService } from '../../tenancy/tenant-provisioning.service';
 import { TenantResolutionCache } from '../../tenancy/tenant-resolution-cache.service';
+import { CLIENT_PLATFORM_HEADER } from '../../tenancy/tenant.middleware';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { SetTenantDomainDto } from './dto/set-domain.dto';
 import { SetTenantStatusDto } from './dto/set-tenant-status.dto';
 import { PLATFORM_KEY_HEADER, PlatformAdminGuard } from './guards/platform-admin.guard';
 import { InternalKeyGuard } from './guards/internal-key.guard';
 import { SubscriptionsService } from './subscriptions.service';
-import { PLANS, type PlanKey } from './plans';
+import { PLANS, type PlanKey, getPlanFeatures } from './plans';
 
 // Suscripciones que hoy generan ingreso: past_due sigue contando hasta que Stripe la dé por perdida
 const PAYING_STATUSES = ['active', 'past_due'];
@@ -56,6 +59,34 @@ export class PlatformController {
   ) {}
 
   /**
+   * Directorio público de tiendas activas en la plataforma: permite que clientes y dueños cambien de
+   * tienda en el front o elijan en qué tienda registrarse / iniciar sesión. Solo devuelve datos públicos.
+   */
+  @Get('public')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Listar las tiendas activas disponibles públicamente' })
+  async listPublic() {
+    const tenants = await this.control.tenant.findMany({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, slug: true, name: true, plan: true },
+    });
+    const data = tenants.map((t) => {
+      const features = getPlanFeatures(t.plan);
+      return {
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        plan: t.plan,
+        planName: features.planName,
+        mobileApp: features.mobileApp,
+      };
+    });
+    return { success: true, data, message: 'Tiendas disponibles' };
+  }
+
+  /**
    * Público: lo usan el <TenantSelector/> del front y de la app para pasar de "slug" (lo que escribe
    * o ve el usuario) al UUID que va en x-tenant-id. Solo devuelve tiendas ACTIVE y datos públicos.
    */
@@ -63,13 +94,41 @@ export class PlatformController {
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } }) // frena el barrido de slugs
   @ApiOperation({ summary: 'Resolver el id de una tienda a partir de su slug' })
-  async resolve(@Param('slug') slug: string) {
+  async resolve(@Param('slug') slug: string, @Headers(CLIENT_PLATFORM_HEADER) clientPlatform?: string) {
+    const cleanSlug = slug.trim().toLowerCase();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanSlug);
     const tenant = await this.control.tenant.findFirst({
-      where: { slug: slug.trim().toLowerCase(), status: 'ACTIVE' },
-      select: { id: true, slug: true, name: true },
+      where: {
+        status: 'ACTIVE',
+        OR: [
+          ...(isUuid ? [{ id: cleanSlug }] : []),
+          { slug: cleanSlug },
+          { slug: cleanSlug.replace(/\s+/g, '-') },
+          { name: { equals: slug.trim(), mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, slug: true, name: true, plan: true },
     });
     if (!tenant) throw new NotFoundException('No encontramos una tienda con ese nombre');
-    return { success: true, data: tenant, message: 'Tienda encontrada' };
+
+    const features = getPlanFeatures(tenant.plan);
+    if (clientPlatform?.trim().toLowerCase() === 'mobile' && !features.mobileApp) {
+      throw new ForbiddenException(
+        `La tienda "${tenant.name}" no cuenta con App Móvil habilitada en su plan actual (${features.planName}). Disponible en el Plan Pro.`,
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        id: tenant.id,
+        slug: tenant.slug,
+        name: tenant.name,
+        plan: tenant.plan,
+        features,
+      },
+      message: 'Tienda encontrada',
+    };
   }
 
   /**
@@ -86,10 +145,16 @@ export class PlatformController {
 
     const tenant = await this.control.tenant.findFirst({
       where: { domain, domainVerifiedAt: { not: null }, status: 'ACTIVE' },
-      select: { id: true, slug: true, name: true },
+      select: { id: true, slug: true, name: true, plan: true },
     });
-    if (!tenant) throw new NotFoundException('Dominio no registrado');
-    return { success: true, data: tenant, message: 'Tienda encontrada' };
+    if (!tenant || !getPlanFeatures(tenant.plan).customDomain) {
+      throw new NotFoundException('Dominio no registrado');
+    }
+    return {
+      success: true,
+      data: { id: tenant.id, slug: tenant.slug, name: tenant.name },
+      message: 'Tienda encontrada',
+    };
   }
 
   // El admin de plataforma asigna el dominio después de verificar el DNS (CNAME al front). Por eso
@@ -99,6 +164,17 @@ export class PlatformController {
   @ApiHeader({ name: PLATFORM_KEY_HEADER, required: true })
   @ApiOperation({ summary: 'Asignar (o quitar) el dominio propio de una tienda' })
   async setDomain(@Param('id', ParseUUIDPipe) id: string, @Body() dto: SetTenantDomainDto) {
+    if (dto.domain) {
+      const target = await this.control.tenant.findUnique({ where: { id }, select: { plan: true } });
+      if (!target) throw new NotFoundException('Tienda no encontrada');
+      const features = getPlanFeatures(target.plan);
+      if (!features.customDomain) {
+        throw new ForbiddenException(
+          `El plan actual de la tienda (${features.planName}) no incluye dominio propio. Requiere plan Growth o Pro.`,
+        );
+      }
+    }
+
     try {
       const tenant = await this.control.tenant.update({
         where: { id },

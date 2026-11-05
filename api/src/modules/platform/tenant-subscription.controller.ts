@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
@@ -22,9 +22,9 @@ export class TenantSubscriptionController {
 
   @Get()
   @ApiOperation({ summary: 'Plan y estado de la suscripción de la tienda (sincronizado por el webhook)' })
-  async status(@GetUser() user: AuthUser) {
+  async status(@GetUser() user: AuthUser, @Query('session_id') sessionId?: string) {
     this.assertOwner(user);
-    const data = await this.subscriptions.getTenantSubscription(user.tenantId);
+    const data = await this.subscriptions.getTenantSubscription(user.tenantId, sessionId);
     return { success: true, data, message: 'Estado de la suscripción' };
   }
 

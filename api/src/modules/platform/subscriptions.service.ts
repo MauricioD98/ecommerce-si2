@@ -12,11 +12,12 @@ import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import { ControlPrismaService } from '../../tenancy/control-prisma.service';
 import { TenantProvisioningService } from '../../tenancy/tenant-provisioning.service';
+import { TenantResolutionCache } from '../../tenancy/tenant-resolution-cache.service';
 import { withTenantParam } from '../../tenancy/tenant-context';
 import { MailService } from '../mail/mail.service';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
-import { PLANS, type PlanKey, missingBillingEnv, planForPrice, priceIdFor } from './plans';
+import { PLANS, type PlanKey, getPlanFeatures, missingBillingEnv, planForPrice, priceIdFor } from './plans';
 
 // metadata.kind distingue estas sesiones de cualquier otro Checkout de la misma cuenta de Stripe
 const SIGNUP_KIND = 'tenant_signup';
@@ -46,6 +47,7 @@ export class SubscriptionsService implements OnModuleInit {
     private readonly control: ControlPrismaService,
     private readonly provisioning: TenantProvisioningService,
     private readonly mail: MailService,
+    private readonly tenantCache: TenantResolutionCache,
   ) {}
 
   onModuleInit() {
@@ -70,13 +72,21 @@ export class SubscriptionsService implements OnModuleInit {
       throw new ServiceUnavailableException(i18nMessage('errors.PLAN_UNAVAILABLE'));
     }
 
+    const planFeatures = getPlanFeatures(dto.plan);
+    const normalizedDomain = planFeatures.customDomain ? (dto.domain ?? null) : null;
+    if (dto.domain && !planFeatures.customDomain) {
+      throw new BadRequestException('El dominio propio está disponible desde el plan Growth.');
+    }
+
     // Se valida ANTES de cobrar: después del pago ya no se le puede decir "ese email está tomado"
     const [ownerTaken, domainTaken] = await Promise.all([
       this.control.tenantCredential.findFirst({
         where: { type: 'OWNER_PASSWORD', identifier: dto.adminEmail },
         select: { id: true },
       }),
-      dto.domain ? this.control.tenant.findFirst({ where: { domain: dto.domain }, select: { id: true } }) : null,
+      normalizedDomain
+        ? this.control.tenant.findFirst({ where: { domain: normalizedDomain }, select: { id: true } })
+        : null,
     ]);
     if (ownerTaken) throw new ConflictException(i18nMessage('errors.OWNER_EMAIL_TAKEN'));
     if (domainTaken) throw new ConflictException(i18nMessage('errors.DOMAIN_TAKEN'));
@@ -85,7 +95,7 @@ export class SubscriptionsService implements OnModuleInit {
       data: {
         plan: dto.plan,
         tenantName: dto.tenantName,
-        domain: dto.domain ?? null,
+        domain: normalizedDomain,
         adminEmail: dto.adminEmail,
         passwordHash: await bcrypt.hash(dto.adminPassword, 12),
       },
@@ -99,7 +109,7 @@ export class SubscriptionsService implements OnModuleInit {
       signupId: signup.id,
       plan: dto.plan,
       tenantName: dto.tenantName.slice(0, 100),
-      domain: dto.domain ?? '',
+      domain: normalizedDomain ?? '',
     };
 
     const session = await this.stripe.checkout.sessions.create(
@@ -162,12 +172,33 @@ export class SubscriptionsService implements OnModuleInit {
   // ---------------------------------------------------------------------------------------------
 
   /** Estado guardado por los webhooks; Stripe solo aporta el fin de período y si se cancela al final. */
-  async getTenantSubscription(tenantId: string) {
-    const tenant = await this.control.tenant.findUnique({
+  async getTenantSubscription(tenantId: string, sessionId?: string) {
+    let tenant = await this.control.tenant.findUnique({
       where: { id: tenantId },
       select: { plan: true, subscriptionStatus: true, stripeSubscriptionId: true, stripeCustomerId: true },
     });
     if (!tenant) throw new NotFoundException(i18nMessage('errors.TENANT_NOT_FOUND'));
+
+    // Respaldo sin webhook (p. ej. en desarrollo local sin `stripe listen`): si viene session_id de la
+    // redirección de Stripe Checkout y la tienda aún no figura activa, se consulta la sesión directamente.
+    if (sessionId && /^cs_(test|live)_/.test(sessionId) && !this.hasLiveSubscription(tenant)) {
+      try {
+        const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+        if (
+          session.status === 'complete' &&
+          session.metadata?.kind === TENANT_SUBSCRIPTION_KIND &&
+          session.metadata?.tenantId === tenantId
+        ) {
+          await this.linkTenantSubscription(session);
+          tenant = (await this.control.tenant.findUnique({
+            where: { id: tenantId },
+            select: { plan: true, subscriptionStatus: true, stripeSubscriptionId: true, stripeCustomerId: true },
+          }))!;
+        }
+      } catch (error) {
+        this.logger.warn(`No se pudo verificar la sesión ${sessionId} en Stripe: ${(error as Error).message}`);
+      }
+    }
 
     let cancelAtPeriodEnd = false;
     let currentPeriodEnd: string | null = null;
@@ -177,6 +208,13 @@ export class SubscriptionsService implements OnModuleInit {
         cancelAtPeriodEnd = subscription.cancel_at_period_end;
         const end = subscription.items.data[0]?.current_period_end;
         currentPeriodEnd = end ? new Date(end * 1000).toISOString() : null;
+        // También sincroniza si el cliente cambió de plan desde el Billing Portal de Stripe
+        await this.syncTenant(subscription);
+        const refreshed = await this.control.tenant.findUnique({
+          where: { id: tenantId },
+          select: { plan: true, subscriptionStatus: true, stripeSubscriptionId: true, stripeCustomerId: true },
+        });
+        if (refreshed) tenant = refreshed;
       } catch (error) {
         // El estado de la BD alcanza para la pantalla; los detalles son un extra
         this.logger.warn(`No se pudo leer la suscripción ${tenant.stripeSubscriptionId}: ${(error as Error).message}`);
@@ -187,6 +225,7 @@ export class SubscriptionsService implements OnModuleInit {
     return {
       plan: tenant.plan,
       planName: plan ? PLANS[plan].name : tenant.plan,
+      features: getPlanFeatures(tenant.plan),
       status: tenant.subscriptionStatus,
       active: this.hasLiveSubscription(tenant),
       canManage: !!tenant.stripeCustomerId,
@@ -221,8 +260,8 @@ export class SubscriptionsService implements OnModuleInit {
       metadata,
       subscription_data: { metadata },
       allow_promotion_codes: true,
-      // La vuelta no prueba nada: la página consulta GET /subscription, que refleja lo que dijo el webhook
-      success_url: withTenantParam(`${returnUrl}?checkout=success`, tenantId),
+      // La vuelta incluye session_id para sincronizar en local aunque no esté corriendo stripe listen
+      success_url: withTenantParam(`${returnUrl}?checkout=success&session_id={CHECKOUT_SESSION_ID}`, tenantId),
       cancel_url: withTenantParam(`${returnUrl}?checkout=cancelled`, tenantId),
     });
     if (!session.url) throw new ServiceUnavailableException(i18nMessage('errors.PAYMENT_URL_MISSING'));
@@ -367,7 +406,7 @@ export class SubscriptionsService implements OnModuleInit {
   private async syncTenant(subscription: Stripe.Subscription): Promise<void> {
     const tenant = await this.control.tenant.findUnique({
       where: { stripeSubscriptionId: subscription.id },
-      select: { id: true, status: true, subscriptionStatus: true },
+      select: { id: true, slug: true, plan: true, status: true, subscriptionStatus: true },
     });
     if (!tenant) return; // suscripción de otra cosa, o la tienda todavía se está creando
 
@@ -388,6 +427,8 @@ export class SubscriptionsService implements OnModuleInit {
         ...(!suspend && billingSuspended && subscription.status === 'active' ? { status: 'ACTIVE' } : {}),
       },
     });
+    // Invalidar cache del tenant para que el nuevo plan o estado aplique de inmediato
+    this.tenantCache.invalidate(tenant.id, tenant.slug);
     if (suspend) this.logger.warn(`Tienda ${tenant.id} suspendida: suscripción ${subscription.status}`);
   }
 

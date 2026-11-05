@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { PlatformFooter, PlatformNav } from "@/components/modules/platform/PlatformNav";
+import { PLATFORM_BRAND } from "@/utils/storeName";
+
+export const metadata: Metadata = {
+    applicationName: PLATFORM_BRAND,
+    openGraph: { siteName: PLATFORM_BRAND },
+};
 
 // Páginas del SaaS (/planes, /contacto): no llevan el Header de la tienda (carrito, sucursal…),
 // pero sí su propia navegación con el selector de idioma (lo primero que ve un posible cliente de otro

@@ -5,10 +5,9 @@ import CheckoutSteps from './CheckoutSteps';
 import CheckoutHeader from './CheckoutHeader';
 import DeliveryStep from './DeliveryStep';
 import styles from './checkout.module.scss';
-import { CreditCard, WifiOff, QrCode, Landmark, Coins } from 'lucide-react';
+import { CreditCard, WifiOff, QrCode, Landmark, Coins, Wallet as WalletIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 
-// IMPORTANTE: Asegúrate de que las rutas de importación apunten a los archivos reales en tu proyecto
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { usePayment } from '@/hooks/usePayment';
@@ -16,7 +15,7 @@ import { useOrder } from '@/hooks/useOrder';
 import { useBranches } from '@/hooks/useBranches';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { StripePaymentProvider, StripePaymentForm, StripePaymentPlaceholder } from './stripe-payment-form';
-import PaymentMethodCard from './PaymentMethodCard'; // Debes tener este componente creado
+import PaymentMethodCard from './PaymentMethodCard';
 import QrPaymentSection from './QrPaymentSection';
 import ManualPaymentSection from './ManualPaymentSection';
 import { OrderItem, CreateOrderRequest } from '@/types/orders.types';
@@ -27,20 +26,22 @@ import { DELIVERY_SHIPPING_COST, round2 } from '@/utils/pricing';
 import { addOfflineOrder } from '@/utils/offlineOrderQueue';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PaymentOptions, paymentSettingsService } from '@/service/api/paymentSettings.service';
-import { useStoreName } from '@/providers/StoreInfoProvider';
+import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
 
 export const revalidate = false;
 
 export default function CheckoutClient() {
-    const { isAuthenticated } = useAuth()
+    const { isAuthenticated } = useAuth();
     const router = useRouter();
     const t = useTranslations('Checkout');
     const storeName = useStoreName();
+    const { features } = useStorePlan();
+
     useEffect(() => {
         if (!isAuthenticated) {
-            router.push("/auth/login?redirect=/checkout")
+            router.push("/auth/login?redirect=/checkout");
         }
-    }, [isAuthenticated, router])
+    }, [isAuthenticated, router]);
 
     // Pasos: 1 = Entrega, 2 = Pago, 3 = Completado
     const [currentStep, setCurrentStep] = useState<number>(1);
@@ -59,31 +60,33 @@ export default function CheckoutClient() {
     const { createOrder, order, error: orderError } = useOrder();
     const { selectedBranch, selectedBranchId } = useBranches();
     const { isOnline } = useNetworkStatus();
-    // Medios de cobro activos de la tienda (Gestión de pagos). La tarjeta solo se ofrece si completó su
-    // cuenta de cobros (Stripe Connect); si no, el backend rechaza el PaymentIntent. null = todavía no se sabe.
+
     const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
     const [optionsLoaded, setOptionsLoaded] = useState(false);
     useEffect(() => {
         paymentSettingsService
             .getOptions()
             .then(setPaymentOptions)
-            .catch(() => setPaymentOptions({ card: false, bankQr: null, usdt: null }))
+            .catch(() => setPaymentOptions({ card: false, qrAllowed: false, bankQr: null, usdt: null, wallet: null }))
             .finally(() => setOptionsLoaded(true));
     }, []);
     const cardEnabled = optionsLoaded ? Boolean(paymentOptions?.card) : null;
+    // QR solo se ofrece si el plan de la tienda incluye pagos por QR (Starter, Growth, Pro).
+    const qrAllowed = optionsLoaded ? Boolean(paymentOptions?.qrAllowed ?? features.qrPayments) : false;
+    // Billetera digital (Airtm, Takenos, Wallbit) solo se ofrece desde el Plan Growth.
+    const walletAllowed = optionsLoaded ? Boolean(paymentOptions?.walletAllowed ?? features.digitalWallet) : false;
+
     const [isSavingOffline, setIsSavingOffline] = useState(false);
     const [offlineError, setOfflineError] = useState<string | null>(null);
 
     const [stockError, setStockError] = useState<string | null>(null);
 
-    const [orderId, setOrderId] = useState<string | undefined>(order?.id); // Extraemos el orderId de la orden creada
-    // Total, descuento de empleado y costo de envío calculados por el backend al crear la orden
+    const [orderId, setOrderId] = useState<string | undefined>(order?.id);
     const [orderTotal, setOrderTotal] = useState<number | null>(null);
     const [orderDiscount, setOrderDiscount] = useState<number | null>(null);
     const [orderShippingCost, setOrderShippingCost] = useState<number | null>(null);
 
     const isPickup = fulfillmentType === "PICKUP";
-    // Antes de crear la orden, se previsualiza con la constante del frontend; ya creada, se usa el valor real del backend
     const shippingCost = orderShippingCost ?? (isPickup ? 0 : DELIVERY_SHIPPING_COST);
     const payableTotal = orderTotal ?? round2(totalPrice + shippingCost);
     const employeeDiscount = orderDiscount ?? totals.employeeDiscount;
@@ -100,28 +103,26 @@ export default function CheckoutClient() {
         }
     }, [items.length, orderId, router]);
 
-    // Al llegar al paso 2, preseleccionar automáticamente el método según conectividad
+    // Al llegar al paso 2, preseleccionar automáticamente solo medios habilitados y permitidos por el plan
     useEffect(() => {
         if (currentStep !== 2 || selectedPayment) return;
-        if (!isOnline) setSelectedPayment("offline");
-        else if (cardEnabled !== null) {
-            // Sin tarjeta se prefieren los medios reales de la tienda (no crean el pedido hasta enviar el
-            // comprobante) antes que el QR simulado, que crea el pedido apenas se selecciona
-            setSelectedPayment(
-                cardEnabled ? "stripe" : paymentOptions?.bankQr ? "bank_qr" : paymentOptions?.usdt ? "usdt" : "qr",
-            );
+        if (!isOnline) {
+            setSelectedPayment("offline");
+        } else if (optionsLoaded && cardEnabled !== null) {
+            if (cardEnabled) setSelectedPayment("stripe");
+            else if (paymentOptions?.bankQr && qrAllowed) setSelectedPayment("bank_qr");
+            else if (qrAllowed) setSelectedPayment("qr");
+            else if (paymentOptions?.wallet && walletAllowed) setSelectedPayment("wallet");
+            else if (paymentOptions?.usdt) setSelectedPayment("usdt");
         }
-    }, [currentStep, selectedPayment, isOnline, cardEnabled, paymentOptions]);
+    }, [currentStep, selectedPayment, isOnline, optionsLoaded, cardEnabled, paymentOptions, qrAllowed]);
 
-    // Creación del pedido en curso: si dos caminos la piden a la vez (p. ej. el QR simple al
-    // preseleccionarse y el envío de un comprobante), comparten la misma petición en vez de crear dos
     const orderInFlight = useRef<Promise<string | null> | null>(null);
 
     const ensureOrderCreated = useCallback(async (forceRetry = false): Promise<string | null> => {
         if (orderInFlight.current) return orderInFlight.current;
         let activeOrderId = orderId;
 
-        // Crear la orden si no existe aún o si se fuerza reintento
         if (!activeOrderId || forceRetry) {
             const create = async (): Promise<string | null> => {
                 setIsCreatingOrder(true);
@@ -135,17 +136,14 @@ export default function CheckoutClient() {
                         selectedSize: item.selectedSize,
                     }));
 
-                    // createOrder (useOrder) ahora lanza con el mensaje EXACTO del backend en vez de
-                    // devolver null; si esta línea no lanza, createdOrder siempre viene con datos.
                     const createdOrder = await createOrder({
                         items: cartItems,
                         fulfillmentType,
                         branchId: selectedBranchId ?? undefined,
-                        // El backend acepta QR, BANK_QR o USDT (CreateOrderDto); para Stripe hay que omitir
-                        // el campo, no enviar 'STRIPE' (eso da 400 y aborta la orden).
-                        ...(selectedPayment === 'qr' ? { paymentMethod: 'QR' as const } : {}),
-                        ...(selectedPayment === 'bank_qr' ? { paymentMethod: 'BANK_QR' as const } : {}),
+                        ...(selectedPayment === 'qr' && qrAllowed ? { paymentMethod: 'QR' as const } : {}),
+                        ...(selectedPayment === 'bank_qr' && qrAllowed ? { paymentMethod: 'BANK_QR' as const } : {}),
                         ...(selectedPayment === 'usdt' ? { paymentMethod: 'USDT' as const } : {}),
+                        ...(selectedPayment === 'wallet' && walletAllowed ? { paymentMethod: 'WALLET' as const } : {}),
                         ...(!isPickup && deliveryAddress
                             ? {
                                 shippingAddress: formatShippingAddress(deliveryAddress),
@@ -162,9 +160,7 @@ export default function CheckoutClient() {
                     setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
                     return activeOrderId ?? null;
                 } catch (error) {
-                    // error.message es ahora el texto EXACTO devuelto por NestJS (ej. "size should not
-                    // be empty"), no un texto genérico fijo — ver useOrder.createOrder.
-                    console.error("Error al preparar la orden:", error instanceof Error ? error.message : error);
+                    console.warn("Error al preparar la orden:", error instanceof Error ? error.message : error);
                     setOrderFailed(true);
                     return null;
                 } finally {
@@ -177,7 +173,7 @@ export default function CheckoutClient() {
         }
 
         return activeOrderId ?? null;
-    }, [orderId, items, createOrder, fulfillmentType, selectedBranchId, selectedPayment, isPickup, deliveryAddress]);
+    }, [orderId, items, createOrder, fulfillmentType, selectedBranchId, selectedPayment, qrAllowed, isPickup, deliveryAddress]);
 
     const preparePayment = useCallback(async (forceRetry = false) => {
         if (currentStep !== 2 || selectedPayment !== 'stripe' || isCreatingOrder || clientSecret) {
@@ -187,7 +183,6 @@ export default function CheckoutClient() {
         const activeOrderId = await ensureOrderCreated(forceRetry);
         if (!activeOrderId) return;
 
-        // Iniciar el PaymentIntent de Stripe para esta orden
         if (!clientSecret) {
             setIsCreatingOrder(true);
             try {
@@ -201,13 +196,13 @@ export default function CheckoutClient() {
                     throw new Error(t('payment.gatewayFailed'));
                 }
             } catch (error) {
-                console.error("Error al preparar Stripe:", error);
+                console.warn("Error al preparar Stripe:", error);
                 setOrderFailed(true);
             } finally {
                 setIsCreatingOrder(false);
             }
         }
-    }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, ensureOrderCreated, createPaymentIntent]);
+    }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, ensureOrderCreated, createPaymentIntent, storeName, t]);
 
     useEffect(() => {
         if (currentStep === 2 && selectedPayment === 'stripe' && !clientSecret && !orderFailed && !isCreatingOrder) {
@@ -216,23 +211,21 @@ export default function CheckoutClient() {
     }, [currentStep, selectedPayment, clientSecret, orderFailed, isCreatingOrder, preparePayment]);
 
     useEffect(() => {
-        if (currentStep === 2 && selectedPayment === 'qr' && !orderId && !orderFailed && !isCreatingOrder) {
+        if (currentStep === 2 && selectedPayment === 'qr' && qrAllowed && !orderId && !orderFailed && !isCreatingOrder) {
             ensureOrderCreated();
         }
-    }, [currentStep, selectedPayment, orderId, orderFailed, isCreatingOrder, ensureOrderCreated]);
+    }, [currentStep, selectedPayment, qrAllowed, orderId, orderFailed, isCreatingOrder, ensureOrderCreated]);
 
     const handleRetry = () => {
         setOrderFailed(false);
         setStripeError(null);
         if (selectedPayment === 'stripe') {
             preparePayment(true);
-        } else if (selectedPayment === 'qr') {
+        } else if (selectedPayment === 'qr' && qrAllowed) {
             ensureOrderCreated(true);
         }
     };
 
-    // La confirmación real del pago (idempotente) y la limpieza del carrito ocurren en /checkout/success:
-    // así también funciona si Stripe redirige la página completa (ej. 3D Secure) en vez de resolver aquí mismo.
     const handlePaymentSuccess = (paymentIntentId: string) => {
         if (!orderId) return;
         router.push(`/checkout/success?orderId=${orderId}&payment_intent=${paymentIntentId}`);
@@ -242,9 +235,6 @@ export default function CheckoutClient() {
         setStripeError(error);
     };
 
-    // Sin conexión no se puede llamar a POST /orders (ni a Stripe): se guarda el pedido tal cual en
-    // IndexedDB y se sincroniza solo cuando vuelva el internet (useOfflineOrderSync, montado global
-    // en OfflineSyncProvider). El stock recién se valida de verdad en ese momento, en el backend.
     const handleSaveOfflineOrder = async () => {
         if (isSavingOffline) return;
         setIsSavingOffline(true);
@@ -261,7 +251,7 @@ export default function CheckoutClient() {
                 items: cartItems,
                 fulfillmentType,
                 branchId: selectedBranchId ?? undefined,
-                paymentMethod: 'QR',
+                ...(qrAllowed ? { paymentMethod: 'QR' as const } : {}),
                 ...(!isPickup && deliveryAddress
                     ? {
                         shippingAddress: formatShippingAddress(deliveryAddress),
@@ -284,9 +274,13 @@ export default function CheckoutClient() {
         }
     };
 
-    // Antes, un fallo al crear el payment intent quedaba en silencio (usePayment tenía su propio `error`,
-    // pero nunca se leía aquí): se mostraba el placeholder para siempre sin explicar por qué.
     const displayedError = stripeError ?? paymentError ?? (orderFailed ? orderError : null);
+    const hasAnyOnlineMethod =
+        Boolean(cardEnabled) ||
+        qrAllowed ||
+        Boolean(paymentOptions?.bankQr && qrAllowed) ||
+        Boolean(paymentOptions?.usdt) ||
+        Boolean(paymentOptions?.wallet && walletAllowed);
 
     return (
         <section className={styles.section}>
@@ -303,7 +297,6 @@ export default function CheckoutClient() {
                                 deliveryAddress={deliveryAddress}
                                 onAddressChange={setDeliveryAddress}
                                 onContinue={async () => {
-                                    // Precios y stock definitivos de la sucursal elegida antes de pagar
                                     await syncCartProducts(selectedBranchId);
                                     const invalidItem = items.find(
                                         (item) => item.product.stock <= 0 || item.quantity > item.product.stock,
@@ -368,6 +361,12 @@ export default function CheckoutClient() {
                                         <p className={styles.paymentHint}>{t('payment.cardUnavailable')}</p>
                                     )}
 
+                                    {isOnline && optionsLoaded && !hasAnyOnlineMethod && (
+                                        <div className={styles.errorMessage}>
+                                            <span>Esta tienda aún no tiene métodos de cobro configurados. El administrador puede habilitarlos desde Gestión de pagos.</span>
+                                        </div>
+                                    )}
+
                                     {isOnline && cardEnabled ? (
                                         <PaymentMethodCard
                                             method="stripe"
@@ -414,7 +413,7 @@ export default function CheckoutClient() {
                                         </PaymentMethodCard>
                                     ) : null}
 
-                                    {isOnline && (
+                                    {isOnline && qrAllowed && (
                                         <PaymentMethodCard
                                             method="qr"
                                             selectedMethod={selectedPayment}
@@ -434,7 +433,7 @@ export default function CheckoutClient() {
                                     )}
 
                                     {/* Medios manuales de la tienda: el pedido se crea recién al enviar el comprobante */}
-                                    {isOnline && paymentOptions?.bankQr && (
+                                    {isOnline && qrAllowed && paymentOptions?.bankQr && (
                                         <PaymentMethodCard
                                             method="bank_qr"
                                             selectedMethod={selectedPayment}
@@ -472,6 +471,25 @@ export default function CheckoutClient() {
                                         </PaymentMethodCard>
                                     )}
 
+                                    {isOnline && walletAllowed && paymentOptions?.wallet && (
+                                        <PaymentMethodCard
+                                            method="wallet"
+                                            selectedMethod={selectedPayment}
+                                            onSelect={handlePaymentMethodSelect}
+                                            icon={<WalletIcon />}
+                                            title={t('payment.wallet')}
+                                            description={t('payment.walletDescription')}
+                                        >
+                                            <ManualPaymentSection
+                                                method="WALLET"
+                                                options={paymentOptions}
+                                                amount={payableTotal}
+                                                ensureOrder={() => ensureOrderCreated()}
+                                                onSubmitted={clearAllCart}
+                                            />
+                                        </PaymentMethodCard>
+                                    )}
+
                                     {!isOnline && (
                                         <PaymentMethodCard
                                             method="offline"
@@ -493,7 +511,7 @@ export default function CheckoutClient() {
                                         </PaymentMethodCard>
                                     )}
 
-                                    {isOnline && !selectedPayment && (
+                                    {isOnline && !selectedPayment && hasAnyOnlineMethod && (
                                         <>
                                             <p className={styles.paymentHint}>{t('payment.selectHint')}</p>
                                             {cardEnabled && <StripePaymentPlaceholder amount={payableTotal} isLoading={false} />}
@@ -510,7 +528,6 @@ export default function CheckoutClient() {
         </section>
     );
 
-    // Resumen del pedido: descuentos de producto y de empleado, envío y total final
     function renderSummary() {
         return (
             <aside className={styles.summary}>
@@ -540,7 +557,6 @@ export default function CheckoutClient() {
                         <span>-Bs {employeeDiscount.toFixed(2)}</span>
                     </div>
                 )}
-                {/* Recojo en sucursal no tiene costo de envío: la fila se oculta en vez de mostrar $0.00 */}
                 {!isPickup && (
                     <div className={styles.summaryRow}>
                         <span>{t('summary.shipping')}</span>
