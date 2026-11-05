@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { PLATFORM_BRAND, STORE_HINT_COOKIE } from "./storeName";
 
 const API_URL = (process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1").replace(/\/+$/, "");
@@ -6,12 +6,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export const SERVER_API_URL = API_URL;
 
-// Tienda que ve el servidor: cookie del dominio propio (front/proxy.ts) → la que eligió el navegador
-// (StoreInfoProvider) → la tienda fija del despliegue
-export async function getServerTenantId(): Promise<string | null> {
-    const jar = await cookies();
+// Tienda que ve el servidor: header que pone front/proxy.ts en un dominio propio (el único dato disponible
+// cuando el navegador pide manifest e íconos, que van sin cookies) → cookie del dominio propio → la que
+// eligió el navegador (StoreInfoProvider) → la tienda fija del despliegue. Solo sirve para mostrar marca.
+export async function getServerTenantId(explicit?: string | null): Promise<string | null> {
+    const [jar, requestHeaders] = await Promise.all([cookies(), headers()]);
     return (
-        [jar.get("sf_tenant")?.value, jar.get(STORE_HINT_COOKIE)?.value, process.env.NEXT_PUBLIC_TENANT_ID]
+        [explicit, requestHeaders.get("x-tenant-id"), jar.get("sf_tenant")?.value, jar.get(STORE_HINT_COOKIE)?.value, process.env.NEXT_PUBLIC_TENANT_ID]
             .map((value) => value?.trim().toLowerCase())
             .find((value): value is string => !!value && UUID_RE.test(value)) ?? null
     );
@@ -22,8 +23,8 @@ export async function getServerTenantId(): Promise<string | null> {
  * (la pone front/proxy.ts) → la tienda que eligió el navegador (StoreInfoProvider) → la tienda fija
  * del despliegue. Sin tienda conocida, o si la API no responde, cae en la marca de la plataforma.
  */
-export async function getServerStoreName(): Promise<string> {
-    const tenantId = await getServerTenantId();
+export async function getServerStoreName(explicitTenantId?: string | null): Promise<string> {
+    const tenantId = await getServerTenantId(explicitTenantId);
     if (!tenantId) return PLATFORM_BRAND;
 
     try {

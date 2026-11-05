@@ -1,52 +1,39 @@
 import { CreateOrderRequest } from "@/types/orders.types";
-import { ORDERS_STORE, isOfflineDbSupported, withOfflineStore } from "./offlineDb";
+import { DRAFTS_STORE, isOfflineDbSupported, withOfflineStore } from "./offlineDb";
 import { getCurrentTenantId } from "./tenant";
 
-export interface OfflineOrder {
+// Dos conceptos que NO se mezclan:
+//  - OrderDraft (acá): armado sin conexión. No tiene stock garantizado ni pago, y NUNCA se envía solo: al
+//    volver la conexión se revalida en el checkout y se pide confirmación antes de crear una compra nueva.
+//  - CheckoutAttempt (checkoutAttempts.ts): ya autorizado y posiblemente enviado. Ese sí se recupera solo.
+export interface OrderDraft {
     id: string;
-    payload: CreateOrderRequest;
+    payload: Omit<CreateOrderRequest, "cartVersion" | "expectedTotal">;
     createdAt: string;
-    status: "pending" | "failed";
-    lastError?: string;
+    // null solo en colas antiguas, que se guardaron sin propietario
+    userId: string | null;
+    legacyUnowned?: boolean;
 }
 
-// La base es por tienda (ver offlineDb.ts): solo se ven y sincronizan los pedidos de la tienda activa
 const isSupported = () => isOfflineDbSupported() && getCurrentTenantId() !== null;
 
-const withStore = <T,>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBRequest<T>) =>
-    withOfflineStore(ORDERS_STORE, mode, fn);
-
-// Guarda un pedido armado offline (mismo shape que POST /orders) para reintentarlo al volver la conexión
-export async function addOfflineOrder(payload: CreateOrderRequest): Promise<OfflineOrder> {
+export async function addOrderDraft(userId: string, payload: OrderDraft["payload"]): Promise<OrderDraft> {
     if (!isOfflineDbSupported()) throw new Error("IndexedDB no disponible en este navegador");
-    if (!getCurrentTenantId()) throw new Error("No hay una tienda seleccionada para guardar el pedido offline");
+    if (!getCurrentTenantId()) throw new Error("No hay una tienda seleccionada para guardar el borrador");
 
-    const order: OfflineOrder = {
-        id:
-            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-                ? crypto.randomUUID()
-                : `offline-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        payload,
-        createdAt: new Date().toISOString(),
-        status: "pending",
-    };
-    await withStore("readwrite", (store) => store.add(order));
-    return order;
+    const draft: OrderDraft = { id: crypto.randomUUID(), payload, createdAt: new Date().toISOString(), userId };
+    await withOfflineStore(DRAFTS_STORE, "readwrite", (store) => store.add(draft));
+    return draft;
 }
 
-export async function getOfflineOrders(): Promise<OfflineOrder[]> {
-    if (!isSupported()) return [];
-    return withStore("readonly", (store) => store.getAll());
+// Solo los de este usuario, más los antiguos sin propietario (que exigen revisión explícita)
+export async function getOrderDrafts(userId: string | null): Promise<OrderDraft[]> {
+    if (!isSupported() || !userId) return [];
+    const drafts = await withOfflineStore<OrderDraft[]>(DRAFTS_STORE, "readonly", (store) => store.getAll());
+    return drafts.filter((draft) => draft.userId === userId || draft.userId === null);
 }
 
-export async function removeOfflineOrder(id: string): Promise<void> {
+export async function removeOrderDraft(id: string): Promise<void> {
     if (!isSupported()) return;
-    await withStore("readwrite", (store) => store.delete(id));
-}
-
-export async function updateOfflineOrder(id: string, patch: Partial<Pick<OfflineOrder, "status" | "lastError">>): Promise<void> {
-    if (!isSupported()) return;
-    const existing = await withStore<OfflineOrder | undefined>("readonly", (store) => store.get(id));
-    if (!existing) return;
-    await withStore("readwrite", (store) => store.put({ ...existing, ...patch }));
+    await withOfflineStore(DRAFTS_STORE, "readwrite", (store) => store.delete(id));
 }

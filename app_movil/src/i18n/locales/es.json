@@ -36,5 +36,14 @@
     "urlSavedBody": "Conectando con: {{url}}",
     "urlRestored": "URL Restaurada",
     "urlRestoredBody": "URL por defecto: {{url}}"
+  },
+  "checkoutRecovery": {
+    "verifyingTitle": "Verificando tu compra",
+    "verifying": "Estamos verificando tu compra. No hace falta que la repitas.",
+    "retry": "Reintentar la verificación",
+    "rejectedTitle": "No se realizó la compra",
+    "storageFailed": "No pudimos guardar tu compra en este dispositivo, así que no la enviamos. Libera espacio e inténtalo de nuevo.",
+    "pendingTitle": "Pago en proceso",
+    "pending": "Tu pago todavía no está confirmado. Actualizaremos tu pedido cuando el banco responda. No hace falta que pagues de nuevo."
   }
 }

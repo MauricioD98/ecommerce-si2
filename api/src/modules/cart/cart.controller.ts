@@ -1,9 +1,10 @@
 
-import { Controller, Get, Post, Patch, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
+import { SyncCartDto } from './dto/sync-cart.dto';
 
 import { JwtAuthGuard } from '../../common/decorators/guards/jwt-auth.guard';
 import { GetUser } from '../../common/decorators/get-user.decorator';
@@ -24,6 +25,14 @@ export class CartController {
     @Query('branchId', new ParseUUIDPipe({ optional: true })) branchId?: string,
   ) {
     return this.cartService.getOrCreateCart(userId, branchId);
+  }
+
+  @Put()
+  @ApiOperation({ summary: 'Reemplaza el carrito por estas líneas en una transacción (aplica solo diferencias)' })
+  @ApiResponse({ status: 200, description: 'Carrito sincronizado; devuelve su nueva revisión (version).' })
+  @ApiResponse({ status: 409, description: 'OUT_OF_STOCK o CART_VERSION_CONFLICT. Nada se aplicó.' })
+  syncCart(@GetUser('id') userId: string, @Body() dto: SyncCartDto) {
+    return this.cartService.syncCart(userId, dto);
   }
 
   @Post('items')

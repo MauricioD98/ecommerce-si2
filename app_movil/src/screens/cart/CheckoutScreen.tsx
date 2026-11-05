@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -16,7 +17,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/types';
 import { useCart } from '../../context/CartContext';
 import { useBranch } from '../../context/BranchContext';
-import { ordersApi } from '../../api/orders.api';
+import { useAuth } from '../../context/AuthContext';
+import { cartApi } from '../../api/cart.api';
+import { CheckoutAttempt, createAttempt, getOwnAttempts, submitAttempt } from '../../utils/checkoutAttempts';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -26,7 +29,12 @@ import { getErrorMessage } from '../../api/client';
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
 export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
-  const { cart, totalAmount } = useCart();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const userId = (user as { id?: string } | null)?.id;
+  const { cart, totalAmount, fetchCart } = useCart();
+  // Compra enviada cuyo resultado se desconoce: se verifica con la misma clave, nunca se inicia otra
+  const [pendingAttempt, setPendingAttempt] = useState<CheckoutAttempt | null>(null);
   const { branches, selectedBranch, selectedBranchId, isLoadingBranches } = useBranch();
   const [fulfillmentType, setFulfillmentType] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
   const [shippingAddress, setShippingAddress] = useState<string>('Av. Principal #123, Ciudad');
@@ -43,7 +51,53 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
     (branches.length > 0 ? branches[0] : null);
   const displayedBranches = activeBranch ? [activeBranch] : [];
 
+  const goToPayment = useCallback(
+    (orderId: string, amount?: number) => {
+      navigation.navigate('Payment', { orderId, amount: amount && amount > 0 ? amount : 0 });
+    },
+    [navigation],
+  );
+
+  // Volver a esta pantalla tras un cierre forzado retoma el intento: pagar si ya hay orden, verificar si no
+  useEffect(() => {
+    let active = true;
+    getOwnAttempts(userId)
+      .then((own) => {
+        if (!active || !own[0]) return;
+        if (own[0].state === 'CONFIRMED' && own[0].orderId) goToPayment(own[0].orderId, own[0].amount);
+        else setPendingAttempt(own[0]);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [userId, goToPayment]);
+
+  const handleResult = async (result: Awaited<ReturnType<typeof submitAttempt>>) => {
+    if (result.kind === 'created') {
+      setPendingAttempt(null);
+      goToPayment(result.attempt.orderId!, result.amount);
+    } else if (result.kind === 'uncertain') {
+      setPendingAttempt(result.attempt);
+      Alert.alert(t('checkoutRecovery.verifyingTitle'), t('checkoutRecovery.verifying'));
+    } else {
+      setPendingAttempt(null);
+      await fetchCart().catch(() => undefined);
+      Alert.alert(t('checkoutRecovery.rejectedTitle'), result.message);
+    }
+  };
+
   const handleCreateOrder = async () => {
+    if (pendingAttempt) {
+      try {
+        setIsSubmitting(true);
+        await handleResult(await submitAttempt(pendingAttempt));
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     if (fulfillmentType === 'DELIVERY' && !shippingAddress.trim()) {
       Alert.alert('Dirección requerida', 'Por favor ingresa la dirección de entrega.');
       return;
@@ -70,22 +124,26 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
         size: item.size || (item.product as any)?.sizes?.[0] || 'M',
       }));
 
-      const newOrder = await ordersApi.create({
-        items: itemsPayload,
-        shippingAddress: fulfillmentType === 'DELIVERY' ? shippingAddress.trim() : undefined,
-        fulfillmentType,
-        branchId: activeBranchId || undefined,
-      });
+      // Revisión leída del servidor: si el carrito cambió en otro dispositivo, el servidor responde conflicto
+      const freshCart = await cartApi.getCart();
 
-      // Calculate amount safely (supports total from DTO and totalAmount from Prisma)
-      const rawAmount = (newOrder as any)?.total ?? newOrder?.totalAmount ?? payableTotal;
-      const orderAmount = Number(rawAmount);
-
-      // Navigate to Payment screen (navigate preserves history so user can go back without losing cart)
-      navigation.navigate('Payment', {
-        orderId: newOrder.id,
-        amount: isNaN(orderAmount) || orderAmount <= 0 ? payableTotal : orderAmount,
-      });
+      // Se guarda ANTES de enviar: sin esto la compra no sería recuperable tras un cierre forzado
+      let attempt: CheckoutAttempt;
+      try {
+        attempt = await createAttempt(userId!, {
+          cartVersion: freshCart.version,
+          expectedTotal: Math.round(payableTotal * 100) / 100,
+          items: itemsPayload,
+          shippingAddress: fulfillmentType === 'DELIVERY' ? shippingAddress.trim() : undefined,
+          fulfillmentType,
+          branchId: activeBranchId || undefined,
+        });
+      } catch {
+        Alert.alert(t('checkoutRecovery.rejectedTitle'), t('checkoutRecovery.storageFailed'));
+        return;
+      }
+      setPendingAttempt(attempt);
+      await handleResult(await submitAttempt(attempt));
     } catch (err) {
       Alert.alert('Error al crear orden', getErrorMessage(err));
     } finally {
@@ -290,8 +348,15 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </View>
 
+          {pendingAttempt && (
+            <View style={styles.infoBox}>
+              <Ionicons name="time-outline" size={20} color={Colors.primary} />
+              <Text style={styles.infoText}>{t('checkoutRecovery.verifying')}</Text>
+            </View>
+          )}
+
           <Button
-            title={`Confirmar Pedido y Pagar (Bs ${payableTotal.toFixed(2)})`}
+            title={pendingAttempt ? t('checkoutRecovery.retry') : `Confirmar Pedido y Pagar (Bs ${payableTotal.toFixed(2)})`}
             onPress={handleCreateOrder}
             isLoading={isSubmitting}
             variant="primary"

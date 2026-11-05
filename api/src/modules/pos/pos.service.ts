@@ -20,6 +20,7 @@ import { hasAllBranches } from '../../common/utils/permission.util';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { PosCheckoutDto } from './dto/pos-checkout.dto';
 import { PosCheckoutResponseDto } from './dto/pos-receipt.dto';
+import { compareVariants, withTxRetry } from '../../common/checkout/tx.util';
 
 // Cliente placeholder para ventas de caja sin cuenta registrada. Se crea una sola vez (lazy) y se reutiliza.
 const WALK_IN_CUSTOMER_EMAIL = 'consumidor-final@pos.stellafemme.internal';
@@ -165,7 +166,7 @@ export class PosService {
 
     let order: { id: string; orderNumber: string; createdAt: Date };
     try {
-      order = await this.prisma.$transaction(async (tx) => {
+      order = await withTxRetry(() => this.prisma.$transaction(async (tx) => {
       const newOrder = await tx.order.create({
         data: {
           userId: customer.id,
@@ -195,15 +196,20 @@ export class PosService {
 
       // Un updateMany condicional por talla (la garantía atómica contra sobreventa) y UN solo
       // recálculo del stock global al final, en vez de dos queries extra por línea.
-      for (const line of requested.values()) {
+      // En orden de variante: dos cajas con el mismo ticket en distinto orden no se bloquean en ciclo
+      const sortedLines = [...requested.values()].sort((a, b) => compareVariants({ ...a, branchId }, { ...b, branchId }));
+      for (const line of sortedLines) {
         await this.inventoryService.decrement(tx, line.productId, branchId, line.size, line.quantity, {
-          syncGlobal: false,
+          effectId: `pos:${newOrder.id}:${line.productId}:${line.size}`,
+          reason: 'POS_SALE',
+          refType: 'ORDER',
+          refId: newOrder.id,
         });
       }
       await this.inventoryService.syncGlobalStockMany(tx, productIds);
 
       return newOrder;
-      });
+      }));
     } catch (error) {
       // Las excepciones HTTP ya son mensajes pensados para el cajero (stock insuficiente, monto que no
       // alcanza): se dejan pasar tal cual. Cualquier otra cosa es un fallo real que el cliente veía

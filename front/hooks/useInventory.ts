@@ -1,3 +1,6 @@
+import axios from "axios";
+import { useSelector } from "react-redux";
+import type { IRootState } from "@/store";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { InventoryService } from "@/service/api/inventory.service";
@@ -28,6 +31,7 @@ export interface InventoryRow {
 
 // Catálogo + stock y descuentos de una sucursal con soporte offline y caché local
 export function useInventory(branchId: string | null) {
+    const userId = useSelector((state: IRootState) => state.auth.user?.id ?? null);
     const t = useTranslations("AdminErrors");
     const [products, setProducts] = useState<Product[]>([]);
     const [productsLoadedFor, setProductsLoadedFor] = useState<string | null>(null);
@@ -117,8 +121,25 @@ export function useInventory(branchId: string | null) {
     });
 
     // Guarda el inventario con soporte offline y persistencia inmediata en la UI
-    const saveInventory = async (productId: string, payload: SetInventoryPayload, productName?: string) => {
+    const saveInventory = async (
+        productId: string,
+        draft: Omit<SetInventoryPayload, "operationId" | "sizes"> & { sizes: { size: string; stock: number }[] },
+        productName?: string,
+    ) => {
         if (!branchId) return { isOffline: false };
+
+        // Cada talla lleva la versión que se leyó: si se vendió algo mientras tanto, el servidor responde 409
+        // en vez de resucitar unidades. La versión no cambia con el valor optimista: sigue siendo lo último leído.
+        const versionOf = (size: string) => inventoryMap[productId]?.sizes?.find((row) => row.size === size)?.version ?? 0;
+        const payload: SetInventoryPayload = {
+            ...draft,
+            operationId: crypto.randomUUID(),
+            sizes: draft.sizes.map(({ size, stock }) => ({ size, stock, expectedVersion: versionOf(size) })),
+        };
+        const queueOffline = () => {
+            if (!userId) throw new Error(t("sessionRequired"));
+            return addOfflineInventoryUpdate(branchId, productId, payload, productName, userId);
+        };
 
         const isOnline = typeof navigator !== "undefined" && navigator.onLine;
 
@@ -149,6 +170,7 @@ export function useInventory(branchId: string | null) {
                     size: s.size,
                     stock: s.stock,
                     damagedStock: existing?.sizes?.find((x) => x.size === s.size)?.damagedStock ?? 0,
+                    version: existing?.sizes?.find((x) => x.size === s.size)?.version,
                 })),
                 discountPrice,
                 discountPercentage,
@@ -162,7 +184,7 @@ export function useInventory(branchId: string | null) {
         };
 
         if (!isOnline) {
-            await addOfflineInventoryUpdate(branchId, productId, payload, productName);
+            await queueOffline();
             applyOptimistic();
             return { isOffline: true };
         }
@@ -175,9 +197,16 @@ export function useInventory(branchId: string | null) {
                 return next;
             });
             return { isOffline: false };
-        } catch {
-            // Si la llamada de red falló (sin conexión real), guardar en cola local y actualizar UI
-            await addOfflineInventoryUpdate(branchId, productId, payload, productName);
+        } catch (error) {
+            // Solo sin respuesta se encola. Una respuesta del servidor (conflicto, permisos) es una decisión,
+            // y encolarla la reintentaría a ciegas. Tras un conflicto se recarga para mostrar el valor actual.
+            if (axios.isAxiosError(error) && error.response) {
+                if (error.response.data?.code === "INVENTORY_VERSION_CONFLICT") {
+                    await loadInventory(branchId, () => true);
+                }
+                throw error;
+            }
+            await queueOffline();
             applyOptimistic();
             return { isOffline: true };
         }

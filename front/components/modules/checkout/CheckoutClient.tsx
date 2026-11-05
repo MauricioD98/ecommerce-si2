@@ -18,12 +18,15 @@ import { StripePaymentProvider, StripePaymentForm, StripePaymentPlaceholder } fr
 import PaymentMethodCard from './PaymentMethodCard';
 import QrPaymentSection from './QrPaymentSection';
 import ManualPaymentSection from './ManualPaymentSection';
-import { OrderItem, CreateOrderRequest } from '@/types/orders.types';
+import { OrderItem } from '@/types/orders.types';
 import { CartItem } from '@/types/cart.types';
 import { FulfillmentType } from '@/types/branch.types';
 import { DeliveryAddress, formatShippingAddress } from '@/types/address.types';
 import { DELIVERY_SHIPPING_COST, round2 } from '@/utils/pricing';
-import { addOfflineOrder } from '@/utils/offlineOrderQueue';
+import { addOrderDraft } from '@/utils/offlineOrderQueue';
+import { ATTEMPTS_CHANGED_EVENT, CheckoutAttempt, forgetAttemptsOfOrder, getOwnAttempts } from '@/utils/checkoutAttempts';
+import { OrderService } from '@/service/api/order.service';
+import { OfflineStorageError } from '@/utils/offlineDb';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PaymentOptions, paymentSettingsService } from '@/service/api/paymentSettings.service';
 import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
@@ -31,7 +34,8 @@ import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
 export const revalidate = false;
 
 export default function CheckoutClient() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    const userId = user?.id ?? null;
     const router = useRouter();
     const t = useTranslations('Checkout');
     const storeName = useStoreName();
@@ -57,7 +61,7 @@ export default function CheckoutClient() {
 
     const { totalPrice, totals, items, clearAllCart, syncCartProducts } = useCart();
     const { clientSecret, createPaymentIntent, error: paymentError } = usePayment();
-    const { createOrder, order, error: orderError } = useOrder();
+    const { startCheckout, resumeCheckout, error: orderError, setError: setOrderError } = useOrder();
     const { selectedBranch, selectedBranchId } = useBranches();
     const { isOnline } = useNetworkStatus();
 
@@ -81,7 +85,13 @@ export default function CheckoutClient() {
 
     const [stockError, setStockError] = useState<string | null>(null);
 
-    const [orderId, setOrderId] = useState<string | undefined>(order?.id);
+    const [orderId, setOrderId] = useState<string | undefined>(undefined); // Orden creada por este intento
+    // Compra enviada cuyo resultado se desconoce (corte de red, 5xx): se está verificando, no es un fallo
+    const [verifying, setVerifying] = useState(false);
+    const activeAttempt = useRef<CheckoutAttempt | null>(null);
+    const [resumeChecked, setResumeChecked] = useState(false);
+    // Total, descuento de empleado y costo de envío calculados por el backend al crear la orden
+
     const [orderTotal, setOrderTotal] = useState<number | null>(null);
     const [orderDiscount, setOrderDiscount] = useState<number | null>(null);
     const [orderShippingCost, setOrderShippingCost] = useState<number | null>(null);
@@ -97,21 +107,68 @@ export default function CheckoutClient() {
         setOrderFailed(false);
     };
 
+    const applyOrderTotals = useCallback((created: { id: string; total: number; discountApplied?: number; shippingCost?: number }) => {
+        setOrderId(created.id);
+        setOrderTotal(Number(created.total));
+        setOrderDiscount(Number(created.discountApplied ?? 0));
+        setOrderShippingCost(Number(created.shippingCost ?? 0));
+    }, []);
+
+    // Recuperación: volver a esta pantalla (recarga, app cerrada, retorno de otra pestaña) retoma el intento
+    // de esta cuenta y esta tienda. La misma clave garantiza que no se crea otra compra.
+    const syncActiveAttempt = useCallback(async () => {
+        const own = await getOwnAttempts(userId).catch(() => [] as CheckoutAttempt[]);
+        const attempt = own[0] ?? null;
+        activeAttempt.current = attempt;
+        if (attempt?.state === 'CONFIRMED' && attempt.orderId) {
+            setVerifying(false);
+            setCurrentStep(2);
+            try {
+                const response = await OrderService.getOrder(attempt.orderId);
+                const current = (response.data ?? response) as unknown as { id: string; total: number; discountApplied?: number; shippingCost?: number; status?: string; paymentStatus?: string };
+                if (current.status !== 'PENDIENTE' || current.paymentStatus === 'COMPLETADO') {
+                    await forgetAttemptsOfOrder(userId, attempt.orderId);
+                    activeAttempt.current = null;
+                } else {
+                    applyOrderTotals(current);
+                }
+            } catch {
+                setOrderId(attempt.orderId);
+            }
+        } else if (attempt) {
+            // Recién enviado todavía no es incierto: solo si quien lo enviaba ya no puede responder
+            setVerifying(attempt.state === 'IN_DOUBT' || Date.now() - new Date(attempt.updatedAt).getTime() > 15_000);
+            setCurrentStep(2);
+        } else {
+            setVerifying(false);
+        }
+        setResumeChecked(true);
+    }, [userId, applyOrderTotals]);
+
     useEffect(() => {
-        if (items.length === 0 && !orderId) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        syncActiveAttempt();
+        window.addEventListener(ATTEMPTS_CHANGED_EVENT, syncActiveAttempt);
+        return () => window.removeEventListener(ATTEMPTS_CHANGED_EVENT, syncActiveAttempt);
+    }, [syncActiveAttempt]);
+
+    // Tras guardar un borrador el carrito queda vacío a propósito: no hay que competir con esa navegación
+    const leavingForDraft = useRef(false);
+    useEffect(() => {
+        if (resumeChecked && items.length === 0 && !orderId && !verifying && !leavingForDraft.current) {
             router.push("/cart");
         }
-    }, [items.length, orderId, router]);
+    }, [resumeChecked, items.length, orderId, verifying, router]);
 
     // Al llegar al paso 2, preseleccionar automáticamente solo medios habilitados y permitidos por el plan
     useEffect(() => {
         if (currentStep !== 2 || selectedPayment) return;
         if (!isOnline) {
             setSelectedPayment("offline");
-        } else if (optionsLoaded && cardEnabled !== null) {
+        } else if (cardEnabled !== null) {
             if (cardEnabled) setSelectedPayment("stripe");
             else if (paymentOptions?.bankQr && qrAllowed) setSelectedPayment("bank_qr");
-            else if (qrAllowed) setSelectedPayment("qr");
+            else if (paymentOptions?.simulatedQr && qrAllowed) setSelectedPayment("qr");
             else if (paymentOptions?.wallet && walletAllowed) setSelectedPayment("wallet");
             else if (paymentOptions?.usdt) setSelectedPayment("usdt");
         }
@@ -119,27 +176,35 @@ export default function CheckoutClient() {
 
     const orderInFlight = useRef<Promise<string | null> | null>(null);
 
-    const ensureOrderCreated = useCallback(async (forceRetry = false): Promise<string | null> => {
+    const ensureOrderCreated = useCallback(async (): Promise<string | null> => {
         if (orderInFlight.current) return orderInFlight.current;
-        let activeOrderId = orderId;
+        if (orderId) return orderId;
 
-        if (!activeOrderId || forceRetry) {
-            const create = async (): Promise<string | null> => {
-                setIsCreatingOrder(true);
-                setStripeError(null);
-                setOrderFailed(false);
-
-                try {
+        const create = async (): Promise<string | null> => {
+            setIsCreatingOrder(true);
+            setStripeError(null);
+            setOrderFailed(false);
+            try {
+                // Un intento sin resolver se retoma con su misma clave: jamás se inicia otra compra encima
+                const pending = activeAttempt.current ?? (await getOwnAttempts(userId).catch(() => [] as CheckoutAttempt[]))[0] ?? null;
+                let result;
+                if (pending) {
+                    result = await resumeCheckout(pending);
+                } else {
                     const cartItems: OrderItem[] = items.map((item: CartItem) => ({
                         productId: item.product?.id || item.productId,
                         quantity: item.quantity,
                         selectedSize: item.selectedSize,
                     }));
-
-                    const createdOrder = await createOrder({
+                    result = await startCheckout({
                         items: cartItems,
                         fulfillmentType,
                         branchId: selectedBranchId ?? undefined,
+                        // El total que el usuario está viendo: si el servidor calcula otro, responde
+                        // PRICE_CHANGED sin efectos y se le muestra antes de cobrar nada.
+                        expectedTotal: round2(totalPrice + (isPickup ? 0 : DELIVERY_SHIPPING_COST)),
+                        // El backend acepta QR, BANK_QR o USDT (CreateOrderDto); para Stripe hay que omitir
+                        // el campo, no enviar 'STRIPE' (eso da 400 y aborta la orden).
                         ...(selectedPayment === 'qr' && qrAllowed ? { paymentMethod: 'QR' as const } : {}),
                         ...(selectedPayment === 'bank_qr' && qrAllowed ? { paymentMethod: 'BANK_QR' as const } : {}),
                         ...(selectedPayment === 'usdt' ? { paymentMethod: 'USDT' as const } : {}),
@@ -153,34 +218,47 @@ export default function CheckoutClient() {
                             : {}),
                     });
 
-                    activeOrderId = createdOrder.id;
-                    setOrderId(createdOrder.id);
-                    setOrderTotal(Number(createdOrder.total));
-                    setOrderDiscount(Number(createdOrder.discountApplied ?? 0));
-                    setOrderShippingCost(Number(createdOrder.shippingCost ?? 0));
-                    return activeOrderId ?? null;
-                } catch (error) {
-                    console.warn("Error al preparar la orden:", error instanceof Error ? error.message : error);
-                    setOrderFailed(true);
-                    return null;
-                } finally {
-                    setIsCreatingOrder(false);
-                    orderInFlight.current = null;
                 }
-            };
-            orderInFlight.current = create();
-            return orderInFlight.current;
-        }
 
-        return activeOrderId ?? null;
-    }, [orderId, items, createOrder, fulfillmentType, selectedBranchId, selectedPayment, qrAllowed, isPickup, deliveryAddress]);
+                if (result.kind === 'created') {
+                    activeAttempt.current = result.attempt;
+                    setVerifying(false);
+                    applyOrderTotals(result.order);
+                    return result.order.id;
+                }
+                if (result.kind === 'uncertain') {
+                    // No es un fracaso: el servidor pudo confirmar y perder la respuesta
+                    activeAttempt.current = result.attempt;
+                    setVerifying(true);
+                    return null;
+                }
+                if (result.kind === 'not-saved') {
+                    setOrderError(t(result.quota ? 'payment.storageFull' : 'payment.storageFailed'));
+                }
+                // Decisión definitiva: nada se creó. Comprar de nuevo es una intención nueva, revisada por el usuario
+                activeAttempt.current = null;
+                setOrderFailed(true);
+                return null;
+            } catch (error) {
+                console.error("Error al preparar la orden:", error instanceof Error ? error.message : error);
+                setOrderFailed(true);
+                return null;
+            } finally {
+                setIsCreatingOrder(false);
+                orderInFlight.current = null;
+            }
+        };
+        orderInFlight.current = create();
+        return orderInFlight.current;
+    }, [orderId, items, startCheckout, resumeCheckout, applyOrderTotals, setOrderError, t, userId, fulfillmentType, selectedBranchId, selectedPayment, isPickup, deliveryAddress, totalPrice]);
 
-    const preparePayment = useCallback(async (forceRetry = false) => {
+
+    const preparePayment = useCallback(async () => {
         if (currentStep !== 2 || selectedPayment !== 'stripe' || isCreatingOrder || clientSecret) {
             return;
         }
 
-        const activeOrderId = await ensureOrderCreated(forceRetry);
+        const activeOrderId = await ensureOrderCreated();
         if (!activeOrderId) return;
 
         if (!clientSecret) {
@@ -205,24 +283,24 @@ export default function CheckoutClient() {
     }, [currentStep, selectedPayment, isCreatingOrder, clientSecret, ensureOrderCreated, createPaymentIntent, storeName, t]);
 
     useEffect(() => {
-        if (currentStep === 2 && selectedPayment === 'stripe' && !clientSecret && !orderFailed && !isCreatingOrder) {
+        if (currentStep === 2 && selectedPayment === 'stripe' && !clientSecret && !orderFailed && !isCreatingOrder && !verifying && !paymentError) {
             preparePayment();
         }
-    }, [currentStep, selectedPayment, clientSecret, orderFailed, isCreatingOrder, preparePayment]);
+    }, [currentStep, selectedPayment, clientSecret, orderFailed, isCreatingOrder, verifying, paymentError, preparePayment]);
 
     useEffect(() => {
-        if (currentStep === 2 && selectedPayment === 'qr' && qrAllowed && !orderId && !orderFailed && !isCreatingOrder) {
+        if (currentStep === 2 && selectedPayment === 'qr' && qrAllowed && !orderId && !orderFailed && !isCreatingOrder && !verifying) {
             ensureOrderCreated();
         }
-    }, [currentStep, selectedPayment, qrAllowed, orderId, orderFailed, isCreatingOrder, ensureOrderCreated]);
+    }, [currentStep, selectedPayment, qrAllowed, orderId, orderFailed, isCreatingOrder, verifying, ensureOrderCreated]);
 
     const handleRetry = () => {
         setOrderFailed(false);
         setStripeError(null);
         if (selectedPayment === 'stripe') {
-            preparePayment(true);
+            preparePayment();
         } else if (selectedPayment === 'qr' && qrAllowed) {
-            ensureOrderCreated(true);
+            ensureOrderCreated();
         }
     };
 
@@ -235,8 +313,10 @@ export default function CheckoutClient() {
         setStripeError(error);
     };
 
+    // Sin conexión no se puede comprar: se guarda un BORRADOR. No reserva stock ni es una orden, y al volver
+    // la conexión se revalida y se pide confirmación (ver /checkout/drafts). Nunca se envía solo.
     const handleSaveOfflineOrder = async () => {
-        if (isSavingOffline) return;
+        if (isSavingOffline || !user?.id) return;
         setIsSavingOffline(true);
         setOfflineError(null);
 
@@ -247,7 +327,7 @@ export default function CheckoutClient() {
                 selectedSize: item.selectedSize,
             }));
 
-            const payload: CreateOrderRequest = {
+            await addOrderDraft(user.id, {
                 items: cartItems,
                 fulfillmentType,
                 branchId: selectedBranchId ?? undefined,
@@ -259,16 +339,16 @@ export default function CheckoutClient() {
                         longitude: deliveryAddress.longitude,
                     }
                     : {}),
-            };
-
-            await addOfflineOrder(payload);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('offline-order-added'));
-            }
+            });
+            window.dispatchEvent(new CustomEvent('offline-order-added'));
+            leavingForDraft.current = true;
             clearAllCart();
-            router.push('/checkout/offline-success');
+            // Navegación completa: sin red, el router haría un fetch RSC que no llegaría a la página guardada
+            window.location.assign('/checkout/offline-success');
         } catch (error) {
-            setOfflineError(getApiErrorMessage(error, t('payment.offlineSaveFailed')));
+            setOfflineError(
+                error instanceof OfflineStorageError && error.quota ? t('payment.storageFull') : getApiErrorMessage(error, t('payment.offlineSaveFailed')),
+            );
         } finally {
             setIsSavingOffline(false);
         }
@@ -349,6 +429,13 @@ export default function CheckoutClient() {
                                     </button>
                                 </div>
 
+                                {verifying && (
+                                    <div className={styles.offlineNotice} role="status">
+                                        <WifiOff size={18} />
+                                        <span>{t('payment.verifying')}</span>
+                                    </div>
+                                )}
+
                                 <div className={styles.paymentMethods}>
                                     {!isOnline && (
                                         <div className={styles.offlineNotice}>
@@ -413,7 +500,7 @@ export default function CheckoutClient() {
                                         </PaymentMethodCard>
                                     ) : null}
 
-                                    {isOnline && qrAllowed && (
+                                    {isOnline && qrAllowed && paymentOptions?.simulatedQr && (
                                         <PaymentMethodCard
                                             method="qr"
                                             selectedMethod={selectedPayment}
@@ -447,7 +534,10 @@ export default function CheckoutClient() {
                                                 options={paymentOptions}
                                                 amount={payableTotal}
                                                 ensureOrder={() => ensureOrderCreated()}
-                                                onSubmitted={clearAllCart}
+                                                onSubmitted={(submittedOrderId) => {
+                                                    clearAllCart();
+                                                    forgetAttemptsOfOrder(userId, submittedOrderId).catch(() => undefined);
+                                                }}
                                             />
                                         </PaymentMethodCard>
                                     )}
@@ -466,7 +556,10 @@ export default function CheckoutClient() {
                                                 options={paymentOptions}
                                                 amount={payableTotal}
                                                 ensureOrder={() => ensureOrderCreated()}
-                                                onSubmitted={clearAllCart}
+                                                onSubmitted={(submittedOrderId) => {
+                                                    clearAllCart();
+                                                    forgetAttemptsOfOrder(userId, submittedOrderId).catch(() => undefined);
+                                                }}
                                             />
                                         </PaymentMethodCard>
                                     )}

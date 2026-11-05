@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "outDir": "../../dist-acceptance",
+    "types": ["node"],
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": true,
+    "tsBuildInfoFile": "../../dist-acceptance/.tsbuildinfo"
+  },
+  "include": ["../../src", "./**/*.ts"],
+  "exclude": ["../../src/**/*.spec.ts"]
+}

@@ -54,7 +54,7 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With', 'X-Tenant-Id', 'Accept-Language', 'X-Lang', 'X-Platform-Key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Cache-Control', 'Pragma', 'Expires', 'X-Requested-With', 'X-Tenant-Id', 'Accept-Language', 'X-Lang', 'X-Platform-Key', 'Idempotency-Key'],
   });
 
   // Deshabilitar caché del navegador/proxies para respuestas dinámicas (stock, precios, órdenes)

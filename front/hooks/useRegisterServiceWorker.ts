@@ -1,4 +1,18 @@
 import { useEffect } from "react";
+import { getCurrentTenantId } from "@/utils/tenant";
+
+export const SW_UPDATE_EVENT = "sf-sw-update-available";
+
+let userRequestedUpdate = false;
+
+// A pedido del usuario: el worker nuevo toma el control y recién entonces se recarga una vez. Nunca
+// automáticamente, para no interrumpir un pago. El intento de compra ya está persistido antes de enviarse.
+export async function applyServiceWorkerUpdate(): Promise<void> {
+    const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+    if (!registration?.waiting) return;
+    userRequestedUpdate = true;
+    registration.waiting.postMessage({ type: "SKIP_WAITING" });
+}
 
 // Registro global del service worker (caché offline del catálogo/assets + PWA instalable).
 // Antes solo se registraba dentro de usePushNotifications().subscribe(), es decir, solo para quien
@@ -30,8 +44,33 @@ export function useRegisterServiceWorker(): void {
             return;
         }
 
-        navigator.serviceWorker.register("/sw.js").catch(() => {
-            // Best-effort: si falla (ej. navegador sin soporte real), la app sigue funcionando online
-        });
+        const announce = () => window.dispatchEvent(new CustomEvent(SW_UPDATE_EVENT));
+        const onControllerChange = () => {
+            if (userRequestedUpdate) window.location.reload();
+        };
+        navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+
+        navigator.serviceWorker
+            .register("/sw.js", { updateViaCache: "none" })
+            .then((registration) => {
+                navigator.serviceWorker.ready
+                    .then((ready) => {
+                        const locale = document.cookie.split("; ").find((part) => part.startsWith("NEXT_LOCALE="))?.split("=")[1] ?? "";
+                        ready.active?.postMessage({ type: "PRECACHE", tenant: getCurrentTenantId(), locale });
+                    })
+                    .catch(() => undefined);
+                if (registration.waiting && navigator.serviceWorker.controller) announce();
+                registration.addEventListener("updatefound", () => {
+                    const installing = registration.installing;
+                    installing?.addEventListener("statechange", () => {
+                        if (installing.state === "installed" && navigator.serviceWorker.controller) announce();
+                    });
+                });
+            })
+            .catch(() => {
+                // Best-effort: si falla (ej. navegador sin soporte real), la app sigue funcionando online
+            });
+
+        return () => navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
     }, []);
 }

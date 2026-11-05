@@ -1,38 +1,76 @@
-// Service Worker de Stella Femme: notificaciones Web Push + caché offline del catálogo/perfil/assets.
+// Service Worker de Stella Femme: notificaciones Web Push + caché offline del catálogo PÚBLICO y de assets.
 //
 // Deliberadamente NO es un service worker generado por una librería (next-pwa/Workbox no funcionan
 // con Turbopack, que es lo único que usa este proyecto en Next 16). Las estrategias de abajo son la
 // versión a mano de NetworkFirst/StaleWhileRevalidate/CacheFirst: cada una son ~10 líneas con la
 // Cache API nativa del navegador.
 //
-// Importante: solo se interceptan peticiones GET. Las mutaciones (POST /orders, /cart, /auth, etc.)
-// nunca pasan por acá — la cola de pedidos offline la maneja la app explícitamente
-// (utils/offlineOrderQueue.ts + hooks/useOfflineOrderSync.ts), nunca el service worker en silencio.
+// Regla de seguridad: aquí solo se cachea lo que está en una LISTA PERMITIDA. Perfil, pedidos, pagos,
+// comprobantes, administración, auth e inventario privado nunca entran a Cache Storage (la Cache API
+// guardaría igual respuestas con Cache-Control: no-store: la exclusión tiene que estar acá). Solo se
+// interceptan GET; las compras nunca pasan por el service worker. El catálogo guardado es una copia
+// informativa: stock y precio offline no autorizan ningún checkout, eso lo decide el servidor.
 
-// v8: las respuestas de la API se cachean por tienda (apiCacheKey). Subir la versión hace que el
-// activate borre sf-api-v7, cuyas entradas no tenían tienda y podían servirse en otra.
-const CACHE_VERSION = 'v8';
-const API_CACHE = `sf-api-${CACHE_VERSION}`;
+const CACHE_VERSION = 'v9';
+const API_CACHE = `sf-public-api-${CACHE_VERSION}`;
 const ASSET_CACHE = `sf-assets-${CACHE_VERSION}`;
 const PAGE_CACHE = `sf-pages-${CACHE_VERSION}`;
 const CURRENT_CACHES = [API_CACHE, ASSET_CACHE, PAGE_CACHE];
+// Assets de la versión anterior: pestañas abiertas con el build viejo todavía pueden pedir sus chunks.
+// Las cachés de API y de páginas anteriores se borran siempre: podían contener datos privados.
+const PREVIOUS_ASSET_CACHE = 'sf-assets-v8';
+// La v8 cacheaba toda la API. Si está instalada no se espera a que cierren sus pestañas: mientras siga
+// activa seguiría guardando respuestas privadas. No recarga ninguna página, solo reemplaza el worker.
+const UNSAFE_LEGACY_CACHE = 'sf-api-v8';
 
-// Fallback de navegación: si una URL no cacheada falla por falta de red, se sirve esta página en
-// vez del error nativo del navegador (ERR_FAILED). Se precachea en install() para que exista desde
-// la primera visita, incluso si esa visita nunca llegó a cargar /offline por su cuenta.
+const MAX_ASSET_ENTRIES = 300;
+const MAX_API_ENTRIES = 200;
+
+// Fallback genérico de navegación: sin datos de ninguna sesión
 const OFFLINE_URL = '/offline';
-// Ruta estática a la que redirige el checkout cuando se guarda un pedido offline (nunca un id
-// dinámico de orden: esa página no existiría en caché la primera vez que se visita sin red).
-const OFFLINE_ORDER_SUCCESS_URL = '/checkout/offline-success';
-const PRECACHE_URLS = ['/', OFFLINE_URL, OFFLINE_ORDER_SUCCESS_URL, '/cart'];
+const PRECACHE_URLS = [OFFLINE_URL, '/', '/cart', '/checkout/offline-success', '/checkout/drafts'];
+
+// API pública, sin datos del usuario. La clave de caché incluye tienda, idioma y query (sucursal, página...)
+const PUBLIC_API = [/^\/api\/v1\/products(\/[^/]+)?\/?$/, /^\/api\/v1\/categories(\/[^/]+)?\/?$/, /^\/api\/v1\/collections(\/[^/]+)?\/?$/, /^\/api\/v1\/branches\/?$/, /^\/api\/v1\/store\/?$/];
+
+// Páginas públicas. Las demás (cuenta, panel, plataforma, auth, resultado de pago) van siempre a la red y sin
+// conexión reciben el fallback genérico: nunca HTML o RSC de otra sesión.
+const PUBLIC_PAGE = /^\/($|cart\/?$|checkout\/?$|checkout\/offline-success\/?$|checkout\/drafts\/?$|offline\/?$|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/?$)/;
+
+// Una por una: una ruta que falle no deja sin /offline al resto (addAll es todo o nada).
+async function precachePages(variant) {
+  const cache = await caches.open(PAGE_CACHE);
+  await Promise.allSettled(
+    PRECACHE_URLS.map(async (path) => {
+      const url = variant ? `${path}?tenant=${encodeURIComponent(variant.tenant)}` : path;
+      const response = await fetch(url, { cache: 'reload', credentials: 'same-origin' });
+      if (!response.ok) return;
+      const html = await response.clone().text();
+      await cache.put(pageKey(path, variant), response);
+      await precacheChunks(html);
+    }),
+  );
+}
+
+// El HTML guardado no sirve sin sus chunks: sin red, esa página nunca descargada fallaría al hidratarse
+async function precacheChunks(html) {
+  const assets = await caches.open(ASSET_CACHE);
+  const urls = new Set(html.match(/\/_next\/static\/[^"'\s\\)]+\.(?:js|css)/g) ?? []);
+  await Promise.allSettled(
+    [...urls].map(async (url) => {
+      if (await assets.match(url)) return;
+      const response = await fetch(url);
+      if (response.ok) await assets.put(url, response);
+    }),
+  );
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches
-      .open(PAGE_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => undefined) // best-effort: si falla alguna ruta, no bloquea la instalación
-      .then(() => self.skipWaiting()),
+    (async () => {
+      await precachePages(await pageVariant());
+      if (await caches.has(UNSAFE_LEGACY_CACHE)) await self.skipWaiting();
+    })(),
   );
 });
 
@@ -40,11 +78,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
-      // Limpia cachés de versiones anteriores (si CACHE_VERSION cambia en un deploy futuro)
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('sf-') && !CURRENT_CACHES.includes(key))
+            .filter((key) => key.startsWith('sf-') && !CURRENT_CACHES.includes(key) && key !== PREVIOUS_ASSET_CACHE)
             .map((key) => caches.delete(key)),
         ),
       ),
@@ -52,10 +89,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// El cliente (useAuth().logout() o sincronizador) manda esto para limpiar caché de API
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'CLEAR_USER_CACHE' || event.data?.type === 'CLEAR_API_CACHE') {
-    event.waitUntil(caches.delete(API_CACHE));
+  const type = event.data?.type;
+  if (type === 'PRECACHE' && event.data.tenant) {
+    // En la primera visita el worker se instala antes de que la página sepa de qué tienda es: ella avisa
+    event.waitUntil(precachePages({ tenant: event.data.tenant, locale: event.data.locale ?? '' }));
+  } else if (type === 'SKIP_WAITING') {
+    // Solo a pedido del usuario (aviso de actualización), nunca en medio de un pago
+    self.skipWaiting();
+  } else if (type === 'CLEAR_USER_CACHE' || type === 'CLEAR_API_CACHE') {
+    // Cierre de sesión o cambio de tienda: fuera lo que dependa de esa identidad
+    event.waitUntil(Promise.all([caches.delete(API_CACHE), caches.delete(PAGE_CACHE)]));
   }
 });
 
@@ -68,11 +112,34 @@ function controlledFailureResponse() {
   });
 }
 
-// La Cache API indexa solo por URL (y ignoreVary descarta Vary), así que dos tiendas que piden la
-// misma URL de la API (/api/v1/products) compartirían la entrada. La clave real de caché agrega la
-// tienda del header x-tenant-id como query param ficticio; nunca se envía a la red.
-// Lo mismo con el idioma (Accept-Language): la API devuelve el catálogo traducido, y sin esto, offline
-// se serviría la versión del último idioma usado aunque el usuario haya cambiado a otro.
+async function readCookie(name) {
+  try {
+    const cookie = await self.cookieStore?.get(name);
+    return cookie?.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// HTML y RSC dependen de la tienda y del idioma, que viajan en cookies y no en la URL. Sin saber a qué
+// tienda pertenece la respuesta no se cachea: es preferible perder la caché a servir la de otra tienda.
+async function pageVariant() {
+  const [ownDomain, chosen, locale] = await Promise.all([readCookie('sf_tenant'), readCookie('sf_store_tenant'), readCookie('NEXT_LOCALE')]);
+  const tenant = ownDomain ?? chosen;
+  return tenant ? { tenant, locale: locale ?? '' } : null;
+}
+
+function pageKey(pathOrUrl, variant) {
+  const url = new URL(pathOrUrl, self.location.origin);
+  if (variant) {
+    url.searchParams.set('__sf_tenant', variant.tenant);
+    url.searchParams.set('__sf_lang', variant.locale);
+  }
+  return url.toString();
+}
+
+// La Cache API indexa solo por URL: dos tiendas que piden /api/v1/products compartirían la entrada. La clave
+// agrega tienda (x-tenant-id) e idioma (Accept-Language) como query ficticia, que nunca se envía a la red.
 // Sin tienda → null → la respuesta no se cachea ni se sirve desde caché.
 function apiCacheKey(request) {
   const tenantId = request.headers.get('x-tenant-id');
@@ -84,68 +151,92 @@ function apiCacheKey(request) {
   return url.toString();
 }
 
-// NetworkFirst: intenta la red primero (datos frescos de stock/precios); si falla la red (offline),
-// cae a la última copia en caché para mantener la app utilizable sin conexión.
-// cacheKey: clave alternativa para la caché (ver apiCacheKey); undefined = la propia request,
-// null = no cachear.
-async function networkFirst(request, cacheName, onMiss, cacheKey = request) {
+async function trimCache(cacheName, maxEntries) {
   const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - maxEntries)).map((key) => cache.delete(key)));
+}
+
+// NetworkFirst: intenta la red primero (datos frescos de stock/precios); si falla la red (offline),
+// cae a la última copia pública para mantener el catálogo navegable sin conexión.
+async function publicApiNetworkFirst(event, request) {
+  const key = apiCacheKey(request);
+  const cache = await caches.open(API_CACHE);
   try {
     const response = await fetch(request, { cache: 'no-cache' });
-    if (cacheKey && response && (response.ok || response.type === 'opaque')) {
-      cache.put(cacheKey, response.clone());
+    if (key && response.ok) {
+      await cache.put(key, response.clone());
+      event.waitUntil(trimCache(API_CACHE, MAX_API_ENTRIES));
     }
     return response;
   } catch {
-    const cached = cacheKey ? await cache.match(cacheKey, { ignoreVary: true }) : undefined;
-    if (cached) return cached;
-    return onMiss ? onMiss() : Response.error();
+    const cached = key ? await cache.match(key, { ignoreVary: true }) : undefined;
+    if (!cached) return Response.error();
+    // Marca para que la interfaz pueda avisar que es una copia con fecha, no un dato vigente
+    const headers = new Headers(cached.headers);
+    headers.set('x-sf-offline-copy', cached.headers.get('date') ?? 'unknown');
+    return new Response(cached.body, { status: cached.status, statusText: cached.statusText, headers });
   }
 }
 
-// StaleWhileRevalidate: responde de caché al instante (si existe) y actualiza en segundo plano.
-async function staleWhileRevalidate(request, cacheName, onMiss) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request, { ignoreVary: true });
-  const networkFetch = fetch(request)
-    .then((response) => {
-      if (response && (response.ok || response.type === 'opaque')) cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => undefined);
-  return cached || (await networkFetch) || (onMiss ? onMiss() : Response.error());
-}
-
-// CacheFirst: para contenido inmutable (imágenes, fuentes, chunks hasheados de Next).
-// Soporta respuestas opacas (type === 'opaque') necesarias para imágenes externas (Unsplash, CDN).
-async function cacheFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request, { ignoreVary: true });
+// CacheFirst: solo para contenido inmutable (chunks de Next con hash en el nombre).
+async function immutableCacheFirst(request) {
+  const cache = await caches.open(ASSET_CACHE);
+  const cached = (await cache.match(request, { ignoreVary: true })) ?? (await (await caches.open(PREVIOUS_ASSET_CACHE)).match(request, { ignoreVary: true }));
   if (cached) return cached;
-
   try {
     const response = await fetch(request);
-    if (response && (response.ok || response.type === 'opaque')) cache.put(request, response.clone());
+    if (response.ok) await cache.put(request, response.clone());
     return response;
   } catch {
     return request.destination === 'script' ? controlledFailureResponse() : Response.error();
   }
 }
 
-// NetworkFirst para navegación: intenta red primero (contenido fresco); si falla, cae a la última
-// versión vista de esa misma URL; si tampoco existe en caché, sirve OFFLINE_URL.
-async function navigateWithOfflineFallback(request, cacheName) {
-  const cache = await caches.open(cacheName);
+// StaleWhileRevalidate: imágenes y fuentes. Pueden cambiar con la misma URL (un logo), así que se refrescan
+// en segundo plano y la caché tiene tope. Soporta respuestas opacas (imágenes externas: Unsplash, CDN).
+async function assetStaleWhileRevalidate(event, request) {
+  const cache = await caches.open(ASSET_CACHE);
+  const cached = await cache.match(request, { ignoreVary: true });
+  const refresh = fetch(request)
+    .then(async (response) => {
+      if (response && (response.ok || response.type === 'opaque')) {
+        await cache.put(request, response.clone());
+        await trimCache(ASSET_CACHE, MAX_ASSET_ENTRIES);
+      }
+      return response;
+    })
+    .catch(() => undefined);
+  if (cached) {
+    event.waitUntil(refresh);
+    return cached;
+  }
+  return (await refresh) || Response.error();
+}
+
+async function publicPageNetworkFirst(request, key, onMiss) {
+  const cache = await caches.open(PAGE_CACHE);
   try {
     const response = await fetch(request);
-    if (response && response.ok) cache.put(request, response.clone());
+    if (key && response.ok && !response.redirected) await cache.put(key, response.clone());
     return response;
   } catch {
-    const cached = await cache.match(request, { ignoreVary: true });
-    if (cached) return cached;
-    const offlinePage = await cache.match(OFFLINE_URL, { ignoreVary: true });
-    return offlinePage || Response.error();
+    const cached = key ? await cache.match(key, { ignoreVary: true }) : undefined;
+    return cached ?? onMiss();
   }
+}
+
+// Fallback genérico: el /offline de esta tienda si se conoce; si no, cualquiera guardado. No tiene datos de usuario.
+async function offlineFallback(variant) {
+  const cache = await caches.open(PAGE_CACHE);
+  const own = await cache.match(pageKey(OFFLINE_URL, variant), { ignoreVary: true });
+  if (own) return own;
+  const generic = await cache.match(pageKey(OFFLINE_URL, null), { ignoreVary: true });
+  if (generic) return generic;
+  return new Response('<!doctype html><meta charset="utf-8"><title>Sin conexión</title><h1>Sin conexión</h1>', {
+    status: 503,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
 
 self.addEventListener('fetch', (event) => {
@@ -159,41 +250,58 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Toda la API (catálogo, perfil, pedidos, sucursales...): puede ser cross-origin
-  if (url.pathname.startsWith('/api/v1/')) {
-    event.respondWith(networkFirst(request, API_CACHE, undefined, apiCacheKey(request)));
+  // La API puede ser cross-origin. Lo que no esté en la lista pasa directo, sin tocar Cache Storage.
+  if (url.pathname.startsWith('/api/')) {
+    if (PUBLIC_API.some((pattern) => pattern.test(url.pathname))) {
+      event.respondWith(publicApiNetworkFirst(event, request));
+    }
     return;
   }
 
-  // manifest.webmanifest / manifest.json
-  if (url.pathname.endsWith('manifest.webmanifest') || url.pathname.endsWith('manifest.json')) {
-    event.respondWith(staleWhileRevalidate(request, ASSET_CACHE));
+  // Chunks de Next: el nombre lleva hash, nunca cambian
+  if (url.origin === self.location.origin && url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(immutableCacheFirst(request));
     return;
   }
 
-  // Imágenes (incluyendo hosts externos como Unsplash), fuentes, estilos y scripts
-  const isImageFile = url.pathname.match(/\.(png|jpe?g|webp|svg|gif|ico|avif)(\?.*)?$/i);
-  if (
-    request.destination === 'image' ||
-    Boolean(isImageFile) ||
-    request.destination === 'font' ||
-    request.destination === 'script' ||
-    request.destination === 'style' ||
-    url.pathname.startsWith('/_next/static/')
-  ) {
-    event.respondWith(cacheFirst(request, ASSET_CACHE));
+  // Scripts y estilos de terceros (chat, pagos) no se tocan: deben llegar siempre frescos de su origen
+  if (request.destination === 'image' || request.destination === 'font') {
+    event.respondWith(assetStaleWhileRevalidate(event, request));
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
+
+  // manifest e íconos dependen de la tienda: siempre red, con la copia solo si no hay conexión y es la misma URL
+  if (url.pathname === '/web-manifest') {
+    event.respondWith(assetStaleWhileRevalidate(event, request));
     return;
   }
 
-  // Peticiones internas del router de Next para navegación del lado del cliente (RSC flight data)
-  if (request.headers.has('rsc') || url.pathname.includes('/_next/data/')) {
-    event.respondWith(staleWhileRevalidate(request, PAGE_CACHE, controlledFailureResponse));
+  // Datos RSC de la navegación del cliente. Mismo tratamiento que su HTML; nunca stale con red disponible.
+  if (request.headers.has('rsc') || url.searchParams.has('_rsc')) {
+    if (!PUBLIC_PAGE.test(url.pathname)) {
+      event.respondWith(fetch(request).catch(controlledFailureResponse));
+      return;
+    }
+    event.respondWith(
+      (async () => {
+        const variant = await pageVariant();
+        return publicPageNetworkFirst(request, variant ? pageKey(url.pathname + url.search, variant) : null, controlledFailureResponse);
+      })(),
+    );
     return;
   }
 
   // Navegación (cargar una página completa)
   if (request.mode === 'navigate') {
-    event.respondWith(navigateWithOfflineFallback(request, PAGE_CACHE));
+    event.respondWith(
+      (async () => {
+        const variant = await pageVariant();
+        const isPublic = PUBLIC_PAGE.test(url.pathname);
+        const key = isPublic && variant ? pageKey(url.pathname + url.search, variant) : null;
+        return publicPageNetworkFirst(request, key, () => offlineFallback(variant));
+      })(),
+    );
   }
 });
 
@@ -209,8 +317,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/favicon.ico',
-    badge: data.icon || '/favicon.ico',
+    icon: data.icon || '/pwa-icon/192',
+    badge: data.icon || '/pwa-icon/192',
     data: { url: data.url || '/' },
   };
 

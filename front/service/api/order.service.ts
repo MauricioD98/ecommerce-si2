@@ -4,7 +4,8 @@ import { CreateOrderRequest, OrderResponse, PaginatedMyOrders } from "@/types/or
 import { AdminOrder, OrderStatus, PaginatedOrders } from "@/types/admin.types";
 
 export const OrderService = {
-    createOrder: async (data: CreateOrderRequest): Promise<OrderResponse> => {
+    // La clave nace una vez por intención de compra (utils/checkoutAttempts.ts) y se repite en cada reintento
+    createOrder: async (data: CreateOrderRequest, idempotencyKey: string): Promise<OrderResponse> => {
         // El backend calcula los precios: solo se envían productId, quantity y la talla elegida (como `size`)
         const payload = {
             ...data,
@@ -14,7 +15,15 @@ export const OrderService = {
                 size: selectedSize,
             })),
         };
-        const response = await apiClient.post<OrderResponse>("/orders", payload);
+        const response = await apiClient.post<OrderResponse>("/orders", payload, {
+            headers: { "Idempotency-Key": idempotencyKey },
+        });
+        return response.data;
+    },
+
+    // Estado de un intento propio. 404 no prueba que no exista: un POST puede seguir en vuelo.
+    getAttempt: async (key: string): Promise<{ data: { status: "IN_PROGRESS" | "SUCCEEDED" | "REJECTED"; orderId: string | null; resultCode: string | null } }> => {
+        const response = await apiClient.get(`/orders/attempts/${encodeURIComponent(key)}`);
         return response.data;
     },
 

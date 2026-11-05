@@ -37,6 +37,7 @@ export interface PaymentOptions {
     card: boolean;
     qrAllowed?: boolean;
     walletAllowed?: boolean;
+    simulatedQr?: boolean;
     bankQr: { instructions: string } | null;
     usdt: { network: UsdtNetwork; walletAddress: string; walletQr: string } | null;
     wallet: { provider: string; account: string; instructions: string } | null;

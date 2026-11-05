@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { PaymentsController } from './payments.controller';
 import { PaymentsWebhookController } from './payments.webhook.controller';
+import { PaymentCoreModule } from './payment-core.module';
+import { CheckoutMaintenanceService } from './checkout-maintenance.service';
+import { CheckoutOpsController } from './checkout-ops.controller';
 import { PaymentsService } from './payments.service';
 import { StripeConnectService } from './stripe-connect.service';
 import { StripeConnectController } from './stripe-connect.controller';
@@ -17,6 +20,7 @@ import { PaymentOptionsController, PaymentProofsController, PaymentSettingsContr
   imports: [
     InvoicesModule,
     BranchesModule,
+    PaymentCoreModule,
     // Webhook único de Stripe: los eventos de suscripción al SaaS los procesa SubscriptionsService
     PlatformModule,
     OrdersModule,
@@ -29,7 +33,8 @@ import { PaymentOptionsController, PaymentProofsController, PaymentSettingsContr
     PaymentSettingsController,
     PaymentOptionsController,
     PaymentProofsController,
+    CheckoutOpsController,
   ],
-  providers: [PaymentsService, StripeConnectService, PaymentSettingsService, PaymentProofsService]
+  providers: [PaymentsService, StripeConnectService, PaymentSettingsService, PaymentProofsService, CheckoutMaintenanceService]
 })
 export class PaymentsModule {}

@@ -1,4 +1,4 @@
-import { INVENTORY_STORE, ORDERS_STORE, isOfflineDbSupported, offlineDbName, withOfflineStore } from "./offlineDb";
+import { DRAFTS_STORE, INVENTORY_STORE, LEGACY_ORDERS_STORE, isOfflineDbSupported, legacyOrderToDraft, offlineDbName, withOfflineStore } from "./offlineDb";
 import { LEGACY_TENANT_ID, getCurrentTenantId, tenantScopedKey } from "./tenant";
 
 // Antes del multitenant todo se guardaba con claves sin tienda. Esos datos son de la tienda original
@@ -80,11 +80,12 @@ export async function migrateLegacyOfflineDb(): Promise<void> {
 
     try {
         const [orders, inventory] = await Promise.all([
-            readAll<{ id: string }>(legacy, ORDERS_STORE),
+            readAll<{ id: string; payload: unknown; createdAt?: string }>(legacy, LEGACY_ORDERS_STORE),
             readAll<{ id: string }>(legacy, INVENTORY_STORE),
         ]);
         // put (no add): idempotente si una migración anterior se cortó a la mitad
-        for (const order of orders) await withOfflineStore(ORDERS_STORE, "readwrite", (store) => store.put(order));
+        // Sin propietario ni clave enviada: quedan como borradores que requieren revisión, nunca se reenvían
+        for (const order of orders) await withOfflineStore(DRAFTS_STORE, "readwrite", (store) => store.put(legacyOrderToDraft(order)));
         for (const update of inventory) await withOfflineStore(INVENTORY_STORE, "readwrite", (store) => store.put(update));
         legacy.close();
         indexedDB.deleteDatabase(LEGACY_DB_NAME);

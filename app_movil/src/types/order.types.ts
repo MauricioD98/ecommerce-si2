@@ -49,6 +49,9 @@ export interface CreateOrderItemInput {
 }
 
 export interface CreateOrderPayload {
+  // Revisión del carrito (GET /cart → version) sobre la que el usuario confirmó
+  cartVersion: number;
+  expectedTotal?: number;
   items: CreateOrderItemInput[];
   shippingAddress?: string;
   fulfillmentType?: 'DELIVERY' | 'PICKUP';

@@ -16,8 +16,8 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
  * Misma resolución de tienda que getServerStoreName. Sin tienda conocida, o si la API no responde,
  * devuelve los valores por defecto (la tienda se ve como siempre, no se rompe).
  */
-export async function getServerStoreAppearance(): Promise<StoreAppearance> {
-    const tenantId = await getServerTenantId();
+export async function getServerStoreAppearance(explicitTenantId?: string | null): Promise<StoreAppearance> {
+    const tenantId = await getServerTenantId(explicitTenantId);
     if (!tenantId) return DEFAULT_APPEARANCE;
 
     try {

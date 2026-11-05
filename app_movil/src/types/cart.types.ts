@@ -13,6 +13,8 @@ export interface Cart {
   id: string;
   userId: string;
   checkout: boolean;
+  // Revisión: sube con cada cambio. La compra se confirma contra una revisión exacta.
+  version: number;
   cartItems: CartItem[];
   total: number;
   createdAt: string;

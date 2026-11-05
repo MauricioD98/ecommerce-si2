@@ -7,6 +7,8 @@ export interface CreatePaymentIntentRequest {
 export interface CreatePaymentIntentResponse {
     clientSecret: string;
     paymentId: string;
+    paymentIntentId?: string;
+    status?: string;
 }
 
 export interface PaymentResponse {

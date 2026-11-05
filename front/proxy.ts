@@ -31,6 +31,7 @@ import {
 const TENANT_HEADER = "x-tenant-id";
 const TENANT_COOKIE = "sf_tenant";
 const INTERNAL_KEY_HEADER = "x-internal-key";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // URL de la API vista DESDE EL SERVIDOR del front (en Docker/Azure puede ser la red interna)
 const API_URL = (process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1").replace(/\/+$/, "");
@@ -125,7 +126,14 @@ export async function proxy(request: NextRequest) {
     // proxy confiable delante. Azure Container Apps conserva el Host original del dominio propio.
     const host = normalizeHost(request.headers.get("host"));
     if (!host || isPlatformHost(host)) {
-        return isApi ? NextResponse.next() : nextWithLocale(new Headers(request.headers), locale);
+        if (isApi) return NextResponse.next();
+        // Primera visita por un enlace con ?tenant=: todavía no hay cookie, y sin esto el HTML saldría sin la
+        // tienda (manifest e íconos incluidos). Solo decide la marca que se muestra: la API valida la tienda aparte.
+        const headers = new Headers(request.headers);
+        const linkedTenant = request.nextUrl.searchParams.get("tenant")?.toLowerCase();
+        if (linkedTenant && UUID_RE.test(linkedTenant)) headers.set(TENANT_HEADER, linkedTenant);
+        else headers.delete(TENANT_HEADER);
+        return nextWithLocale(headers, locale);
     }
 
     // La landing de ventas y el contacto del SaaS no existen en el dominio de una tienda
@@ -176,7 +184,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
     matcher: [
-        // Todo menos estáticos: chunks, imágenes optimizadas, service worker, manifest e íconos
-        "/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|manifest.json|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf)$).*)",
+        // Todo menos estáticos: chunks, imágenes optimizadas y service worker. El manifest y los íconos SÍ pasan:
+        // el navegador los pide sin cookies, y en un dominio propio solo el Host dice de qué tienda son.
+        "/((?!_next/static|_next/image|favicon.ico|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf)$).*)",
     ],
 };

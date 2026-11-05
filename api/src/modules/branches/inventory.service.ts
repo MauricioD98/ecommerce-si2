@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { BadRequestException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { Prisma, Product, ProductInventory } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -7,6 +8,22 @@ import { DiscountDto } from './dto/discount.dto';
 import { SetInventoryDto } from './dto/set-inventory.dto';
 import { getBranchPrice } from '../../common/utils/pricing';
 import { tenantSchemaSql } from '../../tenancy/tenant-context';
+import { CheckoutCode, CheckoutException, outOfStock } from '../../common/checkout/checkout-errors';
+import { withTxRetry } from '../../common/checkout/tx.util';
+
+// Identidad de un efecto de stock: effectId único en inventory_movements lo hace aplicable una sola vez
+export interface StockEffect {
+  effectId?: string;
+  reason?: string;
+  refType?: string;
+  refId?: string;
+}
+
+function assertValidQuantity(quantity: number): void {
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new BadRequestException('La cantidad debe ser un entero positivo');
+  }
+}
 
 // Descuento agregado de un producto en una sucursal (igual en todas sus tallas, ver setStock)
 export interface InventoryAggregate {
@@ -124,6 +141,11 @@ export class InventoryService {
 
   // Fija el stock por talla y, opcionalmente, el descuento (igual para todas las tallas) de un
   // producto en una sucursal. Solo acepta tallas que el producto realmente tiene.
+  //
+  // Es un valor ABSOLUTO (un conteo físico), así que cada talla exige la versión leída: si cambió desde
+  // entonces (se vendió algo), se responde 409 con el valor actual y nada se aplica. Una escritura offline
+  // vieja no puede resucitar unidades vendidas, y nunca se convierte en un delta automáticamente.
+  // operationId hace idempotente el reintento de la misma operación.
   async setStock(branchId: string, productId: string, dto: SetInventoryDto): Promise<InventoryResponseDto> {
     const [branch, product] = await Promise.all([
       this.prisma.branch.findUnique({ where: { id: branchId } }),
@@ -139,25 +161,55 @@ export class InventoryService {
 
     this.assertValidDiscount(Number(product.price), dto.discountPrice);
     const discountData = this.toDiscountData(dto);
+    const sizes = [...dto.sizes].sort((a, b) => (a.size < b.size ? -1 : a.size > b.size ? 1 : 0));
 
-    const rows = await this.prisma.$transaction(async (tx) => {
-      for (const { size, stock } of dto.sizes) {
-        await tx.productInventory.upsert({
-          where: { productId_branchId_size: { productId, branchId, size } },
-          update: { stock, ...discountData },
-          create: { productId, branchId, size, stock, ...discountData },
-        });
-      }
+    const rows = await withTxRetry(() =>
+      this.prisma.$transaction(async (tx) => {
+        const t = tenantSchemaSql();
+        const conflicts: { size: string; expectedVersion: number; currentVersion: number; currentStock: number; proposedStock: number }[] = [];
 
-      // El descuento aplica parejo a TODAS las tallas del producto en esta sucursal, incluidas las
-      // que no vinieron en este payload (para que no queden desincronizadas entre sí)
-      if (Object.keys(discountData).length > 0) {
-        await tx.productInventory.updateMany({ where: { productId, branchId }, data: discountData });
-      }
+        for (const { size, stock, expectedVersion } of sizes) {
+          const effectId = `adjust:${dto.operationId}:${size}`;
+          const claimed = await this.recordMovement(tx, { effectId, productId, branchId, size, stockDelta: 0, reason: 'ADJUSTMENT', refType: 'OPERATION', refId: dto.operationId });
+          if (!claimed) continue; // reintento de una operación ya aplicada
 
-      await this.syncGlobalStock(tx, productId);
-      return tx.productInventory.findMany({ where: { productId, branchId } });
-    });
+          // Fila bloqueada: entre esta lectura y la escritura nadie más puede vender esta talla
+          const [current] = await tx.$queryRaw<{ stock: number; version: number }[]>`
+            SELECT "stock", "version" FROM ${t}."product_inventories"
+            WHERE "productId" = ${productId} AND "branchId" = ${branchId} AND "size" = ${size} FOR UPDATE`;
+
+          // Versión 0 = "la fila no existía cuando se leyó"
+          const currentVersion = current?.version ?? 0;
+          if (currentVersion !== expectedVersion) {
+            conflicts.push({ size, expectedVersion, currentVersion, currentStock: current?.stock ?? 0, proposedStock: stock });
+            continue;
+          }
+          if (current) {
+            await tx.productInventory.update({
+              where: { productId_branchId_size: { productId, branchId, size } },
+              data: { stock, version: { increment: 1 }, ...discountData },
+            });
+          } else {
+            await tx.productInventory.create({ data: { productId, branchId, size, stock, version: 1, ...discountData } });
+          }
+          await tx.inventoryMovement.update({ where: { effectId }, data: { stockDelta: stock - (current?.stock ?? 0) } });
+        }
+
+        // Lanzar revierte también lo ya aplicado de otras tallas: el ajuste es todo o nada
+        if (conflicts.length > 0) {
+          throw new CheckoutException(CheckoutCode.INVENTORY_VERSION_CONFLICT, HttpStatus.CONFLICT, {}, { conflicts });
+        }
+
+        // El descuento aplica parejo a TODAS las tallas del producto en esta sucursal, incluidas las
+        // que no vinieron en este payload (para que no queden desincronizadas entre sí)
+        if (Object.keys(discountData).length > 0) {
+          await tx.productInventory.updateMany({ where: { productId, branchId }, data: discountData });
+        }
+
+        await this.syncGlobalStockMany(tx, [productId]);
+        return tx.productInventory.findMany({ where: { productId, branchId } });
+      }),
+    );
 
     return this.toResponse(rows, product);
   }
@@ -191,46 +243,43 @@ export class InventoryService {
     return { updatedBranches: branches.length };
   }
 
-  // Descuenta stock de la talla en la sucursal de forma atómica (falla si no alcanza)
-  // `syncGlobal: false` deja Product.stock sin recalcular: lo usa quien descuenta varias líneas en
-  // una misma transacción y prefiere un solo syncGlobalStockMany() al final, en vez de dos queries
-  // por línea (era lo que hacía que una venta de POS de 5 líneas agotara el timeout de la transacción).
+  // Reclama un efecto en el libro de movimientos. false = ya se aplicó (reintento): no hay que repetirlo.
+  private async recordMovement(tx: Prisma.TransactionClient, movement: Prisma.InventoryMovementCreateManyInput): Promise<boolean> {
+    const { count } = await tx.inventoryMovement.createMany({ data: [movement], skipDuplicates: true });
+    return count === 1;
+  }
+
+  // Descuenta stock de ESA variante (tienda + producto + sucursal + talla) de forma atómica. Si la fila no
+  // existe o no alcanza, falla: nunca se asigna otra sucursal ni se autoriza con el agregado global. Pasar
+  // unidades entre sucursales es una operación explícita (increment + decrement en una transacción).
+  // El agregado NO se recalcula acá: el llamador hace un solo syncGlobalStockMany() al final, para respetar
+  // el orden de bloqueos (inventario antes que producto, ver common/checkout/tx.util.ts).
   async decrement(
     tx: Prisma.TransactionClient,
     productId: string,
     branchId: string,
     size: string,
     quantity: number,
-    options: { syncGlobal?: boolean } = {},
+    effect: StockEffect = {},
   ): Promise<void> {
-    const { syncGlobal = true } = options;
+    assertValidQuantity(quantity);
+    const claimed = await this.recordMovement(tx, {
+      effectId: effect.effectId ?? randomUUID(),
+      productId,
+      branchId,
+      size,
+      stockDelta: -quantity,
+      reason: effect.reason ?? 'SALE',
+      refType: effect.refType,
+      refId: effect.refId,
+    });
+    if (!claimed) return;
+
     const result = await tx.productInventory.updateMany({
       where: { productId, branchId, size, stock: { gte: quantity } },
-      data: { stock: { decrement: quantity } },
+      data: { stock: { decrement: quantity }, version: { increment: 1 } },
     });
-    if (result.count === 0) {
-      // Si la sucursal no tiene fila asignada o stock suficiente para la talla, verificar stock global
-      const prod = await tx.product.findUnique({ where: { id: productId } });
-      if (prod && prod.stock >= quantity) {
-        await tx.product.update({
-          where: { id: productId },
-          data: { stock: { decrement: quantity } },
-        });
-        const anyInv = await tx.productInventory.findFirst({
-          where: { productId, size, stock: { gte: quantity } },
-        });
-        if (anyInv) {
-          await tx.productInventory.update({
-            where: { id: anyInv.id },
-            data: { stock: { decrement: quantity } },
-          });
-        }
-        if (syncGlobal) await this.syncGlobalStock(tx, productId);
-        return;
-      }
-      throw new BadRequestException(`Insufficient stock for size ${size} in the selected branch`);
-    }
-    if (syncGlobal) await this.syncGlobalStock(tx, productId);
+    if (result.count === 0) throw outOfStock(size, productId);
   }
 
   async increment(
@@ -239,17 +288,30 @@ export class InventoryService {
     branchId: string,
     size: string,
     quantity: number,
+    effect: StockEffect = {},
   ): Promise<void> {
+    assertValidQuantity(quantity);
+    const claimed = await this.recordMovement(tx, {
+      effectId: effect.effectId ?? randomUUID(),
+      productId,
+      branchId,
+      size,
+      stockDelta: quantity,
+      reason: effect.reason ?? 'RELEASE',
+      refType: effect.refType,
+      refId: effect.refId,
+    });
+    if (!claimed) return;
+
     await tx.productInventory.upsert({
       where: { productId_branchId_size: { productId, branchId, size } },
-      update: { stock: { increment: quantity } },
+      update: { stock: { increment: quantity }, version: { increment: 1 } },
       create: { productId, branchId, size, stock: quantity },
     });
-    await this.syncGlobalStock(tx, productId);
   }
 
-  // Devolución en mal estado: la prenda entra a mermas, NO al stock vendible. A propósito no llama a
-  // syncGlobalStock: Product.stock suma solo `stock`, así que estas unidades quedan fuera del catálogo,
+  // Devolución en mal estado: la prenda entra a mermas, NO al stock vendible. A propósito no toca el
+  // agregado: Product.stock suma solo `stock`, así que estas unidades quedan fuera del catálogo,
   // de la caja y del carrito, y solo se ven en el reporte de inventario para auditoría o baja.
   async incrementDamaged(
     tx: Prisma.TransactionClient,
@@ -257,42 +319,53 @@ export class InventoryService {
     branchId: string,
     size: string,
     quantity: number,
+    effect: StockEffect = {},
   ): Promise<void> {
+    assertValidQuantity(quantity);
+    const claimed = await this.recordMovement(tx, {
+      effectId: effect.effectId ?? randomUUID(),
+      productId,
+      branchId,
+      size,
+      damagedDelta: quantity,
+      reason: effect.reason ?? 'RETURN_DAMAGED',
+      refType: effect.refType,
+      refId: effect.refId,
+    });
+    if (!claimed) return;
+
     await tx.productInventory.upsert({
       where: { productId_branchId_size: { productId, branchId, size } },
-      update: { damagedStock: { increment: quantity } },
+      update: { damagedStock: { increment: quantity }, version: { increment: 1 } },
       create: { productId, branchId, size, stock: 0, damagedStock: quantity },
     });
   }
 
-  // Igual que syncGlobalStock pero para varios productos en UNA sola ida a la base, en vez de dos
-  // queries (aggregate + update) por producto. El subselect con COALESCE cubre el caso de un producto
-  // sin ninguna fila de inventario: queda en 0, igual que la versión de a uno.
+  // Recalcula Product.stock (agregado solo informativo) de varios productos en UNA ida a la base.
+  // Dos transacciones que tocan variantes distintas del mismo producto se serializan acá: se toma primero
+  // el bloqueo del producto (en orden por id, sin ciclos) y recién en la sentencia siguiente se suma, con un
+  // snapshot nuevo que ya ve lo confirmado por quien tenía el bloqueo. Sumar en una sola sentencia usaría
+  // un snapshot viejo y podría perder el cambio de la otra transacción. Se llama una vez al final de cada
+  // transacción, porque después de bloquear el producto no se puede tomar otro bloqueo de inventario.
   async syncGlobalStockMany(tx: Prisma.TransactionClient, productIds: string[]): Promise<void> {
-    if (productIds.length === 0) return;
+    const ids = [...new Set(productIds)].sort();
+    if (ids.length === 0) return;
 
     // SQL crudo: Prisma no lo califica con el schema del tenant, hay que hacerlo a mano
     const t = tenantSchemaSql();
+    // NO KEY UPDATE, no FOR UPDATE: insertar un order_item toma KEY SHARE sobre el producto por su FK. FOR
+    // UPDATE chocaría con eso y formaría un ciclo con el bloqueo del inventario (deadlock medido en C01).
+    await tx.$queryRaw`
+      SELECT "id" FROM ${t}."products" WHERE "id" IN (${Prisma.join(ids)}) ORDER BY "id" FOR NO KEY UPDATE
+    `;
     await tx.$executeRaw`
       UPDATE ${t}."products" p
       SET "stock" = COALESCE(
         (SELECT SUM(pi."stock") FROM ${t}."product_inventories" pi WHERE pi."productId" = p."id"),
         0
       )
-      WHERE p."id" IN (${Prisma.join(productIds)})
+      WHERE p."id" IN (${Prisma.join(ids)})
     `;
-  }
-
-  // Mantiene Product.stock (global, legado) como la suma del stock de todas las sucursales y tallas
-  private async syncGlobalStock(tx: Prisma.TransactionClient, productId: string): Promise<void> {
-    const { _sum } = await tx.productInventory.aggregate({
-      where: { productId },
-      _sum: { stock: true },
-    });
-    await tx.product.update({
-      where: { id: productId },
-      data: { stock: _sum.stock ?? 0 },
-    });
   }
 
   // Solo incluye los campos enviados: undefined = sin cambios, null = quitar el descuento
@@ -329,7 +402,7 @@ export class InventoryService {
       sizes: rows
         .slice()
         .sort((a, b) => a.size.localeCompare(b.size))
-        .map((row) => ({ size: row.size, stock: row.stock, damagedStock: row.damagedStock })),
+        .map((row) => ({ size: row.size, stock: row.stock, damagedStock: row.damagedStock, version: row.version })),
       productName: product.name,
       sku: product.sku,
       price: Number(product.price),
