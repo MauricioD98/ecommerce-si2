@@ -1,6 +1,6 @@
 # CONTEXTO — STELLA FEMME
 
-> Documento maestro para que un LLM pueda retomar este proyecto y tomar decisiones informadas sin tener que releer todo el código. Actualizado el 2026-10-31 a partir del estado real del repo (rama `main`, HEAD `a2107ab`).
+> Documento maestro para que un LLM pueda retomar este proyecto y tomar decisiones informadas sin tener que releer todo el código. Actualizado el 2026-11-06 a partir del estado real del repo (rama `main`, HEAD `a481006`).
 >
 > **Regla de mantenimiento:** si cambias esquema, rutas, permisos, puertos o dependencias, actualiza este archivo en el mismo commit. Si algo aquí contradice el código, **el código manda** — este documento puede quedar desactualizado.
 >
@@ -12,9 +12,11 @@
 
 ## 1. Qué es el proyecto
 
-**Stella Femme** empezó como un e-commerce **multi-sucursal** de ropa femenina (sucursales físicas en Santa Cruz de la Sierra, Bolivia) y desde el commit `edb3598` es además un **SaaS multitenant**: cada tienda vive en su propio schema de PostgreSQL. Las tiendas se dan de alta pagando un plan con Stripe (`/planes`) y un panel de plataforma (`/plataforma`) las administra. La tienda original quedó como el tenant `tenant_legacy` ("Stella Femme").
+**Stella Femme** empezó como un e-commerce **multi-sucursal** de ropa femenina (sucursales físicas en Santa Cruz de la Sierra, Bolivia) y desde el commit `edb3598` es además un **SaaS multitenant**: cada tienda vive en su propio schema de PostgreSQL. Las tiendas se dan de alta pagando un plan con Stripe (`/planes`) y un panel de plataforma (`/plataforma`) las administra. La tienda original quedó como el tenant `tenant_legacy` ("Stella Femme"). La plataforma SaaS se presenta con la marca **"NovaSoft"** (landing `/planes`, panel `/plataforma`, correos de alta y contacto; `PLATFORM_BRAND` en `front/utils/storeName.ts`, `PLATFORM_NAME` en la API).
 
-Cada tienda cubre: catálogo con stock y ofertas por sucursal y por talla (con **traducciones**), carrito con reserva de stock, checkout (retiro en tienda o envío a domicilio con mapa), cobro con **tarjeta vía Stripe Connect**, **QR bancario** o **USDT** (verificados a mano), QR simulado (heredado), punto de venta físico (POS), devoluciones con reingreso a stock o mermas, probador virtual en tiempo real con Decart, chatbot de Botpress, correos transaccionales, notificaciones push, facturas en PDF, panel administrativo con roles/permisos dinámicos, **personalización visual de la tienda**, **dashboard de analítica arrastrable**, marketing por correo, reportes con IA, una PWA offline-first y una app móvil Expo independiente. Interfaz, errores de la API y app móvil en **4 idiomas** (es, en, fr, zh).
+Desde `a860fbe` **cada plan (Starter / Growth / Pro / Legacy) habilita o limita funcionalidades** (POS, devoluciones, IA, probador, campañas, billeteras, app móvil, dominio propio, tope de sucursales y productos). Ver §4.18.
+
+Cada tienda cubre: catálogo con stock y ofertas por sucursal y por talla (con **traducciones**), carrito con reserva de stock, checkout (retiro en tienda o envío a domicilio con mapa), cobro con **tarjeta vía Stripe Connect**, **QR bancario**, **USDT** o **billetera digital P2P** (Airtm / Takenos / Wallbit) (verificados a mano), QR simulado (heredado), punto de venta físico (POS), devoluciones con reingreso a stock o mermas, probador virtual en tiempo real con Decart, chatbot de Botpress, correos transaccionales, notificaciones push, facturas en PDF, panel administrativo con roles/permisos dinámicos, **personalización visual de la tienda**, **dashboard de analítica arrastrable**, marketing por correo, reportes con IA, una PWA offline-first y una app móvil Expo independiente. Interfaz, errores de la API y app móvil en **4 idiomas** (es, en, fr, zh).
 
 Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos autónomos, cada uno con su propio `package.json`, lockfile y `.env`.
 
@@ -46,9 +48,10 @@ Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos aut
 | Infra | Docker (`api/Dockerfile`, `front/Dockerfile`, `docker-compose.yml`) · deploy real en **Azure Container Apps** con BD **Neon** |
 
 **Reglas de producto que hay que respetar**
-- El idioma base es **español latinoamericano**; todo texto nuevo de UI va a los 4 diccionarios (`front/messages/*.json`, `api/src/i18n/locales/*/`, `app_movil/src/i18n/locales/*.json`). La marca de la plataforma es **"Stella Femme"**, pero dentro de una tienda se muestra **el nombre de esa tienda** (`GET /store`, `StoreInfoProvider`).
+- El idioma base es **español latinoamericano**; todo texto nuevo de UI va a los 4 diccionarios (`front/messages/*.json`, `api/src/i18n/locales/*/`, `app_movil/src/i18n/locales/*.json`). La marca de la plataforma es **"NovaSoft"** (antes "Stella Femme", que ahora es solo el nombre de la tienda legacy), pero dentro de una tienda se muestra **el nombre de esa tienda** (`GET /store`, `StoreInfoProvider`).
 - El precio final **siempre lo calcula el backend** (cliente nunca decide precios/descuentos/montos a cobrar). Lo mismo con el plan del SaaS: el front manda la **clave** del plan, nunca un `price_id`.
-- **Nunca** cruzar datos entre tiendas: todo acceso a datos de negocio pasa por el tenant del request (§4.0).
+- **Nunca** cruzar datos entre tiendas: todo acceso a datos de negocio pasa por el tenant del request (§4.0). (Única excepción deliberada: el login unificado `POST /platform/auth/tenant-login` busca el email en todas las tiendas, §4.1.)
+- Una funcionalidad de pago o de panel nueva debe decidir **en qué planes está incluida** (`api/src/modules/platform/plans.ts`, §4.18) y bloquearse en la API, no solo ocultarse en el front.
 - No cambiar lógica de negocio al "arreglar" estilos o textos.
 
 **Puertos y URLs (desarrollo local)**
@@ -62,9 +65,9 @@ Es un monorepo sin workspaces: `front/`, `api/` y `app_movil/` son proyectos aut
 
 **Producción:** API y front en **Azure Container Apps**; BD en **Neon** (`DATABASE_URL` con pooler, `DIRECT_URL` sin pooler para migrar). `main.ts` confía en `TRUST_PROXY_HOPS` saltos de proxy (ingress de Azure) para leer la IP real.
 
-**Páginas de la tienda (web):** `/` (catálogo) · `/{productId}` (detalle, con Probador Virtual) · `/cart` · `/checkout` (paso QR simulado en `/checkout/qr-confirm`, retorno de Stripe en `/checkout/success`, página estática `/checkout/offline-success`) · `/account` (+ `/account/orders/[id]`, donde el cliente sube el comprobante de QR/USDT) · `/auth/login|register|forgot-password|reset-password` · `/offline` (fallback de la PWA).
+**Páginas de la tienda (web):** `/` (catálogo) · `/{productId}` (detalle, con Probador Virtual) · `/cart` · `/checkout` (paso QR simulado en `/checkout/qr-confirm`, retorno de Stripe en `/checkout/success`, página estática `/checkout/offline-success`, borradores offline en **`/checkout/drafts`**) · `/account` (+ `/account/orders/[id]`, donde el cliente sube el comprobante de QR/USDT/billetera) · `/auth/login` (**login unificado**: detecta la tienda por credenciales y también a los administradores de NovaSoft, §4.1) `|register` (con selector de tienda) `|forgot-password|reset-password` · `/offline` (fallback de la PWA). Manifest por tienda en `/web-manifest` e íconos en `/pwa-icon/[size][/maskable]` (reemplazan al viejo `app/manifest.ts`).
 **Páginas del SaaS (sin tienda):** `/planes` (+ `/planes/exito`, vuelta de Stripe Checkout), `/contacto`, `/plataforma` (panel del plano de control, entra con la llave de plataforma). Listadas en `front/utils/platformPaths.ts`.
-**Panel de tienda (`/admin`):** `pos`, `returns`, `products`, `categories`, `collections`, `inventory`, `orders`, `branches`, `staff`, `roles`, `marketing`, `notifications`, `reports` (+ `reports/dashboard`), `suscripcion` (solo Super Admin), `settings/payments`, `settings/appearance`. `/admin/pagos` es una ruta vieja que redirige a `settings/payments`.
+**Panel de tienda (`/admin`):** (los ítems con `planFeature` en `adminNav.ts` se ocultan o muestran aviso de "actualiza tu plan" si el plan no los incluye) `pos`, `returns`, `products`, `categories`, `collections`, `inventory`, `orders`, `branches`, `staff`, `roles`, `marketing`, `notifications`, `reports` (+ `reports/dashboard`), `suscripcion` (solo Super Admin), `settings/payments`, `settings/appearance`. `/admin/pagos` es una ruta vieja que redirige a `settings/payments`.
 
 ---
 
@@ -76,13 +79,14 @@ ecommerce-si2/
 ├── docker-compose.yml      ← orquesta api (3001) + front (3000) en una red bridge
 ├── front/                  ← Next.js 16 (proyecto autónomo, usa bun; bun.lock)
 ├── api/                    ← NestJS 12 + Prisma 7 (proyecto autónomo, usa npm; package-lock.json)
-├── app_movil/              ← Expo ~57 / React Native (cliente móvil independiente de la misma API)
+├── app_movil/              ← Expo ~58 / React Native 0.88 (cliente móvil independiente de la misma API)
+├── docs/checkout-resiliente.md ← operación y políticas del checkout resistente a fallos (§4.10)
 └── IA/                     ← carpeta vacía
 ```
 
 ### 2.1 Avisos importantes por carpeta (archivos `AGENTS.md` reales del repo)
 - **`front/AGENTS.md`** (incluido vía `front/CLAUDE.md`): *"Esta NO es la versión de Next.js que conoces"* — Next 16 tiene cambios que rompen compatibilidad con lo que un LLM pueda "saber" de memoria (por ejemplo, `middleware.ts` ahora se llama `proxy.ts`). Antes de escribir código en `front/`, revisar `front/node_modules/next/dist/docs/`.
-- **`app_movil/AGENTS.md`**: *"Expo HA CAMBIADO"* — revisar la documentación versionada exacta de Expo 57 (`https://docs.expo.dev/versions/v57.0.0/`) antes de escribir código ahí.
+- **`app_movil/AGENTS.md`**: *"Expo HA CAMBIADO"* — revisar la documentación versionada exacta de Expo antes de escribir código ahí. Ojo: el `AGENTS.md` sigue apuntando a v57, pero desde `a860fbe` el proyecto está en **Expo 58** (`https://docs.expo.dev/versions/v58.0.0/`).
 - `api/` no tiene `AGENTS.md`/`CLAUDE.md` propios (solo el `README.md` boilerplate de Nest).
 
 ### 2.2 Frontend (`front/`)
@@ -90,13 +94,14 @@ ecommerce-si2/
 ```
 proxy.ts         ← enrutamiento por dominio propio de cada tienda + negociación de idioma (ver §4.0 y §4.16)
 app/
-  layout.tsx, globals.css, fonts.ts, manifest.ts, offline/, error.tsx, global-error.tsx
+  layout.tsx, globals.css, fonts.ts, offline/, error.tsx, global-error.tsx
+  web-manifest/route.ts, pwa-icon/[size]/(maskable/)route.tsx ← manifest e íconos PWA por tienda
   (lading)/page.tsx            ← "/" catálogo (carpeta con typo histórico "lading")
   (product)/[id]/page.tsx      ← detalle de producto (monta el Probador Virtual)
   (platform)/                  ← SaaS: planes/ (+ exito/), contacto/
   (platform-admin)/plataforma/ ← panel del plano de control (llave de plataforma)
   auth/ login | register | forgot-password | reset-password
-  cart/, checkout/ (+ qr-confirm/, success/, offline-success/)
+  cart/, checkout/ (+ qr-confirm/, success/, offline-success/, drafts/)
   account/ (+ orders/[id]/)
   admin/                       ← pos/, returns/, products/, categories/, collections/, inventory/,
                                   orders/, branches/, staff/, roles/, marketing/, notifications/,
@@ -110,20 +115,21 @@ components/modules/
   platform/ (landing de planes, plans.ts), platform-admin/, tenant/ (TenantGate + selector),
   appearance/, analytics/, i18n/ (LanguageSwitcher)
 providers/   index.tsx, state-provider.tsx, OfflineSyncProvider.tsx, StoreAppearanceProvider.tsx,
-             StoreInfoProvider.tsx (nombre de la tienda), LocaleCartSync.tsx
+             StoreInfoProvider.tsx (nombre, plan y `features` de la tienda, cacheados en localStorage),
+             LocaleCartSync.tsx
 i18n/        config.ts (LOCALES, cookie), request.ts, client.ts   ·   messages/{es,en,fr,zh}.json
 hooks/       useAuth, useCart, useOrder, useMyOrders, useOrderDetail, usePayment, useProducts, useBranches,
              useAddresses, useSpeechRecognition, useAdminAccess/Branches/Categories/Collections/Orders/
              Products, useInventory, useOfflineInventorySync, useStaff, useRoles, useReports, useReturns,
-             usePos, usePushNotifications, useOfflineOrderSync, useNetworkStatus,
-             useRegisterServiceWorker, useLocaleVersion
+             usePos, usePushNotifications, useCheckoutRecovery, useNetworkStatus, usePublicTenants,
+             useRegisterServiceWorker, useLocaleVersion   (useOfflineOrderSync se eliminó)
 service/api/ axios.config + un *.service.ts por módulo del backend (incluye platform, platformAdmin,
              subscription, paymentSettings, appearance, analytics), error.utils
 store/       index.tsx (Redux store + persist con clave por tienda), slices/
 utils/       tenant.ts (tienda activa), legacyStorageMigration.ts, platformPaths.ts, storeName(.server).ts,
              storeAppearance.server.ts, appearanceTheme.ts, fonts.ts, offlineDb.ts, pricing.ts,
-             permissions.ts, offlineOrderQueue.ts, offlineInventoryQueue.ts, productStorage.ts,
-             printPosReceipt.ts
+             permissions.ts, offlineOrderQueue.ts, offlineInventoryQueue.ts, checkoutAttempts.ts,
+             productStorage.ts, printPosReceipt.ts
 types/       *.types.ts por dominio
 public/sw.js ← Service Worker manual (ver §4.10)
 ```
@@ -151,14 +157,18 @@ src/
   prisma/        ← PrismaModule: registra el proxy multitenant bajo el token PrismaService
   common/
     constants/permissions.ts   ← catálogo de permisos + BASE_ROLES (ver §4.1)
-    decorators/                ← GetUser, @Permissions/@AnyPermission, guards (Jwt, Permissions, Branch), throttlers
+    decorators/                ← GetUser, @Permissions/@AnyPermission, @RequirePlanFeature, guards (Jwt,
+                                 Permissions, Branch, PlanFeature), throttlers
+    checkout/                  ← checkout-policy.ts (TTLs), checkout-errors.ts, tx.util.ts, failpoints.ts (tests)
     encryption/                ← EncryptionService (AES-256-GCM)
     utils/                     ← pricing.ts, permission.util.ts, token-hash.ts
   modules/
     auth · users (+ addresses) · products (+ product-translations) · category · collections
     cart (+ CartCleanupService) · orders · payments (+ webhook, Stripe Connect, payment-settings,
     payment-proofs) · branches (+ InventoryService) · roles · mail · marketing · reports (+ report-scope)
-    pos · notifications · returns · chatbot · platform · store · try-on · appearance · analytics
+    pos · notifications · returns · chatbot · platform (+ plans.ts con las features por plan) · store
+    · try-on · appearance · analytics
+test/acceptance/   ← suite de aceptación del checkout/PWA (`npm run test:acceptance`, PostgreSQL real, Stripe falso)
 ```
 `ValidationPipe` global: `whitelist: true`, **`forbidNonWhitelisted: false`** (ver §5.1.2), `transform: true`, `enableImplicitConversion`. Los errores de validación se lanzan como `ValidationFailedException` y los traduce `I18nExceptionFilter`.
 
@@ -174,11 +184,15 @@ src/
             orders/{Orders,OrderDetail}, payments/Payment, profile/{Profile,EditProfile,ChangePassword},
             tenant/TenantSelectorScreen (nuevo)
   context/  AuthContext, BranchContext, CartContext, TenantContext (nuevo)
-  config/   env.ts (URL de la API; por defecto la de Azure) · tenant.ts (tienda activa en memoria + AsyncStorage)
+  config/   env.ts (URL de la API: `EXPO_PUBLIC_API_URL` → IP del host de Metro (`hostUri`):3001 → IP LAN fija;
+            **ya no cae por defecto en Azure**, ver §5.1.17) · tenant.ts (tienda activa en memoria + AsyncStorage)
+  components/ CheckoutRecovery.tsx (retoma intentos de checkout al volver la app al frente)
+  utils/    checkoutAttempts.ts (intentos de checkout en AsyncStorage)
   api/      client.ts (axios: x-tenant-id, refresh token con cola, auto-logout; ante TENANT_REQUIRED
             muestra el selector de tienda en vez de cerrar sesión) + *.api.ts por módulo
   i18n/     index.ts + locales/{es,en,fr,zh}.json · components/LanguageSelector.tsx
 ```
+- Todas las requests mandan **`x-client-platform: mobile`**: la API solo deja entrar a tiendas con **plan Pro/Legacy** (`mobileApp`, §4.18). El nombre de la tienda se muestra dinámicamente en Login, Registro, Catálogo, Perfil y Pagos. `PaymentScreen` soporta QR bancario, USDT y billetera.
 - Builds de una sola tienda: `EXPO_PUBLIC_TENANT_ID`. Sin eso, el usuario elige la tienda en `TenantSelectorScreen`. Los tokens y la sucursal guardados quedan atados a la tienda que los emitió.
 - **No existe `eas.json`.**
 - `app_movil/README.md` menciona cuentas de prueba (`admin@gmail.com` / `Admin123*`) **distintas** a las del seed (`superadmin@stellafemme.com`): no confiar en ese README; la fuente de verdad es `api/prisma/seed.mjs`.
@@ -191,7 +205,7 @@ src/
 
 | Schema | Contenido |
 |---|---|
-| `public` | **Plano de control** (`prisma/control/schema.prisma`): `tenants`, `tenant_signups`, `tenant_integrations`, `tenant_credentials` + su `_prisma_migrations` |
+| `public` | **Plano de control** (`prisma/control/schema.prisma`): `tenants`, `tenant_signups`, `tenant_integrations`, `tenant_credentials`, `platform_admins`, `provider_event_inbox` + su `_prisma_migrations` |
 | `tenant_legacy` | La tienda original (el antiguo `public` renombrado). Id fijo `00000000-0000-4000-8000-000000000001`, slug `stella-femme` |
 | `tenant_<uuid sin guiones>` | Cada tienda nueva. Mismas tablas que `tenant_legacy` (`prisma/schema.prisma`) y su propia `_prisma_migrations` |
 | `<schema>_reporting` | Vistas de solo lectura para los reportes con IA de cada tienda, con un rol `reports_<sufijo>` NOLOGIN |
@@ -201,14 +215,15 @@ Al escribir este documento, la BD Neon tiene `public`, `tenant_legacy`, `tenant_
 ### 3.1 Plano de control (`public`)
 | Modelo | Campos clave / notas |
 |---|---|
-| **Tenant** | `id` (uuid), `slug` (único, subdominio), `name`, `schemaName` (único), `domain?` + `domainVerifiedAt?` (dominio propio; **solo se enruta si está verificado**), `status` (`PROVISIONING/ACTIVE/SUSPENDED/FAILED`), `plan`, `schemaVersion` (última migración aplicada), `provisionError?`. Stripe Connect: `stripeAccountId`, `stripeChargesEnabled`, `platformFeeBps` (comisión en puntos básicos). Suscripción al SaaS: `stripeCustomerId`, `stripeSubscriptionId`, `subscriptionStatus` |
+| **Tenant** | `id` (uuid), `slug` (único, subdominio), `name`, `schemaName` (único), `domain?` + `domainVerifiedAt?` (dominio propio; **solo se enruta si está verificado**), `status` (`PROVISIONING/ACTIVE/SUSPENDED/FAILED`), `plan` (default `"free"` → se trata como Starter; valores con sentido: `starter`/`growth`/`pro`/`legacy`, §4.18), `schemaVersion` (última migración aplicada), `provisionError?`. Stripe Connect: `stripeAccountId`, `stripeChargesEnabled`, `platformFeeBps` (comisión en puntos básicos). Suscripción al SaaS: `stripeCustomerId`, `stripeSubscriptionId`, `subscriptionStatus` |
 | **TenantSignup** | Alta self-service pendiente de pago (`PENDING/PROVISIONING/COMPLETED/FAILED/EXPIRED`). Guarda el hash bcrypt de la contraseña del dueño para que **no viaje en la metadata de Stripe**; se vacía al completar o expirar. `tenantId` se fija antes de aprovisionar para que un reintento retome la misma tienda |
 | **TenantIntegration** | PK `(tenantId, provider)`, `provider` ∈ `DECART`, `WEBPUSH`, `STRIPE` (reservado). `encryptedData` = `"<versión de llave>:<base64(ciphertext‖tag)>"` + `iv`. AAD = `"<tenantId>:<provider>"`: copiar el valor a otra tienda no descifra |
 | **TenantCredential** | `OWNER_PASSWORD` / `API_KEY`, `identifier`, `secretHash` (bcrypt), expiración y revocación |
 | **PlatformAdmin** | Administradores del SaaS (`/plataforma`): `email` (único, en minúsculas), `passwordHash` (bcrypt), `name?`, `isActive`, `loginAttempts`/`lockedUntil`, `lastLoginAt`. Ver §4.17 |
+| **ProviderEventInbox** | Inbox de webhooks de proveedores (Stripe): deduplica y reprocesa eventos (`InboxStatus`). Ver §4.10 |
 
 ### 3.2 Schema de tienda (`prisma/schema.prisma`)
-Modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`, `Collection`, `Category`, `OrderItem`, `CartItem`, `Order`, `Cart`, `Return`, `ReturnItem`, `PushSubscription`, `Payment`, **`PaymentSettings`**, **`PaymentProof`**, **`StoreAppearance`**, **`DashboardLayout`** (+ enums `OrderStatus`, `FulfillmentType`, `OrderSource`, `PaymentMethod`, **`UsdtNetwork`**, **`PaymentProofStatus`**, `PaymentStatus`, `ReturnReason`, `ItemCondition`).
+Modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`, `Collection`, `Category`, `OrderItem`, `CartItem`, `Order`, `Cart`, `Return`, `ReturnItem`, `PushSubscription`, `Payment`, **`PaymentSettings`**, **`PaymentProof`**, **`StoreAppearance`**, **`DashboardLayout`** y, desde el commit `2291d1c` (checkout resiliente), **`StockReservation`**, **`InventoryMovement`**, **`CheckoutAttempt`**, **`PaymentAttempt`**, **`PaymentCompensation`**, **`OutboxEvent`**, **`OperationalIssue`** (+ enums `OrderStatus`, `FulfillmentType`, `OrderSource`, `PaymentMethod`, `UsdtNetwork`, `PaymentProofStatus`, `PaymentStatus`, `ReturnReason`, `ItemCondition`, `ReservationStatus`, `CheckoutAttemptStatus`, `PaymentAttemptStatus`, `CompensationStatus`, `OutboxStatus`).
 
 | Modelo | Campos clave / notas |
 |---|---|
@@ -220,17 +235,19 @@ Modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`,
 | **Collection** / **Category** | Sin cambios: colección = campaña, categoría = tipo de prenda |
 | **Cart / CartItem** | `CartItem` único por `(cartId, productId, size)`, con `branchId?` = sucursal donde se reservó el stock |
 | **Order** | `shippingCost`, `paymentStatus`, `stripePaymentIntentId` (único), `paymentMethod`, `source` (`WEB/POS`), `cashierId`, `nit`/`razonSocial`, `returns[]`, `paymentProof?` |
-| **PaymentMethod** (enum) | `STRIPE`, `CASH`, `PHYSICAL_CARD`, `QR` (simulado), **`BANK_QR`**, **`USDT`** |
-| **PaymentSettings** *(nuevo)* | Fila única `id = "default"`: `qrEnabled`, `qrImage` (BYTEA) + `qrImageType`, `qrInstructions`, `usdtEnabled`, `usdtNetwork` (`TRC20/ERC20/BEP20/POLYGON`), `usdtWalletAddress` |
-| **PaymentProof** *(nuevo)* | Uno por pedido (`orderId` único): `method`, `image?` (BYTEA, comprobante QR) o `txId?` (USDT, único entre pedidos), `status` (`PENDIENTE/APROBADO/RECHAZADO`), `reviewedById`, `reviewedAt` |
+| **PaymentMethod** (enum) | `STRIPE`, `CASH`, `PHYSICAL_CARD`, `QR` (simulado), `BANK_QR`, `USDT`, **`WALLET`** (billetera P2P, nuevo) |
+| **PaymentSettings** | Fila única `id = "default"`: `qrEnabled`, `qrImage` (BYTEA) + `qrImageType`, `qrInstructions`, `usdtEnabled`, `usdtNetwork` (`TRC20/ERC20/BEP20/POLYGON`), `usdtWalletAddress`, **`walletEnabled`, `walletProvider`, `walletAccount`, `walletInstructions`** (nuevo) |
+| **PaymentProof** | Uno por pedido (`orderId` único): `method`, `image?` (BYTEA, comprobante QR) o `txId?` (USDT / referencia de billetera, único entre pedidos), `status` (`PENDIENTE/APROBADO/RECHAZADO`), `reviewedById`, `reviewedAt` |
 | **StoreAppearance** *(nuevo)* | Ver §4.13b |
 | **DashboardLayout** *(nuevo)* | Ver §4.13c |
 | **Return / ReturnItem / PushSubscription / Payment / UserAddress** | Sin cambios de fondo (ver §4.11) |
+| **StockReservation / InventoryMovement** | Reservas explícitas de stock con TTL y movimientos con `effectId` único (idempotencia). Ver §4.10 |
+| **CheckoutAttempt / PaymentAttempt / PaymentCompensation / OutboxEvent / OperationalIssue** | Intentos durables de checkout (clave de idempotencia) y de pago, compensaciones, outbox de correo/push y anomalías para revisión. Ver §4.10 y `docs/checkout-resiliente.md` |
 
 ### 3.3 Migraciones
-**Tienda** (`prisma/migrations/`, 30 en total). Las últimas, posteriores al doc anterior: `returns_and_damaged_stock` (`20260927120000`) → **`tenant_scoped_reporting`** (`20261024120000`, crea `<schema>_reporting` y el rol `reports_<sufijo>` para la tienda que se está migrando, y elimina el viejo schema `reporting`) → **`product_translations`** (`20261025090000`) → **`manual_payments`** (`20261025180000`) → **`store_appearance`** (`20261026120000`) → **`store_appearance_theme`** (`20261026150000`) → **`dashboard_layouts`** (`20261026180000`).
+**Tienda** (`prisma/migrations/`, 32 en total). Las dos más nuevas: **`wallet_payments`** (`20261102000000`, idempotente con `IF NOT EXISTS`: valor `WALLET` del enum + columnas `wallet*`) y **`checkout_resilience`** (`20261103120000`, tablas de reservas, movimientos, intentos, outbox, etc. con backfill). Antes: `returns_and_damaged_stock` (`20260927120000`) → **`tenant_scoped_reporting`** (`20261024120000`, crea `<schema>_reporting` y el rol `reports_<sufijo>` para la tienda que se está migrando, y elimina el viejo schema `reporting`) → **`product_translations`** (`20261025090000`) → **`manual_payments`** (`20261025180000`) → **`store_appearance`** (`20261026120000`) → **`store_appearance_theme`** (`20261026150000`) → **`dashboard_layouts`** (`20261026180000`).
 
-**Control** (`prisma/control/migrations/`): `20261024130000_control_init` → `20261031120000_platform_admins` (aplicada en Neon el 2026-10-31).
+**Control** (`prisma/control/migrations/`): `20261024130000_control_init` → `20261031120000_platform_admins` (aplicada en Neon el 2026-10-31) → **`20261103120000_provider_event_inbox`**. Confirmar en Neon que `wallet_payments`, `checkout_resilience` y `provider_event_inbox` estén aplicadas (el contenedor las aplica al arrancar con `migrate:all`).
 
 **Paso único a multitenant (ya ejecutado en Neon):** `control/sql/001_split_public_into_tenant_legacy.sql` (renombra `public` → `tenant_legacy` y crea un `public` vacío) → `npx prisma migrate deploy --config prisma.control.config.ts` → `control/sql/002_register_legacy_tenant.sql` (registra la tienda legacy con el id fijo). No volver a correrlos.
 
@@ -243,7 +260,7 @@ Modelos: `Role`, `User`, `UserAddress`, `Product`, `Branch`, `ProductInventory`,
 - `migrate dev` sigue sin servir cuando el cambio migra datos existentes (la migración se escribe a mano).
 
 ### 3.4 Datos iniciales (`api/prisma/seed.mjs`)
-Siembra **un** schema de tienda, nunca `public`: `TENANT_SCHEMA=tenant_legacy npm run seed` (sin `TENANT_SCHEMA` válido aborta). Es idempotente y solo para desarrollo. Las tiendas nuevas ya nacen con roles base y su Super Admin (el dueño) vía `TenantProvisioningService`.
+Siembra **un** schema de tienda, nunca `public`: `TENANT_SCHEMA=tenant_legacy npm run seed` (sin `TENANT_SCHEMA` válido aborta). Es idempotente y solo para desarrollo. Las tiendas nuevas ya nacen con roles base y su Super Admin (el dueño) vía `TenantProvisioningService`, y además (desde `a860fbe`) con una fila de `store_appearance` por defecto y, si el plan incluye billetera, con **`walletEnabled = true` y una cuenta de ejemplo** (`@<slug> / pagos@<slug>.com`) — ver §5.1.19.
 
 | Rol | Permisos |
 |---|---|
@@ -258,7 +275,7 @@ Siembra **un** schema de tienda, nunca `public`: `TENANT_SCHEMA=tenant_legacy np
 
 ### 4.0 Multitenancy — cómo se resuelve la tienda de cada request
 - **API (`api/src/tenancy/`):** `TenantMiddleware` corre en todas las rutas bajo `/api/v1`, salvo `platform/*`, `GET /` (health), `POST /payments/webhook` y Swagger. Resuelve la tienda por **header `x-tenant-id` (UUID)** o, si no viene, por **subdominio** (`<slug>.<TENANT_BASE_DOMAIN>`). Si falta, es inválida o la tienda no está `ACTIVE`, responde **401 con `code: "TENANT_REQUIRED"`** (mismo mensaje en todos los casos, para no revelar qué tiendas existen). La resolución se cachea 60 s (`TenantResolutionCache`; suspender una tienda invalida la caché).
-- El contexto (`tenantId`, `schemaName`) queda en `req.tenant` y en un `AsyncLocalStorage` (`tenant-context.ts`). Para crons, colas y scripts: `runInTenant(ctx, fn)`.
+- El contexto (`tenantId`, `schemaName`, **`plan`**) queda en `req.tenant` y en un `AsyncLocalStorage` (`tenant-context.ts`). Para crons, colas y scripts: `runInTenant(ctx, fn)`.
 - **Acceso a datos:** `TenantPrismaService` mantiene un `PrismaClient` por schema (LRU, `TENANT_CLIENT_CACHE`, default 100) sobre **un solo `pg.Pool`**, con `PrismaPg(pool, { schema })`, así las queries de modelos van calificadas con el schema. Los ~30 servicios existentes siguen inyectando `PrismaService`: `PrismaModule` registra bajo ese token un **Proxy** (`tenant-prisma.proxy.ts`) que resuelve cada acceso al cliente de la tienda del request.
   - **SQL crudo:** Prisma no califica `$queryRaw`. Usar `tenantSchemaSql()` (`Prisma.sql\`... FROM ${tenantSchemaSql()}.orders\``) o `TenantPrismaService.transaction()`, que hace `SET LOCAL search_path` (seguro con PgBouncer). Una tabla sin calificar cae en `public` y da "relation does not exist".
   - Los nombres de schema se validan contra `^tenant_([a-f0-9]{32}|legacy)$` antes de interpolarse en SQL.
@@ -270,6 +287,12 @@ Siembra **un** schema de tienda, nunca `public`: `TENANT_SCHEMA=tenant_legacy np
 - **Credenciales por tienda (`TenantSecretsService`):** Decart y Web Push ya **no** usan variables de entorno globales; viven cifradas en `public.tenant_integrations` con la llave maestra `TENANT_SECRETS_KEYS` (rotable por versión). Se cargan desde el panel de plataforma. `src/scripts/import-legacy-integrations.ts` importó una vez las claves globales viejas a la tienda legacy.
 
 ### 4.1 Autenticación, roles y permisos
+**Login unificado (nuevo, `a860fbe`):** el formulario `/auth/login` ya no llama a `POST /auth/login` de la tienda activa, sino a **`POST /platform/auth/tenant-login`** (sin tenant, throttle 20/min) con `email`, `password` y opcionalmente `tenantId` / `preferredTenantId`. `PlatformAuthService.tenantLogin`:
+1. Si el email es de un **administrador de NovaSoft** activo y la contraseña coincide → devuelve el JWT de plataforma y `redirectUrl: "/plataforma"`.
+2. Si viene `tenantId` → autentica en esa tienda (`runInTenant` + `AuthService.login`).
+3. Si no → busca el email (case-insensitive, excluyendo los usuarios internos `@pos.stellafemme.internal`) en **todas** las tiendas ACTIVE; con una sola coincidencia de email + contraseña inicia sesión ahí (y el front cambia de tienda con `switchTenantWithAuth`), con varias devuelve `requiresTenantSelection: true` y la lista para elegir.
+El registro (`RegisterForm`) muestra un selector de tienda alimentado por `GET /platform/tenants/public` (`usePublicTenants`). Los emails ahora se normalizan a minúsculas al registrarse y se buscan sin distinguir mayúsculas.
+
 OTP de 6 dígitos para recuperar contraseña (5 intentos, 10 min), bloqueo de login a 3 intentos por 5 min, JWT con `role/permissions/branchId/tenantId` sin consultar la BD, refresh token hasheado SHA-256, "Mi cuenta" con perfil/direcciones/sucursal favorita. Permisos nuevos: **`MANAGE_PAYMENTS`** (medios de cobro: Stripe, QR bancario, USDT) y **`MANAGE_APPEARANCE`** (apariencia de la tienda); antes ya se habían sumado `USE_POS` y `PROCESS_RETURNS`. Los espejos que hay que mantener sincronizados si se agrega un permiso:
 - `api/src/common/constants/permissions.ts` (fuente de verdad, incluye `BASE_ROLES`, que usa el aprovisionamiento)
 - `front/utils/permissions.ts` (`Permission`, `PERMISSION_OPTIONS`, `PANEL_PERMISSIONS`)
@@ -287,17 +310,17 @@ OTP de 6 dígitos para recuperar contraseña (5 intentos, 10 min), bloqueo de lo
 
 ### 4.3 Carrito y checkout (web)
 - Carrito por Redux, líneas por `productId + selectedSize`; una fila por talla en el backend.
-- **El carrito reserva stock real al agregar** (`CartService.addItem`), guardado en `CartItem.branchId`. `CartCleanupService` corre cada 15 min y libera carritos sin actividad por más de 1 h (recorre las tiendas con `runInTenant`). `OrdersService.create` consume la reserva y descuenta solo la diferencia.
-- Checkout en 3 pasos (Entrega → Pago → Completado). Medios ofrecidos según `GET /store/payment-options` y `GET /payments/connect/availability`: **tarjeta** (solo si la tienda completó Stripe Connect), **QR bancario** y **USDT** (si están activos y completos; `ManualPaymentSection.tsx`) y el QR simulado heredado.
-- **Cola offline**: si `POST /orders` falla por red, el pedido va a IndexedDB y se reintenta; el usuario ve `/checkout/offline-success`.
+- **El carrito reserva stock real al agregar** mediante `StockReservation` con TTL explícito (`CART_RESERVATION_TTL_MS`, default 1 h). `CartCleanupService` corre cada 15 min y libera lo vencido (recorre las tiendas con `runInTenant`). El front sincroniza el carrito completo con `PUT /cart` (con revisión, `Cart.activeUserId`).
+- Checkout en 3 pasos (Entrega → Pago → Completado). Medios ofrecidos según `GET /store/payment-options` y `GET /payments/connect/availability`, **filtrados por plan**: **tarjeta** (solo si la tienda completó Stripe Connect), **QR bancario**, **USDT** y **billetera digital** (si están activos, completos y el plan los incluye; `ManualPaymentSection.tsx`) y el QR simulado heredado.
+- **Offline**: los pedidos sin red quedan como **borradores** en IndexedDB (`/checkout/drafts`) y **nunca se envían solos**; los intentos interrumpidos se retoman con `useCheckoutRecovery` (ver §4.10).
 
 ### 4.4 Pedidos, pagos, facturas y webhook de Stripe
 - `OrdersService.create` calcula precios en servidor y ajusta el stock por talla.
 - **Tarjeta = Stripe Connect con destination charges** (`payments/stripe-connect.service.ts`): el PaymentIntent se crea en la cuenta de la plataforma con `transfer_data.destination = acct_` de la tienda y `application_fee_amount` según `Tenant.platformFeeBps`. **Sin cuenta conectada y habilitada, el pago con tarjeta responde 400**: nunca se cobra a la cuenta central. Onboarding desde `/admin/settings/payments` (`POST /admin/settings/payments/stripe/onboarding`, cuenta Express); `DELETE .../stripe` desvincula sin borrar la cuenta en Stripe. La tienda legacy necesita su `stripe_account_id` cargado a mano (ver comentario de `002_register_legacy_tenant.sql`).
 - `POST /payments/create-intent` calcula el monto desde `order.totalAmount`; el cliente no envía monto.
-- **Pagos manuales (QR bancario y USDT)** — `payment-settings.service.ts` / `payment-proofs.service.ts`:
-  - La tienda configura en `/admin/settings/payments` la imagen de su QR bancario (PNG/JPEG/WebP validados **por bytes**) e instrucciones, y/o red + wallet USDT (dirección validada según la red). Un medio solo se activa completo.
-  - El cliente crea el pedido (queda `PENDIENTE` con el stock reservado) y sube el comprobante (`POST /orders/:id/payment-proof`): imagen para QR, TxID para USDT (un TxID no puede pagar dos pedidos). Puede reemplazarlo mientras no se revisó.
+- **Pagos manuales (QR bancario, USDT y billetera)** — `payment-settings.service.ts` / `payment-proofs.service.ts`:
+  - La tienda configura en `/admin/settings/payments` la imagen de su QR bancario (PNG/JPEG/WebP validados **por bytes**) e instrucciones, red + wallet USDT (dirección validada según la red) y/o **billetera digital P2P** (`walletProvider` — Airtm / Takenos / Wallbit —, `walletAccount`, `walletInstructions`; requiere plan con `digitalWallet`). Un medio solo se activa completo.
+  - El cliente crea el pedido (queda `PENDIENTE` con el stock reservado) y sube el comprobante (`POST /orders/:id/payment-proof`): imagen para QR, TxID para USDT, referencia de la transferencia para billetera (un TxID/referencia no puede pagar dos pedidos). Puede reemplazarlo mientras no se revisó.
   - El admin lo revisa en Pedidos (`VIEW_ORDERS`): **aprobar** = mismo cierre que una tarjeta (Payment COMPLETADO, pedido PROCESANDO, carrito cerrado, factura); **rechazar** = cancela el pedido y repone el stock. La aprobación está condicionada a `PENDIENTE` (dos clics no aprueban dos veces).
 - **Webhook de Stripe** (`POST /payments/webhook`, sin tenant ni JWT; validado por firma con `rawBody`). Acepta **dos secretos**: `STRIPE_WEBHOOK_SECRET` (cuenta de la plataforma: `payment_intent.*`, `checkout.session.*`, `customer.subscription.*`) y `STRIPE_CONNECT_WEBHOOK_SECRET` (cuentas conectadas: `account.updated`). Resuelve la tienda desde `metadata.tenantId` + `transfer_data.destination`; PaymentIntents viejos sin `tenantId` caen en **`LEGACY_TENANT_ID`**. En local: `stripe listen --forward-to localhost:3001/api/v1/payments/webhook` (para eventos de Connect hace falta `--forward-connect-to`).
 - QR simulado (`/payments/qr/*`) sigue existiendo (`Order.paymentMethod = QR`).
@@ -320,9 +343,10 @@ Rutas en §1. Destacados nuevos: **`/admin/settings/payments`** ("Gestión de pa
 
 ### 4.10 PWA y compra resistente a fallos
 Operación, políticas y despliegue en `docs/checkout-resiliente.md`. Comprobado con `api/test/acceptance` (PostgreSQL real, dos procesos, Chromium sobre build de producción).
+*(Entró con el commit `2291d1c "PWA"`, ~7.700 líneas: reescritura de `orders.service`, `payments.service`, `cart.service` e `inventory.service`.)*
 - **Inventario:** `ProductInventory.stock` = disponibles. Reservas explícitas (`StockReservation`), movimientos con `effectId` único e `inventory.version`. Sin fallback a otra sucursal ni al stock global; `Product.stock` es solo informativo. Todos los escritores (carrito, checkout, cron, POS, cancelación, devolución, aprobación, panel) pasan por `InventoryService`.
 - **Checkout:** `POST /orders` exige `Idempotency-Key` y `cartVersion`; todo se confirma en una transacción (`CheckoutAttempt`). Carrito activo único (`Cart.activeUserId`) con revisión. El web sincroniza con `PUT /cart`.
-- **Pagos:** intento durable antes de llamar a Stripe (`PaymentAttempt`), inbox de webhooks en el plano de control (`ProviderEventInbox`), outbox de correo/push (`OutboxEvent`), compensaciones (`PaymentCompensation`) y anomalías (`OperationalIssue`). `CheckoutMaintenanceService` corre cada minuto. QR simulado y autoconfirmación solo con `ALLOW_SIMULATED_PAYMENTS` fuera de producción.
+- **Pagos:** intento durable antes de llamar a Stripe (`PaymentAttempt`), inbox de webhooks en el plano de control (`ProviderEventInbox`), outbox de correo/push (`OutboxEvent`), compensaciones (`PaymentCompensation`) y anomalías (`OperationalIssue`). `CheckoutMaintenanceService` corre cada minuto (vence pedidos impagos: tarjeta `ORDER_TTL_CARD_MS` 1 h, QR/USDT `ORDER_TTL_MANUAL_MS` 24 h; reconciliación `PAYMENT_RECONCILIATION_HOLD_MS` 6 h; `DISABLE_BACKGROUND_JOBS` lo apaga). Métricas en `GET /checkout-ops/metrics` (`VIEW_REPORTS`). Si un checkout se cae a medias, `GET /orders/attempts/:key` devuelve el estado del intento. QR simulado y autoconfirmación solo con `ALLOW_SIMULATED_PAYMENTS` fuera de producción.
 - **Web:** `front/public/sw.js` escrito a mano (no Workbox/next-pwa, incompatibles con Turbopack), con lista permitida: solo catálogo público, páginas públicas por tienda e idioma, y assets. Lo privado nunca entra a Cache Storage. Actualización con aviso, sin recarga automática. Intentos recuperables en IndexedDB (`utils/checkoutAttempts.ts`, `useCheckoutRecovery`) por tienda y usuario. Los borradores offline (`/checkout/drafts`) nunca se envían solos. Manifest en `/web-manifest` e íconos en `/pwa-icon`, por tienda.
 - **Móvil:** mismo contrato, con `src/utils/checkoutAttempts.ts` (AsyncStorage) y `CheckoutRecovery` (AppState). La tarjeta real sigue pendiente de un SDK de Stripe.
 
@@ -362,12 +386,13 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 - **orders:** `POST /orders`, `GET /orders`, `GET /orders/me`, `GET /orders/:id`, `GET /orders/admin/all`, `GET /orders/admin/:id`, `PATCH|DELETE /orders/:id`, `PATCH|DELETE /orders/admin/:id`; **comprobantes:** `POST /orders/:id/payment-proof`, `GET /orders/admin/:id/payment-proof/image`, `POST /orders/admin/:id/payment-proof/approve|reject` (`VIEW_ORDERS`)
 - **payments:** `POST /payments/create-intent|confirm`, `GET /payments[/:id]`, `GET /payments/order/:orderId`, `POST /payments/webhook` *(sin tenant ni guards, por firma)*, `GET /payments/connect/availability`; QR simulado: `POST /payments/qr/generate`, `GET /payments/qr/status/:orderId`, `POST /payments/qr/confirm`, `GET /payments/qr-confirm/:orderId`
 - **gestión de pagos** (`MANAGE_PAYMENTS`): `GET|PATCH /admin/settings/payments`, `GET|PUT|DELETE /admin/settings/payments/qr-image`, `POST /admin/settings/payments/stripe/onboarding`, `DELETE /admin/settings/payments/stripe`; público: `GET /store/payment-options`, `GET /store/payment-options/qr-image`
-- **store** (público, con tienda): `GET /store` (nombre y slug), `GET /store/appearance`
+- **store** (público, con tienda): `GET /store` (nombre, slug, **`plan` y `features`**), `GET /store/appearance`
+- **cart (nuevo):** `PUT /cart` (sincroniza el carrito completo) · **orders (nuevo):** `GET /orders/attempts/:key` (estado de un intento de checkout; `POST /orders` exige `Idempotency-Key`) · **checkout-ops:** `GET /checkout-ops/metrics` (`VIEW_REPORTS`)
 - **appearance** (`MANAGE_APPEARANCE`): `GET|PATCH /admin/settings/appearance`, `PUT /admin/settings/appearance/logo|favicon|background`
 - **analytics** (`VIEW_REPORTS`): `GET|PUT /analytics/layout`, `GET /analytics/metrics`
 - **try-on:** `POST /try-on/session` (JWT)
 - **subscription** (JWT, tienda actual): `GET /subscription`, `POST /subscription/checkout`, `POST /subscription/portal`
-- **platform** (sin tienda): `POST /platform/auth/login`, `GET /platform/auth/me` (Bearer de plataforma); `POST /platform/contact`; `POST /platform/subscriptions/checkout`, `GET /platform/subscriptions/checkout/:sessionId/status`; `GET /platform/tenants/resolve/:slug`; `GET /platform/tenants/by-domain` (`x-internal-key`); con sesión de administrador de plataforma o `x-platform-key`: `GET|POST /platform/tenants`, `GET /platform/tenants/metrics`, `PATCH /platform/tenants/:id/status|domain`, `POST /platform/tenants/:id/retry`, `PUT /platform/tenants/:id/integrations/decart|web-push`, `POST .../web-push/generate`, `DELETE .../integrations/:provider`, `POST /platform/subscriptions/signups/:id/retry`
+- **platform** (sin tienda): `POST /platform/auth/login`, **`POST /platform/auth/tenant-login`** (login unificado, §4.1), `GET /platform/auth/me` (Bearer de plataforma); **`GET /platform/tenants/public`** (directorio público de tiendas activas: id, slug, nombre, plan, `mobileApp`); `POST /platform/contact`; `POST /platform/subscriptions/checkout`, `GET /platform/subscriptions/checkout/:sessionId/status`; `GET /platform/tenants/resolve/:slug` (ahora acepta **UUID, slug o nombre** de la tienda; con `x-client-platform: mobile` responde 403 si el plan no incluye app móvil); `GET /platform/tenants/by-domain` (`x-internal-key`; 404 si el plan no incluye dominio propio); con sesión de administrador de plataforma o `x-platform-key`: `GET|POST /platform/tenants`, `GET /platform/tenants/metrics`, `PATCH /platform/tenants/:id/status|domain`, `POST /platform/tenants/:id/retry`, `PUT /platform/tenants/:id/integrations/decart|web-push`, `POST .../web-push/generate`, `DELETE .../integrations/:provider`, `POST /platform/subscriptions/signups/:id/retry`
 - **pos:** `GET /pos/products`, `POST /pos/checkout` · **returns:** `GET /returns/search-order`, `POST /returns/process`, `GET /returns`, `GET /returns/:id`
 - **notifications:** `GET /notifications/vapid-public-key`, `POST /notifications/subscribe` · **chatbot:** `GET /chatbot/products`
 - **marketing:** `POST /marketing/send-campaign` · **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic`
@@ -379,11 +404,37 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 - **Catálogo:** `Product.translations` (§4.2).
 
 ### 4.17 Plataforma SaaS (alta, suscripción y administración de tiendas)
-- **Planes:** `starter`, `growth`, `pro` (`api/src/modules/platform/plans.ts`). El `price_id` sale de `STRIPE_PRICE_*`; los montos que muestra la landing (`front/components/modules/platform/plans.ts`) tienen que coincidir con los Prices de Stripe. Al arrancar, la API avisa qué variables de facturación faltan sin caerse.
+- **Planes:** `starter` ($11.50), `growth` ($21.50, destacado), `pro` ($36.00) (`api/src/modules/platform/plans.ts`). El `price_id` sale de `STRIPE_PRICE_*`; los montos que muestra la landing (`front/components/modules/platform/plans.ts`) tienen que coincidir con los Prices de Stripe. Qué incluye cada plan: §4.18. Al arrancar, la API avisa qué variables de facturación faltan sin caerse.
 - **Alta self-service:** `/planes` → `POST /platform/subscriptions/checkout` crea un `TenantSignup` y una sesión de Stripe Checkout (solo viaja `signupId` en la metadata) → el webhook `checkout.session.completed` aprovisiona la tienda y su Super Admin → `/planes/exito` consulta el estado. Si el aprovisionamiento falla, se reintenta desde la plataforma.
 - **Suscripción de la tienda:** `/admin/suscripcion` (Super Admin) muestra el plan y abre Checkout o el Billing Portal de Stripe. Los webhooks `customer.subscription.updated|deleted` actualizan el estado y **suspenden** la tienda si deja de pagar.
-- **Panel de plataforma (`/plataforma`):** se entra con **email y contraseña** de un administrador de la plataforma (tabla `public.platform_admins`, bcrypt). `POST /platform/auth/login` devuelve un JWT de 8 h con audience `stella-platform` (firmado con `PLATFORM_JWT_SECRET` o, si no está, `JWT_SECRET`), sin refresh; el panel lo guarda solo en `sessionStorage`. Bloqueo de 5 min tras 5 intentos fallidos y throttle de 10 logins/min por IP. `PlatformAdminGuard` acepta ese Bearer (y en cada request verifica que la cuenta siga activa) **o** la llave `PLATFORM_ADMIN_KEY` en `x-platform-key` (≥ 32 caracteres, para scripts). Un token de tienda no sirve en la plataforma ni viceversa. Los administradores se crean o se les cambia la contraseña con `npm run build && npm run platform:admin -- <email> <contraseña> ["Nombre"]` (también desbloquea y reactiva); no hay pantalla para gestionarlos. El panel permite listar, crear, suspender y reactivar tiendas, ver métricas, verificar dominios propios, reintentar altas y cargar las integraciones Decart y Web Push.
+- **Panel de plataforma NovaSoft (`/plataforma`):** se entra con **email y contraseña** (en su propio login o directamente desde `/auth/login`, que detecta al administrador) de un administrador de la plataforma (tabla `public.platform_admins`, bcrypt). `POST /platform/auth/login` devuelve un JWT de 8 h con audience `stella-platform` (firmado con `PLATFORM_JWT_SECRET` o, si no está, `JWT_SECRET`), sin refresh; el panel lo guarda solo en `sessionStorage`. Bloqueo de 5 min tras 5 intentos fallidos y throttle de 10 logins/min por IP. `PlatformAdminGuard` acepta ese Bearer (y en cada request verifica que la cuenta siga activa) **o** la llave `PLATFORM_ADMIN_KEY` en `x-platform-key` (≥ 32 caracteres, para scripts). Un token de tienda no sirve en la plataforma ni viceversa. Los administradores se crean o se les cambia la contraseña con `npm run build && npm run platform:admin -- <email> <contraseña> ["Nombre"]` (también desbloquea y reactiva); no hay pantalla para gestionarlos. El panel permite listar, crear, suspender y reactivar tiendas, ver métricas, verificar dominios propios, reintentar altas y cargar las integraciones Decart y Web Push.
 - **Contacto:** `POST /platform/contact` (throttle, la IP real sale de `trust proxy`) → correo a `SUPPORT_EMAIL`.
+
+### 4.18 Funcionalidades por plan (nuevo, commit `a860fbe`)
+Fuente de verdad: `PLAN_FEATURES_MAP` en `api/src/modules/platform/plans.ts`. `getPlanFeatures(tenant.plan)` normaliza el texto; **cualquier valor desconocido (incluido el default `"free"`) cae en Starter**. `legacy` = igual que Pro.
+
+| Funcionalidad | Starter | Growth | Pro / Legacy |
+|---|---|---|---|
+| Sucursales (`maxBranches`) | 1 | 5 | ilimitadas |
+| Productos activos (`maxProducts`) | 200 | ilimitados | ilimitados |
+| POS (`pos`) · Devoluciones (`returns`) | — | ✔ | ✔ |
+| Inventario multi-sucursal / descuentos masivos (`multiBranchInventory`) | — | ✔ | ✔ |
+| Dominio propio (`customDomain`) | — | ✔ | ✔ |
+| Pagos QR (`qrPayments`) | ✔ | ✔ | ✔ |
+| Billetera digital (`digitalWallet`) | — | ✔ | ✔ |
+| Reportes con IA (`aiReports`) · Probador virtual (`virtualTryOn`) | — | — | ✔ |
+| Campañas de email y push (`campaigns`) | — | — | ✔ |
+| App móvil para clientes (`mobileApp`) | — | — | ✔ |
+
+**Cómo se aplica en la API:**
+- `@RequirePlanFeature('<feature>')` + `PlanFeatureGuard` (no es global: hay que ponerlo en `@UseGuards`): marketing (`campaigns`), POS (`pos`), devoluciones (`returns`), `POST /reports/dynamic` (`aiReports`), `POST /try-on/session` (`virtualTryOn`).
+- `assertPlanFeature()` / `currentPlanFeatures()` dentro de servicios: notificaciones push (`campaigns`), creación de pedidos y comprobantes según el medio (`qrPayments` / `digitalWallet`), gestión de pagos, descuentos masivos (`multiBranchInventory`), topes de sucursales (crear y reactivar) y de productos activos (crear y reactivar).
+- `TenantMiddleware` rechaza con **403** las requests con `x-client-platform: mobile` a tiendas sin `mobileApp`.
+- Dominio propio: `PATCH /platform/tenants/:id/domain` y `by-domain` exigen `customDomain`.
+- Los errores son `ForbiddenException` con mensaje fijo en español (`FEATURE_ERROR_MESSAGES`), **no** claves i18n (ver §5.1.18).
+- El plan viaja en el contexto del tenant, que se cachea 60 s: un cambio de plan tarda hasta un minuto en reflejarse.
+
+**En el front:** `StoreInfoProvider` expone `plan` y `features` (de `GET /store`, cacheados en `localStorage` con la clave `tenant_plan_features:<tenantId>`); `adminNav.ts` usa `planFeature` / `requiredPlanName` para ocultar ítems o mostrar el aviso de upgrade; `PaymentSettingsClient`, `InventoryClient`, `ProductsClient`, `BranchesClient`, `ReportsClient` y el checkout se adaptan al plan.
 
 ---
 
@@ -400,15 +451,21 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 8. **`ProductDetail.tsx:106` conserva un comentario que dice que el probador "aún no existe".** Es obsoleto (§4.12).
 9. **`DECART_API_KEY` ya se sacó de `docker-compose.yml`**, pero la key vieja (`dct_probador_...`) **sigue en el historial de git**: hay que rotarla en Decart si no se hizo. `api/.env` todavía tiene `DECART_API_KEY`, que solo lee el script `import-legacy-integrations`.
 10. **La rama `oscar` es incompatible con la BD actual.** Es anterior a `edb3598` y usa un único `PrismaService` contra `public`; como el SQL `001_…` ya renombró `public` a `tenant_legacy`, cualquier query de negocio falla con `P2021 TableDoesNotExist`. Para trabajar con la BD actual usar `main`; para revivir `oscar` habría que rebasarla sobre `main` o darle su propia BD.
-11. **`api/.env.example` está desactualizado:** no tiene `DIRECT_URL`, `TENANT_SECRETS_KEYS`, `PLATFORM_ADMIN_KEY`, `INTERNAL_API_KEY`, `STRIPE_CONNECT_WEBHOOK_SECRET`, `LEGACY_TENANT_ID` ni `TENANT_BASE_DOMAIN`, y todavía documenta `VAPID_*` globales (ya son por tienda). Usar la tabla de §6.4.
+11. **`api/.env.example` sigue incompleto:** en `2291d1c` se le agregaron las variables del checkout (`PAYMENT_CURRENCY`, `CART_RESERVATION_TTL_MS`, `ORDER_TTL_*`, `ALLOW_SIMULATED_PAYMENTS`, etc.), pero todavía no tiene `DIRECT_URL`, `TENANT_SECRETS_KEYS`, `PLATFORM_ADMIN_KEY`, `INTERNAL_API_KEY`, `STRIPE_CONNECT_WEBHOOK_SECRET`, `LEGACY_TENANT_ID` ni `TENANT_BASE_DOMAIN`, y todavía documenta `VAPID_*` globales (ya son por tienda). Usar la tabla de §6.4.
 12. **`LEGACY_TENANT_ID` no está en `api/.env`.** Es el fallback del webhook para PaymentIntents creados antes del multitenant (sin `tenantId` en la metadata): sin la variable, esos eventos no encuentran tienda. Debería valer `00000000-0000-4000-8000-000000000001`.
 13. **Docker del front sin tienda por defecto:** ni `front/Dockerfile` ni `docker-compose.yml` pasan `NEXT_PUBLIC_TENANT_ID`/`NEXT_PUBLIC_LEGACY_TENANT_ID` como build args (son `NEXT_PUBLIC_*`, se hornean en el build), ni `INTERNAL_API_KEY`/`PLATFORM_HOSTS` en runtime. Una imagen construida así abre el selector de tienda y no resuelve dominios propios. Confirmar cómo está configurado el deploy real en Azure.
 14. **Comentarios desalineados sobre idiomas del catálogo:** la migración `product_translations` y `schema.prisma` mencionan `pt`, pero `TRANSLATABLE_LANGUAGES` solo acepta `en`, `fr`, `zh` (un `pt` se rechaza).
-15. **El mismo email puede ser usuario de varias tiendas** (son tablas distintas). Es intencional, pero el login siempre es contra la tienda del request: entrar a la tienda equivocada da "credenciales inválidas", no "no existe".
+15. **El mismo email puede ser usuario de varias tiendas** (son tablas distintas). Es intencional. Con el login unificado (§4.1) el usuario ya no necesita estar en la tienda correcta; el `POST /auth/login` por tienda sigue existiendo (lo usa la app móvil).
+16. **El login unificado recorre todas las tiendas** (`tenant-login`): consulta el email en cada schema activo en paralelo y compara bcrypt en cada coincidencia. Riesgos: (a) costo y latencia crecen con el número de tiendas; (b) la respuesta con varias coincidencias **revela en qué tiendas está registrado un email** a quien conozca la contraseña; (c) el throttle es 20/min por IP. Revisar antes de escalar.
+17. **El bloqueo de app móvil por plan depende de un header que manda el propio cliente** (`x-client-platform: mobile`). Basta con no enviarlo para saltarse la restricción; es una restricción comercial, no de seguridad. Además, `app_movil/src/config/env.ts` **ya no apunta a Azure por defecto**: sin `EXPO_PUBLIC_API_URL` usa la IP del host de Metro o una IP LAN fija (`192.168.100.240`), así que un build de producción necesita esa variable.
+18. **Mensajes de plan sin i18n:** `FEATURE_ERROR_MESSAGES` (`plans.ts`) y los errores de topes de sucursales y productos están en español fijo, en contra de la regla de los 4 idiomas.
+19. **Billetera con datos de ejemplo activada por defecto:** al aprovisionar una tienda Growth/Pro, `seedPaymentSettings` activa la billetera con la cuenta ficticia `@<slug> / pagos@<slug>.com`. Si el dueño no la cambia, los clientes verán un medio de pago "activo" que transfiere a una cuenta que no existe.
+20. **Los pedidos con billetera vencen como si fueran tarjeta:** `orderTtlMs` (`common/checkout/checkout-policy.ts`) solo da el TTL manual (24 h) a `BANK_QR` y `USDT`; `WALLET` cae en `ORDER_TTL_CARD_MS` (1 h), así que un pedido por billetera se cancela y libera el stock a la hora aunque el cliente ya haya subido la referencia. Probablemente haya que agregar `PaymentMethod.WALLET` a esa condición.
 
 ### 5.2 Pendientes ya conocidos que siguen sin resolver
 - **Reserva de stock en carrito:** si la API está caída, el cron no corre y la reserva queda tomada hasta el siguiente arranque.
-- **Pagos manuales:** la verificación es 100 % humana; no hay consulta automática a la blockchain para USDT ni al banco para el QR, ni vencimiento automático de pedidos con comprobante sin revisar.
+- **Pagos manuales:** la verificación es 100 % humana; no hay consulta automática a la blockchain para USDT, al banco para el QR ni a Airtm/Takenos/Wallbit para la billetera. Los pedidos impagos sí vencen ahora por TTL (§4.10, ojo con §5.1.20).
+- **Planes:** no hay *downgrade* controlado: si una tienda baja de plan, los datos que excedan el nuevo tope (sucursales, productos) quedan como están; solo se bloquea crear o reactivar más.
 - **Stripe Connect:** la tienda legacy cobra con tarjeta solo si se le cargó `stripe_account_id` a mano o completó el onboarding.
 - **Dominios propios:** la verificación del DNS la hace una persona desde `/plataforma` (no hay chequeo automático de TXT/CNAME).
 - **Escala del multitenant:** un `PrismaClient` por schema en una LRU de 100 y las migraciones se aplican tienda por tienda al arrancar el contenedor; con cientos de tiendas el arranque se alarga.
@@ -419,10 +476,15 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 - Text-to-SQL: la seguridad real es el rol de solo lectura + vistas, no el validador por regex.
 - Marketing: sin cola para miles de destinatarios, sin enlace de baja.
 - Mapa: mosaicos públicos de OpenStreetMap, sin validar que la ubicación esté en la ciudad.
-- Lint preexistente con varios `any`; los `*.spec.ts` (salvo `product-translations.spec.ts`) son plantillas sin ejecutar de verdad.
+- Lint preexistente con varios `any`; los `*.spec.ts` unitarios (salvo `product-translations.spec.ts`) son plantillas. La suite real es **`api/test/acceptance`** (`npm run test:acceptance`: inventario/checkout, pagos con Stripe falso, PWA en Chromium, intentos móviles, backfill de migración); no cubre aún los planes ni el login unificado.
 
 ### 5.3 Historial de commits recientes (más nuevo primero, `git log --oneline`)
 ```
+a481006 Merge branch 'origin/main' (MauricioD98)        ← une a860fbe con 2291d1c
+a860fbe feat: planes multi-tenant, panel admin NovaSoft, integracion de pagos y soporte dinamico movil
+                                                        ← features por plan, billetera P2P, login unificado, marca NovaSoft, Expo 58
+2291d1c PWA                                             ← checkout resiliente: reservas, idempotencia, outbox, suite de aceptación
+c7be543 v0                                              ← administradores de plataforma con email/contraseña
 a2107ab reportes dashboard                              ← apariencia de la tienda + dashboard de analítica
 271a5f3 Integracion de nuevos metodos de pago           ← QR bancario, USDT, comprobantes, MANAGE_PAYMENTS
 edb3598 Migración a Multitenant                         ← schema por tienda, plataforma SaaS, Stripe Connect, i18n, try-on en la API
@@ -440,7 +502,7 @@ feb64e6 fix: remove _t query param and allow non-whitelisted params to prevent 4
 ```
 
 ### 5.4 Estado de git al escribir este documento
-Rama `main`, HEAD `a2107ab`, sincronizada con `origin/main`; árbol de trabajo limpio. Existen también `oscar` y `origin/oscar` (en `fffafec`, ver §5.1.10). Correr `git status --short` y `git log --oneline -10` de nuevo antes de asumir que sigue siendo así.
+Rama `main`, HEAD `a481006` (2026-11-05); árbol de trabajo limpio. Desde `a860fbe` hay commits de un segundo autor (MauricioD98). Existen también `oscar` y `origin/oscar` (en `fffafec`, ver §5.1.10). Correr `git status --short` y `git log --oneline -10` de nuevo antes de asumir que sigue siendo así.
 
 ---
 
@@ -476,7 +538,8 @@ Primero la API, luego el front. En `localhost` la tienda sale de `NEXT_PUBLIC_TE
 ```bash
 cd app_movil
 npm install
-# por defecto apunta a la API de Azure; ajustar src/config/env.ts o la pantalla de Login/Profile si se usa otra URL
+# en desarrollo usa la IP del host de Metro:3001; para Azure u otra API definir EXPO_PUBLIC_API_URL
+# la tienda debe tener plan Pro/Legacy (la app manda x-client-platform: mobile)
 # EXPO_PUBLIC_TENANT_ID fija la tienda; sin eso se elige en TenantSelectorScreen
 npx expo start
 ```
@@ -506,11 +569,14 @@ npx expo start
 | `SMTP_HOST/PORT/SECURE/USER/PASS`, `MAIL_FROM`, `SUPPORT_EMAIL` | Correo (sin `SMTP_HOST` solo se loguea) y bandeja del formulario de contacto |
 | `FRONTEND_URL`, `PLATFORM_URL`, `PLATFORM_NAME` | Enlaces de correos de la tienda / landing del SaaS (success/cancel de Checkout) / nombre de la plataforma |
 | `GROQ_API_KEY`, `GROQ_MODEL` | IA de reportes |
+| `PAYMENT_CURRENCY` | Moneda de los cobros |
+| `CART_RESERVATION_TTL_MS`, `ORDER_TTL_CARD_MS`, `ORDER_TTL_MANUAL_MS`, `PAYMENT_RECONCILIATION_HOLD_MS` | TTLs del checkout (1 h, 1 h, 24 h, 6 h por defecto; `checkout-policy.ts`) |
+| `ALLOW_SIMULATED_PAYMENTS`, `DISABLE_BACKGROUND_JOBS` | QR simulado / autoconfirmación fuera de producción · apagar los crons (tests) |
 | `DECART_API_KEY`, `VAPID_*` | **Ya no los usa la API en runtime** (son por tienda). Solo los lee `import-legacy-integrations` |
 
 **`front/.env.local`:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_TENANT_ID` (tienda por defecto; en local es la legacy `00000000-0000-4000-8000-000000000001`), `INTERNAL_API_KEY` (la misma que en la API). Opcionales: `NEXT_PUBLIC_LEGACY_TENANT_ID`, `API_INTERNAL_URL` (URL de la API vista desde el servidor del front), `PLATFORM_HOSTS` / `NEXT_PUBLIC_PLATFORM_HOSTS`. Ya **no** necesita `DECART_API_KEY`. El chatbot no usa variables.
 
-**`app_movil`:** `EXPO_PUBLIC_TENANT_ID` (opcional).
+**`app_movil`:** `EXPO_PUBLIC_TENANT_ID` (opcional), `EXPO_PUBLIC_API_URL` (necesaria para builds que apunten a Azure, §5.1.17).
 
 ### 6.5 Docker
 `docker-compose.yml` levanta `api` (3001) y `front` (3000). `api/Dockerfile` (Node 22-alpine) genera los dos clientes Prisma y al iniciar corre `node dist/scripts/migrate.js && node dist/main` (migra control + todas las tiendas; requiere `DIRECT_URL`). `front/Dockerfile` (Node 20-alpine, `output: "standalone"`): las `NEXT_PUBLIC_*` se hornean en el build (ver §5.1.13 sobre las que faltan).
@@ -530,6 +596,7 @@ npx expo start
 - Si vas a tocar **datos de negocio**, lee §4.0: nunca uses `ControlPrismaService` para datos de una tienda, ni SQL crudo sin `tenantSchemaSql()`, ni un cron sin `runInTenant()`.
 - Si vas a agregar una **migración**, va en `prisma/migrations/` (tienda) o en `prisma/control/migrations/` (control), y se aplica con `migrate:all` / `migrate:control`, nunca con `prisma migrate deploy` a secas (§3.3).
 - Si vas a tocar **permisos**, actualiza los espejos de §4.1 y este documento.
+- Si vas a agregar o mover una **funcionalidad entre planes**, edita `PLAN_FEATURES_MAP` (API) y la interfaz `PlanFeatures` de `front/providers/StoreInfoProvider.tsx`, bloquea en la API con `@RequirePlanFeature` o `assertPlanFeature` y revisa `adminNav.ts` (§4.18).
 - Si vas a agregar **texto de UI o mensajes de error**, agrégalo en los 4 idiomas (§4.16).
 - Si vas a tocar **pagos**, recuerda que la tarjeta pasa por Stripe Connect (nunca cobrar sin `destination`) y que QR/USDT se aprueban a mano (§4.4).
 - Si vas a tocar **inventario/stock**, recuerda que es por **talla** y que hay `stock` (vendible) y `damagedStock` (mermas).
