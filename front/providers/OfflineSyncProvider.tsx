@@ -8,6 +8,7 @@ import type { IRootState } from '@/store';
 import { useCheckoutRecovery } from '@/hooks/useCheckoutRecovery';
 import { useOfflineInventorySync } from '@/hooks/useOfflineInventorySync';
 import { useProfileSyncRunner } from '@/hooks/useProfileSync';
+import { useAdminSyncRunner } from '@/hooks/useAdminOffline';
 import { SW_UPDATE_EVENT, applyServiceWorkerUpdate, useRegisterServiceWorker } from '@/hooks/useRegisterServiceWorker';
 import { getOrderDrafts } from '@/utils/offlineOrderQueue';
 import styles from './offline-sync.module.scss';
@@ -20,6 +21,8 @@ export default function OfflineSyncProvider({ children }: { children: React.Reac
     useOfflineInventorySync();
     // Cambios de perfil hechos sin conexión: se envían solos al volver la red (los borradores de compra no)
     useProfileSyncRunner();
+    // Cambios del panel hechos sin conexión (solo para usuarios con acceso al panel)
+    useAdminSyncRunner();
     const { inDoubt, recoverNow } = useCheckoutRecovery();
     const t = useTranslations('Offline');
     const userId = useSelector((state: IRootState) => state.auth.user?.id ?? null);

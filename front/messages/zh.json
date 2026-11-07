@@ -1827,5 +1827,57 @@
       "paidOrders": "{count} 个已付款订单",
       "perPaidOrder": "每个已付款订单"
     }
+  },
+  "AdminOffline": {
+    "offline": "当前离线：您可以编辑商品、分类、系列、订单状态和库存。恢复连接后将发送更改。",
+    "copyFrom": "数据保存于 {date}。",
+    "pending": "{count, plural, other {# 项更改待同步}}",
+    "needsReview": "{count, plural, other {# 项需要查看}}",
+    "review": "查看更改",
+    "hide": "隐藏",
+    "syncNow": "立即同步",
+    "entities": {
+      "product": "商品",
+      "category": "分类",
+      "collection": "系列",
+      "order": "订单"
+    },
+    "fields": {
+      "name": "名称",
+      "description": "描述",
+      "categoryId": "分类",
+      "sku": "SKU",
+      "price": "价格",
+      "sizes": "尺码",
+      "imageUrl": "图片",
+      "isActive": "启用",
+      "branchId": "门店",
+      "collectionIds": "系列",
+      "translations": "翻译",
+      "slug": "Slug",
+      "bannerImageUrl": "横幅",
+      "status": "状态"
+    },
+    "status": {
+      "pending": "待同步",
+      "syncing": "同步中…",
+      "error": "错误",
+      "conflict": "冲突",
+      "needs-login": "需要登录"
+    },
+    "created": "离线创建",
+    "conflictDescription": "您离线期间，此数据已在服务器上被修改。请选择要保留的版本；没有任何内容被覆盖。",
+    "field": "字段",
+    "yourChange": "您的更改",
+    "serverValue": "服务器上的当前值",
+    "keepMine": "使用我的更改",
+    "keepServer": "保留服务器上的",
+    "needsLogin": "您的会话已过期。更改仍已保存：请使用此账户重新登录以发送。",
+    "signIn": "登录",
+    "retry": "重试",
+    "discard": "放弃",
+    "homeTitle": "离线管理面板",
+    "sectionRequiresConnection": "此部分需要网络连接",
+    "homeDescription": "离线时，您可以使用此设备上保存的数据访问以下部分。删除、取消订单、收银台、支付、员工、角色和设置需要网络连接。"
   }
 }

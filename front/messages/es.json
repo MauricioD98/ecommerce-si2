@@ -1837,5 +1837,57 @@
       "paidOrders": "{count, plural, one {# pedido pagado} other {# pedidos pagados}}",
       "perPaidOrder": "Por pedido pagado"
     }
+  },
+  "AdminOffline": {
+    "offline": "Sin conexión: puedes editar productos, categorías, colecciones, el estado de los pedidos y el inventario. Los cambios se enviarán al volver la conexión.",
+    "copyFrom": "Datos guardados el {date}.",
+    "pending": "{count, plural, one {# cambio pendiente de sincronizar} other {# cambios pendientes de sincronizar}}",
+    "needsReview": "{count, plural, one {# requiere revisión} other {# requieren revisión}}",
+    "review": "Ver cambios",
+    "hide": "Ocultar",
+    "syncNow": "Sincronizar ahora",
+    "entities": {
+      "product": "Producto",
+      "category": "Categoría",
+      "collection": "Colección",
+      "order": "Pedido"
+    },
+    "fields": {
+      "name": "Nombre",
+      "description": "Descripción",
+      "categoryId": "Categoría",
+      "sku": "SKU",
+      "price": "Precio",
+      "sizes": "Tallas",
+      "imageUrl": "Imagen",
+      "isActive": "Activo",
+      "branchId": "Sucursal",
+      "collectionIds": "Colecciones",
+      "translations": "Traducciones",
+      "slug": "Slug",
+      "bannerImageUrl": "Banner",
+      "status": "Estado"
+    },
+    "status": {
+      "pending": "Pendiente",
+      "syncing": "Sincronizando…",
+      "error": "Error",
+      "conflict": "Conflicto",
+      "needs-login": "Requiere iniciar sesión"
+    },
+    "created": "Creado sin conexión",
+    "conflictDescription": "Este dato cambió en el servidor mientras estabas sin conexión. Elige qué versión conservar; nada se sobrescribió.",
+    "field": "Campo",
+    "yourChange": "Tu cambio",
+    "serverValue": "Valor actual en el servidor",
+    "keepMine": "Usar mis cambios",
+    "keepServer": "Conservar los del servidor",
+    "needsLogin": "Tu sesión venció. El cambio sigue guardado: inicia sesión de nuevo con esta cuenta para enviarlo.",
+    "signIn": "Iniciar sesión",
+    "retry": "Reintentar",
+    "discard": "Descartar",
+    "homeTitle": "Panel sin conexión",
+    "sectionRequiresConnection": "Esta sección requiere conexión",
+    "homeDescription": "Sin conexión puedes usar estas secciones con los datos guardados en este dispositivo. Borrar, cancelar pedidos, el punto de venta, pagos, personal, roles y configuración requieren conexión."
   }
 }

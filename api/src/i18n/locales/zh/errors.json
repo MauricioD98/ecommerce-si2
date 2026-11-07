@@ -100,5 +100,9 @@
   "PROFILE_SYNC_EMPTY": "没有需要同步的个人资料更改。",
   "PROFILE_SYNC_EXPECTED_MISSING": "缺少字段 {field} 的原值：无法在确认其未被修改的情况下同步。",
   "PROFILE_SYNC_CHANGE_REUSED": "此更改属于另一个账户。",
-  "PROFILE_FIRST_NAME_REQUIRED": "名字为必填项。"
+  "PROFILE_FIRST_NAME_REQUIRED": "名字为必填项。",
+  "OFFLINE_CONFLICT": "您离线期间，此数据已在服务器上被修改。请在保存前查看这些更改。",
+  "OFFLINE_SYNC_EXPECTED_MISSING": "缺少 {fields} 的原值：无法在确认其未被修改的情况下同步。",
+  "OFFLINE_ACTION_REQUIRES_CONNECTION": "此操作需要网络连接：{fields}。",
+  "OFFLINE_SYNC_CHANGE_REUSED": "此更改属于另一个账户或另一项数据。"
 }

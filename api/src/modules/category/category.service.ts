@@ -5,14 +5,17 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Category, Prisma } from '@prisma/client';
 import { QueryCategoryDto } from './dto/query-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { lockRow, type WriteGuard } from '../../common/offline/write-guard';
 
 @Injectable()
 export class CategoryService {
   constructor(private prisma: PrismaService) {}
 
   // Create a new category
+  // `id`: lo fija el dispositivo cuando la categoría se creó sin conexión (reintentos idempotentes)
   async create(
     createCategoryDto: CreateCategoryDto,
+    id?: string,
   ): Promise<CategoryResponseDto> {
 
     const { name, slug, ...rest } = createCategoryDto;
@@ -35,6 +38,7 @@ export class CategoryService {
     }
     const category = await this.prisma.category.create({
       data: {
+        ...(id ? { id } : {}),
         name,
         slug: categorySlug,
         ...rest,
@@ -133,6 +137,7 @@ return {
   async update(
     id: string,
     updateCategoryDto: UpdateCategoryDto,
+    guard?: WriteGuard<Category>,
   ): Promise<CategoryResponseDto> {
     const existingCategory = await this.prisma.category.findUnique({
       where: { id },
@@ -154,14 +159,23 @@ return {
         throw new ConflictException(`Category with slug ${updateCategoryDto.slug} already exists`);
       }
     }
-      const updatedCategory = await this.prisma.category.update({
-      where: { id },
-      data: updateCategoryDto,
-      include: {
-        _count: {
-          select: { products: true },
+    // Con guard (cambio hecho sin conexión): fila bloqueada, comprobación y escritura en la misma transacción
+    const updatedCategory = await this.prisma.$transaction(async (tx) => {
+      if (guard) {
+        await lockRow(tx, 'categories', id);
+        const current = await tx.category.findUnique({ where: { id } });
+        if (!current) throw new NotFoundException('Category not found');
+        await guard(tx, current);
+      }
+      return tx.category.update({
+        where: { id },
+        data: updateCategoryDto,
+        include: {
+          _count: {
+            select: { products: true },
+          },
         },
-      },
+      });
     });
       return this.formatCategory(
       updatedCategory,

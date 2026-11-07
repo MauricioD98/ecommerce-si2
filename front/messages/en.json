@@ -1837,5 +1837,57 @@
       "paidOrders": "{count, plural, one {# paid order} other {# paid orders}}",
       "perPaidOrder": "Per paid order"
     }
+  },
+  "AdminOffline": {
+    "offline": "You're offline: you can edit products, categories, collections, order status and inventory. Changes will be sent when the connection is back.",
+    "copyFrom": "Data saved on {date}.",
+    "pending": "{count, plural, one {# change waiting to sync} other {# changes waiting to sync}}",
+    "needsReview": "{count, plural, one {# needs review} other {# need review}}",
+    "review": "Review changes",
+    "hide": "Hide",
+    "syncNow": "Sync now",
+    "entities": {
+      "product": "Product",
+      "category": "Category",
+      "collection": "Collection",
+      "order": "Order"
+    },
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "categoryId": "Category",
+      "sku": "SKU",
+      "price": "Price",
+      "sizes": "Sizes",
+      "imageUrl": "Image",
+      "isActive": "Active",
+      "branchId": "Branch",
+      "collectionIds": "Collections",
+      "translations": "Translations",
+      "slug": "Slug",
+      "bannerImageUrl": "Banner",
+      "status": "Status"
+    },
+    "status": {
+      "pending": "Pending",
+      "syncing": "Syncing…",
+      "error": "Error",
+      "conflict": "Conflict",
+      "needs-login": "Sign-in required"
+    },
+    "created": "Created offline",
+    "conflictDescription": "This data changed on the server while you were offline. Choose which version to keep; nothing was overwritten.",
+    "field": "Field",
+    "yourChange": "Your change",
+    "serverValue": "Current value on the server",
+    "keepMine": "Use my changes",
+    "keepServer": "Keep the server's",
+    "needsLogin": "Your session expired. The change is still saved: sign in again with this account to send it.",
+    "signIn": "Sign in",
+    "retry": "Retry",
+    "discard": "Discard",
+    "homeTitle": "Offline panel",
+    "sectionRequiresConnection": "This section requires a connection",
+    "homeDescription": "Offline you can use these sections with the data saved on this device. Deleting, cancelling orders, the point of sale, payments, staff, roles and settings require a connection."
   }
 }

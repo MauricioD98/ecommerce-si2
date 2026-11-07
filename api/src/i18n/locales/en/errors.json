@@ -104,5 +104,9 @@
   "PROFILE_SYNC_EMPTY": "There are no profile changes to sync.",
   "PROFILE_SYNC_EXPECTED_MISSING": "The previous value of {field} is missing: it cannot be synced without checking that it did not change.",
   "PROFILE_SYNC_CHANGE_REUSED": "This change belongs to another account.",
-  "PROFILE_FIRST_NAME_REQUIRED": "First name is required."
+  "PROFILE_FIRST_NAME_REQUIRED": "First name is required.",
+  "OFFLINE_CONFLICT": "This data changed on the server while you were offline. Review the changes before saving them.",
+  "OFFLINE_SYNC_EXPECTED_MISSING": "The previous value of {fields} is missing: it cannot be synced without checking that it did not change.",
+  "OFFLINE_ACTION_REQUIRES_CONNECTION": "This action requires a connection: {fields}.",
+  "OFFLINE_SYNC_CHANGE_REUSED": "This change belongs to another account or another item."
 }

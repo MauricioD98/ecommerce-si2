@@ -11,6 +11,7 @@ import { getAdminLinks, getLockedModuleForPath } from './adminNav';
 import { useAdminGuard } from '@/hooks/useAdminAccess';
 import { useAuth } from '@/hooks/useAuth';
 import LanguageSwitcher from '../i18n/LanguageSwitcher';
+import AdminOfflineBar from './AdminOfflineBar';
 import { BASE_ROLE_KEYS } from '@/utils/permissions';
 import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
 
@@ -96,6 +97,8 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
             </aside>
 
             <main className={styles.content}>
+                {/* Sin conexión y cambios pendientes de sincronizar (productos, categorías, colecciones, pedidos) */}
+                <AdminOfflineBar />
                 {lockedModule ? (
                     <div className={tableStyles.page}>
                         <div className={tableStyles.tableCard} style={{ padding: '2rem', textAlign: 'center' }}>

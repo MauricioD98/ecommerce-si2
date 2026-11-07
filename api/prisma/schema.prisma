@@ -878,3 +878,17 @@ model ProfileSyncReceipt {
   @@index([userId])
   @@map("profile_sync_receipts")
 }
+
+// Cambios del panel de administración hechos sin conexión (PWA) que ya se aplicaron: productos, categorías,
+// colecciones y estado de pedidos. Igual que ProfileSyncReceipt: el reintento de un changeId ya aplicado
+// confirma sin volver a escribir. Se escribe en la MISMA transacción que el cambio.
+model OfflineSyncReceipt {
+  changeId  String   @id
+  userId    String
+  entity    String
+  entityId  String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("offline_sync_receipts")
+}

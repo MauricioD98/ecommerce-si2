@@ -6,6 +6,17 @@ import { TENANT_HEADER, TENANT_REQUIRED, getCurrentTenantId, requestTenantSelect
 import { getClientLocale } from "@/i18n/client";
 import { clearProfileSnapshots } from "@/utils/offlineProfile";
 import { clearOrdersCache } from "@/utils/offlineOrders";
+import {
+    ADMIN_COPY_EVENT,
+    AdminOfflineError,
+    clearAdminReadCache,
+    enqueueAdminChange,
+    getAdminRead,
+    mutationTargetOf,
+    overlayAdminList,
+    readEntityOf,
+    saveAdminRead,
+} from "@/utils/adminOfflineStore";
 import { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 const isPlatformRequest = (url?: string) => Boolean(url?.startsWith("/platform/"));
@@ -86,7 +97,7 @@ function forceLogout(): void {
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_USER_CACHE" });
     // Copia local del perfil fuera; el cambio pendiente queda para cuando vuelva a entrar la misma cuenta.
     // Se navega después de borrarla: salir de la página podría cortar la transacción de IndexedDB.
-    void Promise.all([clearProfileSnapshots(), clearOrdersCache()]).finally(() => {
+    void Promise.all([clearProfileSnapshots(), clearOrdersCache(), clearAdminReadCache()]).finally(() => {
         // Si ya estamos en el login, redirigir de nuevo solo recargaría la página y repetiría el 401
         if (!window.location.pathname.startsWith("/auth/login")) {
             window.location.href = "/auth/login";
@@ -159,4 +170,101 @@ apiClient.interceptors.response.use(
         }
         return Promise.reject(error);
     }
+);
+
+// ─── Panel de administración sin conexión ────────────────────────────────────────────────────────
+// Va después de los interceptores de arriba (la renovación de sesión sigue igual). Ver utils/adminOfflineStore.ts.
+//   - GET de listas del panel: se guarda la respuesta; sin red, se responde con esa copia. En ambos casos se
+//     superpone lo pendiente, para que la pantalla muestre lo que el usuario editó.
+//   - Cambios del panel que se pueden hacer sin conexión: sin red, se encolan y se responde como guardado
+//     (202 + x-sf-offline-queued). Lo demás del panel responde "requiere conexión".
+const REQUIRES_CONNECTION: Record<string, { action: string; notCached: string }> = {
+    es: { action: "Esta acción requiere conexión a Internet.", notCached: "No hay una copia de este dato en el dispositivo: ábrelo con conexión antes de editarlo sin ella." },
+    en: { action: "This action requires an Internet connection.", notCached: "There is no copy of this item on the device: open it with a connection before editing it offline." },
+    fr: { action: "Cette action nécessite une connexion Internet.", notCached: "Aucune copie de cet élément sur l'appareil : ouvrez-le avec une connexion avant de le modifier hors ligne." },
+    zh: { action: "此操作需要网络连接。", notCached: "此设备上没有该数据的副本：请先联网打开一次，再离线编辑。" },
+};
+
+const offlineFailure = (config: InternalAxiosRequestConfig, kind: "action" | "notCached") => {
+    const lang = (getClientLocale() ?? "es").split("-")[0];
+    const message = (REQUIRES_CONNECTION[lang] ?? REQUIRES_CONNECTION.es)[kind];
+    return new AxiosError(message, "ERR_OFFLINE_REQUIRES_CONNECTION", config, undefined, {
+        status: 503,
+        statusText: "Offline",
+        headers: {},
+        config,
+        data: { statusCode: 503, code: "OFFLINE_REQUIRES_CONNECTION", message },
+    } as AxiosResponse);
+};
+
+const isOffline = () => typeof navigator !== "undefined" && navigator.onLine === false;
+const bodyOf = (data: unknown): Record<string, unknown> => {
+    if (typeof data === "string") {
+        try {
+            return JSON.parse(data);
+        } catch {
+            return {};
+        }
+    }
+    return (data as Record<string, unknown>) ?? {};
+};
+
+async function queueOffline(config: InternalAxiosRequestConfig): Promise<AxiosResponse> {
+    const target = mutationTargetOf(config.method ?? "get", config.url);
+    if (!target || "blocked" in target) throw offlineFailure(config, "action");
+    try {
+        const { item } = await enqueueAdminChange(target.entity, target.op, target.entityId, bodyOf(config.data));
+        return {
+            // Mismas formas que las respuestas reales: los pedidos del panel vienen envueltos en { data }
+            data: target.entity === "order" ? { data: item } : item,
+            status: 202,
+            statusText: "Queued offline",
+            headers: { "x-sf-offline-queued": "1" },
+            config,
+        } as AxiosResponse;
+    } catch (error) {
+        throw offlineFailure(config, error instanceof AdminOfflineError && error.reason === "not-cached" ? "notCached" : "action");
+    }
+}
+
+apiClient.interceptors.request.use((config) => {
+    const method = (config.method ?? "get").toLowerCase();
+    if (method !== "get" && isOffline() && mutationTargetOf(method, config.url)) {
+        // Sin red no se sale: se encola (o se rechaza con "requiere conexión") sin tocar la red
+        config.adapter = () => queueOffline(config);
+    }
+    return config;
+});
+
+apiClient.interceptors.response.use(
+    async (response) => {
+        const { config } = response;
+        if ((config.method ?? "get").toLowerCase() === "get" && readEntityOf(config.url).cacheable && response.status === 200) {
+            void saveAdminRead(config.url, config.params, response.data);
+            response.data = await overlayAdminList(config.url, config.params, response.data);
+        }
+        return response;
+    },
+    async (error) => {
+        const config = error?.config as InternalAxiosRequestConfig | undefined;
+        if (!config || !axios.isAxiosError(error) || error.response) return Promise.reject(error);
+        const method = (config.method ?? "get").toLowerCase();
+        if (method === "get" && readEntityOf(config.url).cacheable) {
+            const cached = await getAdminRead(config.url, config.params);
+            if (!cached) return Promise.reject(error);
+            if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(ADMIN_COPY_EVENT, { detail: cached.savedAt }));
+            return {
+                data: await overlayAdminList(config.url, config.params, cached.data),
+                status: 200,
+                statusText: "Offline copy",
+                headers: { "x-sf-offline-copy": cached.savedAt },
+                config,
+            } as AxiosResponse;
+        }
+        // Se cortó la red a mitad de un cambio encolable: se encola. Si el servidor sí lo había aplicado, al
+        // sincronizar el valor ya coincide con el nuevo y se acepta sin conflicto.
+        const target = method !== "get" ? mutationTargetOf(method, config.url) : null;
+        if (target && !("blocked" in target)) return queueOffline(config);
+        return Promise.reject(error);
+    },
 );

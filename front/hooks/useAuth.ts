@@ -10,6 +10,7 @@ import { clearAuth, setAuth, setUser } from "@/store/slices/authSlices";
 import { clearAllCart } from "@/store/slices/cartSlice";
 import { clearProfileSnapshots, saveProfileSnapshot } from "@/utils/offlineProfile";
 import { clearOrdersCache } from "@/utils/offlineOrders";
+import { clearAdminReadCache } from "@/utils/adminOfflineStore";
 
 
 export function useAuth() {
@@ -41,7 +42,7 @@ export function useAuth() {
             // La copia del perfil para usarlo sin conexión tampoco queda para la próxima persona. Los cambios
             // de perfil pendientes sí se conservan: solo se envían cuando vuelve a entrar su dueño.
             // Lo mismo para la copia de "Mis pedidos"
-            await Promise.all([clearProfileSnapshots(), clearOrdersCache()]);
+            await Promise.all([clearProfileSnapshots(), clearOrdersCache(), clearAdminReadCache()]);
             setIsLoading(false);
         }
     }

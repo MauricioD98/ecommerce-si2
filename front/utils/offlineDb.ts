@@ -5,7 +5,7 @@ import { requireTenantId } from "./tenant";
 // el pedido o el ajuste de stock de una en la otra.
 
 const DB_PREFIX = "stella-femme-offline";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 // Solo existe en bases anteriores a la v3: su contenido se migra a DRAFTS_STORE (ver upgrade)
 export const LEGACY_ORDERS_STORE = "orders";
@@ -17,6 +17,9 @@ export const PROFILE_SNAPSHOT_STORE = "profile_snapshots";
 export const PROFILE_CHANGES_STORE = "profile_changes";
 // v5: copia de solo lectura de "Mis pedidos" (lista y detalles ya vistos), una por usuario
 export const ORDERS_CACHE_STORE = "orders_cache";
+// v6: panel de administración sin conexión. Copia de lo leído (por usuario) y cola de cambios a sincronizar
+export const ADMIN_READ_STORE = "admin_read_cache";
+export const ADMIN_CHANGES_STORE = "admin_changes";
 
 export const isOfflineDbSupported = () => typeof window !== "undefined" && "indexedDB" in window;
 
@@ -79,6 +82,12 @@ function openDb(): Promise<IDBDatabase> {
             }
             if (!db.objectStoreNames.contains(ORDERS_CACHE_STORE)) {
                 db.createObjectStore(ORDERS_CACHE_STORE, { keyPath: "userId" });
+            }
+            if (!db.objectStoreNames.contains(ADMIN_READ_STORE)) {
+                db.createObjectStore(ADMIN_READ_STORE, { keyPath: "key" });
+            }
+            if (!db.objectStoreNames.contains(ADMIN_CHANGES_STORE)) {
+                db.createObjectStore(ADMIN_CHANGES_STORE, { keyPath: "changeId" });
             }
             const drafts = db.objectStoreNames.contains(DRAFTS_STORE)
                 ? tx.objectStore(DRAFTS_STORE)

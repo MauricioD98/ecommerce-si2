@@ -5,12 +5,14 @@ import { CollectionResponseDto } from './dto/collection-response.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { QueryCollectionDto } from './dto/query-collection.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
+import { lockRow, type WriteGuard } from '../../common/offline/write-guard';
 
 @Injectable()
 export class CollectionsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createCollectionDto: CreateCollectionDto): Promise<CollectionResponseDto> {
+  // `id`: lo fija el dispositivo cuando la colección se creó sin conexión (reintentos idempotentes)
+  async create(createCollectionDto: CreateCollectionDto, id?: string): Promise<CollectionResponseDto> {
     const { name, slug, ...rest } = createCollectionDto;
 
     const collectionSlug =
@@ -26,7 +28,7 @@ export class CollectionsService {
     }
 
     const collection = await this.prisma.collection.create({
-      data: { name, slug: collectionSlug, ...rest },
+      data: { ...(id ? { id } : {}), name, slug: collectionSlug, ...rest },
     });
 
     return this.formatCollection(collection, 0);
@@ -77,7 +79,7 @@ export class CollectionsService {
     return this.formatCollection(collection, collection._count.products);
   }
 
-  async update(id: string, updateCollectionDto: UpdateCollectionDto): Promise<CollectionResponseDto> {
+  async update(id: string, updateCollectionDto: UpdateCollectionDto, guard?: WriteGuard<Collection>): Promise<CollectionResponseDto> {
     const existing = await this.prisma.collection.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Collection not found');
@@ -90,10 +92,19 @@ export class CollectionsService {
       }
     }
 
-    const updated = await this.prisma.collection.update({
-      where: { id },
-      data: updateCollectionDto,
-      include: { _count: { select: { products: true } } },
+    // Con guard (cambio hecho sin conexión): fila bloqueada, comprobación y escritura en la misma transacción
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (guard) {
+        await lockRow(tx, 'collections', id);
+        const current = await tx.collection.findUnique({ where: { id } });
+        if (!current) throw new NotFoundException('Collection not found');
+        await guard(tx, current);
+      }
+      return tx.collection.update({
+        where: { id },
+        data: updateCollectionDto,
+        include: { _count: { select: { products: true } } },
+      });
     });
 
     return this.formatCollection(updated, updated._count.products);

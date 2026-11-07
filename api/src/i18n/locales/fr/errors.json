@@ -104,5 +104,9 @@
   "PROFILE_SYNC_EMPTY": "Aucune modification du profil à synchroniser.",
   "PROFILE_SYNC_EXPECTED_MISSING": "La valeur précédente du champ {field} est manquante : impossible de synchroniser sans vérifier qu'elle n'a pas changé.",
   "PROFILE_SYNC_CHANGE_REUSED": "Cette modification appartient à un autre compte.",
-  "PROFILE_FIRST_NAME_REQUIRED": "Le prénom est obligatoire."
+  "PROFILE_FIRST_NAME_REQUIRED": "Le prénom est obligatoire.",
+  "OFFLINE_CONFLICT": "Cette donnée a été modifiée sur le serveur pendant que vous étiez hors ligne. Vérifiez les modifications avant de les enregistrer.",
+  "OFFLINE_SYNC_EXPECTED_MISSING": "La valeur précédente de {fields} est manquante : impossible de synchroniser sans vérifier qu'elle n'a pas changé.",
+  "OFFLINE_ACTION_REQUIRES_CONNECTION": "Cette action nécessite une connexion : {fields}.",
+  "OFFLINE_SYNC_CHANGE_REUSED": "Cette modification appartient à un autre compte ou à un autre élément."
 }

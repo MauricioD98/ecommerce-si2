@@ -1827,5 +1827,57 @@
       "paidOrders": "{count, plural, one {# commande payée} other {# commandes payées}}",
       "perPaidOrder": "Par commande payée"
     }
+  },
+  "AdminOffline": {
+    "offline": "Hors ligne : vous pouvez modifier les produits, catégories, collections, le statut des commandes et l'inventaire. Les modifications seront envoyées au retour de la connexion.",
+    "copyFrom": "Données enregistrées le {date}.",
+    "pending": "{count, plural, one {# modification en attente de synchronisation} other {# modifications en attente de synchronisation}}",
+    "needsReview": "{count, plural, one {# à vérifier} other {# à vérifier}}",
+    "review": "Voir les modifications",
+    "hide": "Masquer",
+    "syncNow": "Synchroniser",
+    "entities": {
+      "product": "Produit",
+      "category": "Catégorie",
+      "collection": "Collection",
+      "order": "Commande"
+    },
+    "fields": {
+      "name": "Nom",
+      "description": "Description",
+      "categoryId": "Catégorie",
+      "sku": "SKU",
+      "price": "Prix",
+      "sizes": "Tailles",
+      "imageUrl": "Image",
+      "isActive": "Actif",
+      "branchId": "Boutique",
+      "collectionIds": "Collections",
+      "translations": "Traductions",
+      "slug": "Slug",
+      "bannerImageUrl": "Bannière",
+      "status": "Statut"
+    },
+    "status": {
+      "pending": "En attente",
+      "syncing": "Synchronisation…",
+      "error": "Erreur",
+      "conflict": "Conflit",
+      "needs-login": "Connexion requise"
+    },
+    "created": "Créé hors ligne",
+    "conflictDescription": "Cette donnée a été modifiée sur le serveur pendant que vous étiez hors ligne. Choisissez la version à conserver ; rien n'a été écrasé.",
+    "field": "Champ",
+    "yourChange": "Votre modification",
+    "serverValue": "Valeur actuelle sur le serveur",
+    "keepMine": "Utiliser mes modifications",
+    "keepServer": "Conserver celles du serveur",
+    "needsLogin": "Votre session a expiré. La modification est toujours enregistrée : reconnectez-vous avec ce compte pour l’envoyer.",
+    "signIn": "Se connecter",
+    "retry": "Réessayer",
+    "discard": "Abandonner",
+    "homeTitle": "Panneau hors ligne",
+    "sectionRequiresConnection": "Cette section nécessite une connexion",
+    "homeDescription": "Hors ligne, vous pouvez utiliser ces sections avec les données enregistrées sur cet appareil. Supprimer, annuler des commandes, la caisse, les paiements, le personnel, les rôles et les réglages nécessitent une connexion."
   }
 }

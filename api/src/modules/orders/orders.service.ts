@@ -19,6 +19,7 @@ import { assertPlanFeature } from '../platform/plans';
 import { CheckoutCode, CheckoutException } from '../../common/checkout/checkout-errors';
 import { MAX_LINE_QUANTITY, orderPaymentTtlMs, simulatedPaymentsEnabled } from '../../common/checkout/checkout-policy';
 import { compareVariants, isLockTimeout, lockCart, lockOrder, withTxRetry } from '../../common/checkout/tx.util';
+import type { WriteGuard } from '../../common/offline/write-guard';
 import { failpoint } from '../../common/checkout/failpoints';
 import { tenantSchemaSql } from '../../tenancy/tenant-context';
 import { PaymentSettlementService } from '../payments/payment-settlement.service';
@@ -513,6 +514,7 @@ async update(
   updateOrderDto: UpdateOrderDto,
   userId?: string,
   actor?: AuthUser,
+  guard?: WriteGuard<Order>,
 ): Promise<OrderApiResponseDto<OrderResponseDto>> {
   const where: any = { id };
   if (userId) where.userId = userId;
@@ -536,6 +538,8 @@ async update(
       if (updateOrderDto.status && existing.status === OrderStatus.CANCELADO) {
         throw new BadRequestException('A cancelled order cannot change status');
       }
+      // Cambio hecho sin conexión: el estado sigue como lo vio el dispositivo (la orden ya está bloqueada)
+      if (guard) await guard(tx, existing);
       const saved = await tx.order.update({
         where: { id },
         data: updateOrderDto.status ? { status: updateOrderDto.status } : {},

@@ -1,3 +1,4 @@
+import { lockRow, type WriteGuard } from '../../common/offline/write-guard';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -243,6 +244,7 @@ export class ProductsService {
     id: string,
     updateProductDto: UpdateProductDto,
     actor: AuthUser,
+    guard?: WriteGuard<Product & { collections: Collection[] }>,
   ): Promise<ProductResponseDto> {
     // 1. Verificar si el producto existe
     const existingProduct = await this.prisma.product.findUnique({
@@ -312,15 +314,24 @@ export class ProductsService {
       updateData.collections = { set: collectionIds.map((collectionId) => ({ id: collectionId })) };
     }
 
-    // 5. Ejecutar la actualización
-    const updatedProduct = await this.prisma.product.update({
-      where: { id },
-      data: updateData,
-      include: {
-        category: true,
-        collections: true,
-        _count: { select: { orderItems: true } },
-      },
+    // 5. Ejecutar la actualización. Con guard (cambio hecho sin conexión): fila bloqueada, comprobación y
+    // escritura en la misma transacción
+    const updatedProduct = await this.prisma.$transaction(async (tx) => {
+      if (guard) {
+        await lockRow(tx, 'products', id);
+        const current = await tx.product.findUnique({ where: { id }, include: { collections: true } });
+        if (!current) throw new NotFoundException(i18nMessage('errors.PRODUCT_NOT_FOUND'));
+        await guard(tx, current);
+      }
+      return tx.product.update({
+        where: { id },
+        data: updateData,
+        include: {
+          category: true,
+          collections: true,
+          _count: { select: { orderItems: true } },
+        },
+      });
     });
 
     return this.formatProduct(updatedProduct);

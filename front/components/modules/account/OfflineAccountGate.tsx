@@ -9,15 +9,18 @@ import { canUseOfflineSession } from '@/utils/offlineProfile';
 import Header from '../landing/Header';
 import AccountClient from './AccountClient';
 import OrderDetailClient from './OrderDetailClient';
+import AdminOfflineView from '../admin/AdminOfflineView';
+import { canAccessAdmin } from '@/utils/permissions';
 import styles from './account.module.scss';
 
 const ORDER_PATH = /^\/account\/orders\/([^/]+)\/?$/;
 
-type View = { kind: 'generic' } | { kind: 'account' } | { kind: 'order'; orderId: string };
+type View = { kind: 'generic' } | { kind: 'account' } | { kind: 'order'; orderId: string } | { kind: 'admin'; path: string };
 
 /**
- * El service worker sirve /offline cuando una página privada no se puede cargar sin red: "Mi cuenta" y
- * "Mis pedidos" nunca se guardan en Cache Storage. Si lo pedido era la cuenta (/account) o un pedido
+ * El service worker sirve /offline cuando una página privada no se puede cargar sin red: "Mi cuenta", "Mis
+ * pedidos" y el panel de administración nunca se guardan en Cache Storage. El panel se arma aquí si el usuario
+ * tiene acceso a él (AdminOfflineView). Si lo pedido era la cuenta (/account) o un pedido
  * (/account/orders/<id>) y la sesión todavía es renovable y es del mismo usuario, aquí se arma esa pantalla con
  * las copias de IndexedDB. En cualquier otro caso (sin sesión, otra cuenta, sesión vencida) queda el aviso genérico.
  *
@@ -33,8 +36,13 @@ export default function OfflineAccountGate({ children }: { children: React.React
 
     useEffect(() => {
         const path = window.location.pathname;
-        if (!path.startsWith('/account') || !sessionOk || !userId) {
+        // Panel de administración: misma regla de sesión, y además el usuario tiene que tener acceso al panel
+        if (path.startsWith('/admin') && sessionOk && userId && canAccessAdmin(auth.user)) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
+            setView({ kind: 'admin', path });
+            return;
+        }
+        if (!path.startsWith('/account') || !sessionOk || !userId) {
             setView({ kind: 'generic' });
             return;
         }
@@ -42,9 +50,10 @@ export default function OfflineAccountGate({ children }: { children: React.React
         // hay copia, de los datos de la sesión guardada en este dispositivo (los mismos que ya muestra la cabecera)
         const match = path.match(ORDER_PATH);
         setView(match ? { kind: 'order', orderId: decodeURIComponent(match[1]) } : { kind: 'account' });
-    }, [sessionOk, userId]);
+    }, [sessionOk, userId, auth.user]);
 
     if (view.kind === 'generic') return <>{children}</>;
+    if (view.kind === 'admin') return <AdminOfflineView path={view.path} />;
 
     return (
         <div data-testid="offline-account">
