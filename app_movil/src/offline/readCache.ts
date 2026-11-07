@@ -36,26 +36,15 @@ function targetOf(config: InternalAxiosRequestConfig) {
   return { tenantId, userId, key: readCacheKey(path, config.params, language) };
 }
 
-// Diagnóstico solo en desarrollo (Metro muestra estos registros); en release no imprime nada
-const debug = (...args: unknown[]) => {
-  if (__DEV__) console.log('[offline]', ...args);
-};
-
 export async function rememberRead(response: AxiosResponse): Promise<void> {
   try {
     if (response.headers?.[OFFLINE_COPY_HEADER]) return;
     const target = targetOf(response.config);
-    if (!target) {
-      debug('no se guarda', response.config?.method, response.config?.url);
-      return;
-    }
+    if (!target) return;
     const store = await getOfflineStore();
-    if (!store) debug('sin base SQLite: no se guarda', target.key);
     await store?.saveRead(target.tenantId, target.userId, target.key, response.data);
-    if (store) debug('copia guardada', target.key, target.userId ? 'privada' : 'pública');
-  } catch (error) {
+  } catch {
     // guardar la copia nunca rompe la respuesta real
-    debug('error al guardar la copia', String(error));
   }
 }
 
@@ -65,13 +54,9 @@ export async function offlineCopyFor(config: InternalAxiosRequestConfig): Promis
     // Lecturas que deciden una compra o un pago piden { offlineCopy: false }: sin red fallan, no se inventan
     if ((config as { offlineCopy?: boolean }).offlineCopy === false) return null;
     const target = targetOf(config);
-    if (!target) {
-      debug('sin copia posible para', config.method, config.url);
-      return null;
-    }
+    if (!target) return null;
     const store = await getOfflineStore();
     const copy = await store?.getRead(target.tenantId, target.userId, target.key);
-    debug(copy ? 'copia usada' : 'no hay copia', target.key, store ? '' : '(sin base SQLite)');
     if (!copy) return null;
     emitOffline('copy', copy.savedAt);
     return {
@@ -81,8 +66,7 @@ export async function offlineCopyFor(config: InternalAxiosRequestConfig): Promis
       headers: { [OFFLINE_COPY_HEADER]: copy.savedAt },
       config,
     } as AxiosResponse;
-  } catch (error) {
-    debug('error al leer la copia', String(error));
+  } catch {
     return null;
   }
 }

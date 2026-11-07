@@ -126,7 +126,6 @@ apiClient.interceptors.response.use(
 
     // Sin respuesta del servidor (sin red): un GET guardado se responde con la copia local. Nunca una
     // escritura: agregar al carrito, comprar o pagar siempre necesitan la confirmación de la API.
-    if (__DEV__ && !error.response) console.log('[offline] petición sin respuesta', error.code, originalRequest?.method, originalRequest?.url);
     if (!error.response && originalRequest && error.code !== 'ERR_API_URL_MISSING' && error.code !== 'ERR_CANCELED') {
       const copy = await offlineCopyFor(originalRequest);
       if (copy) return copy;
