@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { i18nMessage } from '../../i18n/i18n-message';
 import { requireTenant } from '../../tenancy/tenant-context';
 
 // Planes de suscripción al SaaS. El cliente solo elige la CLAVE del plan; el price_id real sale de
@@ -105,18 +106,36 @@ const PLAN_FEATURES_MAP: Record<PlanFeatures['planKey'], PlanFeatures> = {
   },
 };
 
-const FEATURE_ERROR_MESSAGES: Record<PlanBooleanFeature, string> = {
-  pos: 'El Punto de Venta (POS) está disponible desde el plan Growth. Actualiza tu plan en Suscripción.',
-  returns: 'La gestión de devoluciones y mermas está disponible desde el plan Growth. Actualiza tu plan en Suscripción.',
-  multiBranchInventory: 'La gestión de inventario multi-sucursal y descuentos globales está disponible desde el plan Growth.',
-  customDomain: 'El dominio propio está disponible desde el plan Growth. Actualiza tu plan en Suscripción.',
-  aiReports: 'Los reportes con IA están disponibles exclusivamente en el plan Pro. Actualiza tu plan en Suscripción.',
-  virtualTryOn: 'El Probador Virtual está disponible exclusivamente en el plan Pro.',
-  campaigns: 'Las campañas de email y notificaciones push están disponibles exclusivamente en el plan Pro. Actualiza tu plan en Suscripción.',
-  qrPayments: 'Los pagos por QR están disponibles en todos los planes.',
-  digitalWallet: 'Los pagos con billetera digital (Airtm, Takenos, Wallbit) están disponibles desde el plan Growth. Actualiza tu plan en Suscripción.',
-  mobileApp: 'El acceso por App Móvil para clientes está disponible exclusivamente en tiendas con el plan Pro.',
-};
+// Orden de los planes a la venta, del más barato al más caro (legacy no se vende)
+const PLAN_ORDER = ['starter', 'growth', 'pro'] as const;
+
+/**
+ * Nombre del plan más barato que cumple `test`: es el que nombran los mensajes de "actualiza tu
+ * plan". Sale de PLAN_FEATURES_MAP para que los mensajes no queden desalineados si se mueve una
+ * funcionalidad de plan.
+ */
+export function minimumPlanName(test: (features: PlanFeatures) => boolean): string {
+  const planKey = PLAN_ORDER.find((key) => test(PLAN_FEATURES_MAP[key])) ?? 'pro';
+  return PLAN_FEATURES_MAP[planKey].planName;
+}
+
+/**
+ * Error de funcionalidad no incluida en el plan: una clave por funcionalidad (cada idioma arma la
+ * frase completa con su propia concordancia), con el plan necesario como argumento. Lo traduce
+ * I18nExceptionFilter (diccionarios en src/i18n/locales/<idioma>/errors.json → PLAN_FEATURE).
+ */
+export function planFeatureMessage(feature: PlanBooleanFeature): string {
+  return i18nMessage(`errors.PLAN_FEATURE.${feature}`, { plan: minimumPlanName((features) => features[feature]) });
+}
+
+/** Tope de productos activos alcanzado (crear o desarchivar): nombra el primer plan sin tope. */
+export function productLimitMessage(features: PlanFeatures): string {
+  return i18nMessage('errors.PLAN_PRODUCT_LIMIT', {
+    plan: features.planName,
+    count: features.maxProducts,
+    upgradePlan: minimumPlanName((plan) => plan.maxProducts === null),
+  });
+}
 
 export function getPlanFeatures(rawPlan: string | null | undefined): PlanFeatures {
   const normalized = rawPlan?.trim().toLowerCase();
@@ -134,7 +153,7 @@ export function currentPlanFeatures(): PlanFeatures {
 export function assertPlanFeature(feature: PlanBooleanFeature): void {
   const features = currentPlanFeatures();
   if (!features[feature]) {
-    throw new ForbiddenException(FEATURE_ERROR_MESSAGES[feature]);
+    throw new ForbiddenException(planFeatureMessage(feature));
   }
 }
 

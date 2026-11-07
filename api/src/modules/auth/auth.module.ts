@@ -6,11 +6,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategies';
 import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
+import { MobileAuthController } from './mobile-auth.controller';
+import { MobileAccessModule } from '../mobile-access/mobile-access.module';
 
 
 @Module({
  imports: [
   PassportModule.register({ defaultStrategy: 'jwt' }),
+  MobileAccessModule,
   JwtModule.registerAsync({
     inject: [ConfigService],
     useFactory: async (configService: ConfigService) => ({
@@ -23,7 +26,7 @@ import { RefreshTokenStrategy } from './strategies/refresh-token.strategy';
  }),
 ],
   providers: [AuthService, JwtStrategy, RefreshTokenStrategy],
-  controllers: [AuthController],
+  controllers: [AuthController, MobileAuthController],
   exports: [AuthService],
 })
 export class AuthModule {}

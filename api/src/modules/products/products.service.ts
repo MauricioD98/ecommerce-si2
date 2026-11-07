@@ -12,7 +12,7 @@ import { hasAllBranches } from '../../common/utils/permission.util';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { currentLanguage, localizeProduct, normalizeTranslations, readTranslations } from './product-translations';
-import { assertPlanFeature, currentPlanFeatures } from '../platform/plans';
+import { assertPlanFeature, currentPlanFeatures, productLimitMessage } from '../platform/plans';
 
 @Injectable()
 export class ProductsService {
@@ -28,7 +28,7 @@ export class ProductsService {
       const activeCount = await this.prisma.product.count({ where: { isActive: true } });
       if (activeCount >= features.maxProducts) {
         throw new ForbiddenException(
-          `Tu plan ${features.planName} permite hasta ${features.maxProducts} productos activos. Actualiza al plan Growth o Pro para productos ilimitados.`,
+          productLimitMessage(features),
         );
       }
     }
@@ -260,7 +260,7 @@ export class ProductsService {
         const activeCount = await this.prisma.product.count({ where: { isActive: true } });
         if (activeCount >= features.maxProducts) {
           throw new ForbiddenException(
-            `Tu plan ${features.planName} permite hasta ${features.maxProducts} productos activos. Actualiza al plan Growth o Pro para productos ilimitados.`,
+            productLimitMessage(features),
           );
         }
       }

@@ -14,6 +14,7 @@
   "REGISTER_FAILED": "An error occurred during registration",
   "USER_NOT_FOUND": "User not found",
   "INVALID_CREDENTIALS": "Invalid email or password",
+  "LOGIN_FAILED": "Incorrect email or password. If you failed several times, wait a few minutes before trying again",
   "TOO_MANY_ATTEMPTS": {
     "one": "Too many failed attempts. Please try again in {count} minute",
     "other": "Too many failed attempts. Please try again in {count} minutes"
@@ -66,5 +67,42 @@
   "PAYMENT_MISMATCH": "The payment doesn’t match this order.",
   "PAYMENT_SIMULATION_DISABLED": "This payment method isn’t available.",
   "INVENTORY_VERSION_CONFLICT": "Stock changed since you read it. Check the current value before adjusting.",
-  "PROVIDER_UNAVAILABLE": "The payment provider isn’t responding. Please try again shortly."
+  "PROVIDER_UNAVAILABLE": "The payment provider isn’t responding. Please try again shortly.",
+  "MOBILE_APP_NOT_IN_PLAN": "This store's current plan does not include the mobile app (available on the Pro plan). You can keep shopping on the web store, including from your phone's browser.",
+  "MOBILE_ATTESTATION_REQUIRED": "For security, the app needs to verify this device again.",
+  "MOBILE_ATTESTATION_INVALID": "We could not verify that this is the official app on a secure device.",
+  "MOBILE_ATTESTATION_UNAVAILABLE": "Device verification is not available right now. Please try again later.",
+  "MOBILE_CHANNEL_MISMATCH": "This session does not belong to this channel. Please sign in again.",
+  "PLAN_FEATURE": {
+    "pos": "The Point of Sale (POS) is available from the {plan} plan. Upgrade your plan in Subscription.",
+    "returns": "Returns and shrinkage management is available from the {plan} plan. Upgrade your plan in Subscription.",
+    "multiBranchInventory": "Multi-branch inventory and global discount management is available from the {plan} plan. Upgrade your plan in Subscription.",
+    "customDomain": "A custom domain is available from the {plan} plan. Upgrade your plan in Subscription.",
+    "aiReports": "AI reports are available from the {plan} plan. Upgrade your plan in Subscription.",
+    "virtualTryOn": "The Virtual Try-On is available from the {plan} plan. Upgrade your plan in Subscription.",
+    "campaigns": "Email campaigns and push notifications are available from the {plan} plan. Upgrade your plan in Subscription.",
+    "qrPayments": "QR payments are available on all plans.",
+    "digitalWallet": "Digital wallet payments (Airtm, Takenos, Wallbit) are available from the {plan} plan. Upgrade your plan in Subscription.",
+    "mobileApp": "This store does not have the customer Mobile App enabled on its current plan (available from the {plan} plan)."
+  },
+  "PLAN_BRANCH_LIMIT": {
+    "one": "Your {plan} plan allows up to {count} branch. Upgrade your plan in Subscription to add more branches.",
+    "other": "Your {plan} plan allows up to {count} branches. Upgrade your plan in Subscription to add more branches."
+  },
+  "PLAN_ACTIVE_BRANCH_LIMIT": {
+    "one": "Your {plan} plan allows up to {count} active branch. Upgrade your plan in Subscription.",
+    "other": "Your {plan} plan allows up to {count} active branches. Upgrade your plan in Subscription."
+  },
+  "PLAN_PRODUCT_LIMIT": {
+    "one": "Your {plan} plan allows up to {count} active product. Upgrade to the {upgradePlan} plan or higher for unlimited products.",
+    "other": "Your {plan} plan allows up to {count} active products. Upgrade to the {upgradePlan} plan or higher for unlimited products."
+  },
+  "PLAN_STORE_MOBILE_APP": "The store \"{store}\" does not have the Mobile App enabled on its current plan ({currentPlan}). Available from the {plan} plan.",
+  "PLAN_STORE_CUSTOM_DOMAIN": "The store's current plan ({currentPlan}) does not include a custom domain. Requires the {plan} plan or higher.",
+  "PLAN_SIGNUP_CUSTOM_DOMAIN": "A custom domain is available from the {plan} plan.",
+  "PROFILE_CONFLICT": "Your profile changed on another device while you were offline. Review the changes before saving them.",
+  "PROFILE_SYNC_EMPTY": "There are no profile changes to sync.",
+  "PROFILE_SYNC_EXPECTED_MISSING": "The previous value of {field} is missing: it cannot be synced without checking that it did not change.",
+  "PROFILE_SYNC_CHANGE_REUSED": "This change belongs to another account.",
+  "PROFILE_FIRST_NAME_REQUIRED": "First name is required."
 }

@@ -31,6 +31,9 @@ import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PaymentOptions, paymentSettingsService } from '@/service/api/paymentSettings.service';
 import { useStoreName, useStorePlan } from '@/providers/StoreInfoProvider';
 
+// Moneda en la que el checkout muestra los importes ("Bs")
+const DISPLAY_CURRENCY = 'bob';
+
 export const revalidate = false;
 
 export default function CheckoutClient() {
@@ -74,7 +77,10 @@ export default function CheckoutClient() {
             .catch(() => setPaymentOptions({ card: false, qrAllowed: false, bankQr: null, usdt: null, wallet: null }))
             .finally(() => setOptionsLoaded(true));
     }, []);
-    const cardEnabled = optionsLoaded ? Boolean(paymentOptions?.card) : null;
+    // Los importes se muestran en Bs: la tarjeta solo se ofrece si la API cobra en esa misma moneda.
+    // Una API sin el campo (versión anterior) cobraba en USD por defecto, así que tampoco coincide.
+    const cardCurrencyMatches = (paymentOptions?.currency ?? "").toLowerCase() === DISPLAY_CURRENCY;
+    const cardEnabled = optionsLoaded ? Boolean(paymentOptions?.card) && cardCurrencyMatches : null;
     // QR solo se ofrece si el plan de la tienda incluye pagos por QR (Starter, Growth, Pro).
     const qrAllowed = optionsLoaded ? Boolean(paymentOptions?.qrAllowed ?? features.qrPayments) : false;
     // Billetera digital (Airtm, Takenos, Wallbit) solo se ofrece desde el Plan Growth.
@@ -266,8 +272,8 @@ export default function CheckoutClient() {
             try {
                 const paymentCreated = await createPaymentIntent({
                     orderId: activeOrderId,
+                    // Importe y moneda los fija el servidor (PAYMENT_CURRENCY): el cliente no los envía
                     description: `Pago de orden en ${storeName}`,
-                    currency: "usd"
                 });
 
                 if (!paymentCreated) {
@@ -357,7 +363,7 @@ export default function CheckoutClient() {
     const displayedError = stripeError ?? paymentError ?? (orderFailed ? orderError : null);
     const hasAnyOnlineMethod =
         Boolean(cardEnabled) ||
-        qrAllowed ||
+        Boolean(paymentOptions?.simulatedQr && qrAllowed) ||
         Boolean(paymentOptions?.bankQr && qrAllowed) ||
         Boolean(paymentOptions?.usdt) ||
         Boolean(paymentOptions?.wallet && walletAllowed);
@@ -445,7 +451,9 @@ export default function CheckoutClient() {
                                     )}
 
                                     {isOnline && cardEnabled === false && (
-                                        <p className={styles.paymentHint}>{t('payment.cardUnavailable')}</p>
+                                        <p className={styles.paymentHint}>
+                                            {paymentOptions?.card && !cardCurrencyMatches ? t('payment.cardCurrencyMismatch') : t('payment.cardUnavailable')}
+                                        </p>
                                     )}
 
                                     {isOnline && optionsLoaded && !hasAnyOnlineMethod && (

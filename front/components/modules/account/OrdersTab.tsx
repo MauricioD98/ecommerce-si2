@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, PackageSearch } from 'lucide-react';
+import { ChevronRight, CloudOff, PackageSearch } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import accountStyles from './account.module.scss';
 import styles from './orders.module.scss';
@@ -16,7 +16,7 @@ export default function OrdersTab() {
     const t = useTranslations('Account');
     const tPages = useTranslations('Store');
     const locale = useLocale();
-    const { orders, total, totalPages, isLoading, error } = useMyOrders(page);
+    const { orders, total, totalPages, isLoading, error, offlineCopyAt } = useMyOrders(page);
 
     return (
         <div className={accountStyles.card}>
@@ -30,6 +30,12 @@ export default function OrdersTab() {
             </div>
 
             {error && <div className={accountStyles.alertError}>{error}</div>}
+            {offlineCopyAt && (
+                <div className={accountStyles.alertInfo} role="status" data-testid="orders-offline-copy" style={{ marginBottom: '1rem' }}>
+                    <CloudOff size={18} />
+                    <span>{t('orders.offlineCopy', { date: formatOrderDate(offlineCopyAt, locale) })}</span>
+                </div>
+            )}
 
             {isLoading ? (
                 <p className={accountStyles.subheading}>{t('orders.loading')}</p>

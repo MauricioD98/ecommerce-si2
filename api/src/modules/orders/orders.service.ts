@@ -23,6 +23,7 @@ import { failpoint } from '../../common/checkout/failpoints';
 import { tenantSchemaSql } from '../../tenancy/tenant-context';
 import { PaymentSettlementService } from '../payments/payment-settlement.service';
 import { StripeGateway, isProviderUnavailable } from '../payments/stripe-gateway.service';
+import { isWalletReady } from '../payments/payment-settings.service';
 
 const CHECKOUT_OPERATION = 'CREATE_ORDER';
 const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -624,18 +625,18 @@ private async cancelAtProvider(orderId: string, paymentIntentId: string, attempt
 }
 
 
-  // QR bancario o USDT solo si la tienda los activó (y completó) en Gestión de pagos
+  // QR bancario, USDT o billetera solo si la tienda los activó (y completó) en Gestión de pagos
   private async assertManualMethodEnabled(method: PaymentMethod): Promise<void> {
     const settings = await this.prisma.paymentSettings.findUnique({
       where: { id: 'default' },
-      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletAccount: true },
+      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletProvider: true, walletAccount: true },
     });
     const enabled =
       method === PaymentMethod.BANK_QR
         ? Boolean(settings?.qrEnabled && settings.qrImageType)
         : method === PaymentMethod.USDT
         ? Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress)
-        : Boolean(settings?.walletEnabled && settings.walletAccount);
+        : isWalletReady(settings);
     if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
   }
 

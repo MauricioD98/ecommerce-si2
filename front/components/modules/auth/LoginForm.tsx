@@ -1,34 +1,52 @@
 'use client';
 
 import styles from "./auth-form.module.scss";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
-import { ChevronRight, Eye, EyeOff, Info, Loader2, Store } from "lucide-react";
+import { ChevronRight, Eye, EyeOff, Info, Loader2, ShieldCheck, Store } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAppDispatch } from "@/store";
 import { setAuth } from "@/store/slices/authSlices";
-import { authService, TenantMatchOption } from "@/service/api/auth.service";
+import { authService } from "@/service/api/auth.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { usePublicTenants } from "@/hooks/usePublicTenants";
 import { canAccessAdmin } from "@/utils/permissions";
 import { getCurrentTenantId, switchTenantWithAuth } from "@/utils/tenant";
 import { AutoResponse } from "@/types/auth.types";
+import { countPendingProfileChanges } from "@/utils/offlineProfile";
 
+// La tienda se elige ANTES de pedir las credenciales: dominio propio (cookie de proxy.ts), tienda
+// activa del navegador (?tenant=, la recordada o NEXT_PUBLIC_TENANT_ID) o el selector de abajo. El
+// backend solo consulta el correo en esa tienda. Los administradores de NovaSoft entran por /plataforma.
 export default function LoginForm() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const dispatch = useAppDispatch();
     const t = useTranslations("Auth");
-    const { tenants, currentTenantId, isCustomDomain } = usePublicTenants();
+    const { tenants, currentTenantId, isCustomDomain, isLoading: tenantsLoading } = usePublicTenants();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [selectedTenantId, setSelectedTenantId] = useState<string>("auto");
-    const [matchedTenants, setMatchedTenants] = useState<TenantMatchOption[] | null>(null);
+    // null = el usuario no eligió: vale la tienda activa del navegador. "" = pidió cambiarla
+    const [pickedTenantId, setPickedTenantId] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Cambios de perfil guardados sin conexión en este dispositivo (de esta tienda). No se dice de quién: solo
+    // se avisa que se envían cuando entra la misma cuenta
+    const [pendingProfile, setPendingProfile] = useState(false);
+    useEffect(() => {
+        let active = true;
+        countPendingProfileChanges().then((count) => active && setPendingProfile(count > 0));
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    // Sin tienda ("") se muestra el selector en lugar del formulario
+    const selectedTenantId = pickedTenantId ?? currentTenantId ?? "";
+    const selectedTenant = tenants.find((tenant) => tenant.id === selectedTenantId) ?? null;
 
     const resolveTargetUrl = (auth: AutoResponse): string => {
         const rawRedirect = searchParams.get("redirect");
@@ -64,10 +82,17 @@ export default function LoginForm() {
         router.push(target);
     };
 
+    // El backend responde el mismo 401 para correo inexistente, contraseña incorrecta, cuenta
+    // bloqueada o tienda no disponible: el mensaje tampoco los distingue
     const formatLoginError = (err: unknown): string =>
         axios.isAxiosError(err) && err.response?.status === 401
-            ? "Correo o contraseña incorrectos."
-            : getApiErrorMessage(err, "Error al iniciar sesión. Inténtalo de nuevo.");
+            ? t("login.invalidCredentials")
+            : getApiErrorMessage(err, t("genericError"));
+
+    const pickTenant = (tenantId: string) => {
+        setPickedTenantId(tenantId);
+        setError(null);
+    };
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -76,40 +101,13 @@ export default function LoginForm() {
 
         try {
             if (isCustomDomain) {
+                // Dominio propio verificado: proxy.ts fija la tienda en x-tenant-id
                 const auth = await authService.login({ email, password });
                 completeLogin(getCurrentTenantId(), auth);
                 return;
             }
 
-            const urlTenant = searchParams.get("tenant") ?? undefined;
-            const response = await authService.tenantLogin({
-                email,
-                password,
-                tenantId: selectedTenantId === "auto" ? undefined : selectedTenantId,
-                preferredTenantId: urlTenant || currentTenantId || undefined,
-            });
-
-            if (response.isPlatformAdmin) {
-                try {
-                    sessionStorage.setItem(
-                        "sf_platform_session",
-                        JSON.stringify({
-                            token: response.accessToken,
-                            email: response.admin.email,
-                        }),
-                    );
-                } catch {
-                    // sessionStorage no disponible
-                }
-                window.location.href = response.redirectUrl || "/plataforma";
-                return;
-            }
-
-            if (response.requiresTenantSelection) {
-                setMatchedTenants(response.tenants);
-                return;
-            }
-
+            const response = await authService.tenantLogin({ email, password, tenantId: selectedTenantId });
             completeLogin(response.tenant.id, response.auth);
         } catch (err) {
             setError(formatLoginError(err));
@@ -118,83 +116,68 @@ export default function LoginForm() {
         }
     };
 
-    const handlePickMatchedTenant = async (tenantId: string) => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await authService.tenantLogin({
-                email,
-                password,
-                tenantId,
-            });
-            if (!response.requiresTenantSelection && !response.isPlatformAdmin) {
-                completeLogin(response.tenant.id, response.auth);
-            }
-        } catch (err) {
-            setError(formatLoginError(err));
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const platformAdminLink = !isCustomDomain && (
+        <p className={styles.footerText}>
+            <ShieldCheck size={16} aria-hidden="true" /> {t("login.platformAdminPrompt")}{" "}
+            <button type="button" className={styles.link} onClick={() => router.push("/plataforma")}>
+                {t("login.platformAdminLink")}
+            </button>
+        </p>
+    );
+
+    const needsStore = !isCustomDomain && !selectedTenantId;
 
     return (
         <section className={styles.section}>
             <div className={styles.container}>
                 <div className={styles.fromWrapper}>
-                    {matchedTenants ? (
+                    {needsStore ? (
                         <>
-                            <h1 className={styles.title}>Elige tu tienda</h1>
-                            <p className={styles.subtitle}>
-                                Tu correo está registrado en varias tiendas. Selecciona a cuál deseas ingresar:
-                            </p>
+                            <h1 className={styles.title}>{t("login.storeStepTitle")}</h1>
+                            <p className={styles.subtitle}>{t("login.storeStepSubtitle")}</p>
 
-                            {error && (
+                            {tenantsLoading ? (
+                                <Loader2 className={styles.spinner} />
+                            ) : tenants.length === 0 ? (
                                 <div className={styles.error}>
                                     <Info size={20} />
-                                    <span>{error}</span>
+                                    <span>{t("login.noStores")}</span>
+                                </div>
+                            ) : (
+                                <div className={styles.tenantList}>
+                                    {tenants.map((tenant) => (
+                                        <button
+                                            key={tenant.id}
+                                            type="button"
+                                            className={styles.tenantOption}
+                                            onClick={() => pickTenant(tenant.id)}
+                                        >
+                                            <span className={styles.tenantOptionLeft}>
+                                                <Store size={20} />
+                                                <span className={styles.tenantOptionInfo}>
+                                                    <span className={styles.tenantOptionName}>{tenant.name}</span>
+                                                    <span className={styles.tenantOptionMeta}>/{tenant.slug}</span>
+                                                </span>
+                                            </span>
+                                            <ChevronRight size={18} />
+                                        </button>
+                                    ))}
                                 </div>
                             )}
 
-                            <div className={styles.tenantList}>
-                                {matchedTenants.map((option) => (
-                                    <button
-                                        key={option.id}
-                                        type="button"
-                                        className={styles.tenantOption}
-                                        onClick={() => handlePickMatchedTenant(option.id)}
-                                        disabled={isLoading}
-                                    >
-                                        <span className={styles.tenantOptionLeft}>
-                                            <Store size={20} />
-                                            <span className={styles.tenantOptionInfo}>
-                                                <span className={styles.tenantOptionName}>{option.name}</span>
-                                                <span className={styles.tenantOptionMeta}>/{option.slug}</span>
-                                            </span>
-                                        </span>
-                                        <span className={styles.tenantOptionLeft}>
-                                            <span className={styles.roleBadge}>{option.role}</span>
-                                            <ChevronRight size={18} />
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-
-                            <button
-                                type="button"
-                                className={styles.linkButton}
-                                onClick={() => {
-                                    setMatchedTenants(null);
-                                    setError(null);
-                                }}
-                                disabled={isLoading}
-                            >
-                                ← Volver y cambiar correo
-                            </button>
+                            {platformAdminLink}
                         </>
                     ) : (
                         <>
                             <h1 className={styles.title}>{t("login.title")}</h1>
                             <p className={styles.subtitle}>{t("login.subtitle")}</p>
+
+                            {pendingProfile && (
+                                <div className={styles.notice} role="status">
+                                    <Info size={20} />
+                                    <span>{t("login.pendingProfileChanges")}</span>
+                                </div>
+                            )}
 
                             <form className={styles.form} onSubmit={handleSubmit}>
                                 {error && (
@@ -204,25 +187,32 @@ export default function LoginForm() {
                                     </div>
                                 )}
 
-                                {!isCustomDomain && tenants.length > 0 && (
+                                {!isCustomDomain && (
                                     <div className={styles.field}>
-                                        <label htmlFor="loginTenant">Tienda</label>
-                                        <select
-                                            id="loginTenant"
-                                            className={styles.selectInput}
-                                            value={selectedTenantId}
-                                            onChange={(e) => setSelectedTenantId(e.target.value)}
-                                            disabled={isLoading}
-                                        >
-                                            <option value="auto">
-                                                Automático (detectar según mi correo)
-                                            </option>
-                                            {tenants.map((tenant) => (
-                                                <option key={tenant.id} value={tenant.id}>
-                                                    {tenant.name} (/{tenant.slug})
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <label id="loginTenantLabel">{t("login.storeLabel")}</label>
+                                        <div className={styles.tenantOption} role="group" aria-labelledby="loginTenantLabel">
+                                            <span className={styles.tenantOptionLeft}>
+                                                <Store size={20} />
+                                                <span className={styles.tenantOptionInfo}>
+                                                    <span className={styles.tenantOptionName}>
+                                                        {selectedTenant?.name ?? t("login.currentStore")}
+                                                    </span>
+                                                    {selectedTenant && (
+                                                        <span className={styles.tenantOptionMeta}>/{selectedTenant.slug}</span>
+                                                    )}
+                                                </span>
+                                            </span>
+                                            {tenants.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    className={styles.linkButton}
+                                                    onClick={() => pickTenant("")}
+                                                    disabled={isLoading}
+                                                >
+                                                    {t("login.changeStore")}
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
@@ -294,6 +284,8 @@ export default function LoginForm() {
                                     {t("login.createAccount")}
                                 </button>
                             </p>
+
+                            {platformAdminLink}
                         </>
                     )}
                 </div>

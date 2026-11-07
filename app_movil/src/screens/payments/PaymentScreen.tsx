@@ -16,7 +16,7 @@ import { RootStackParamList } from '../../navigation/types';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext';
 import { forgetAttemptsOfOrder } from '../../utils/checkoutAttempts';
-import { paymentsApi } from '../../api/payments.api';
+import { paymentsApi, WalletPaymentOption } from '../../api/payments.api';
 import { ordersApi } from '../../api/orders.api';
 import { Header } from '../../components/Header';
 import { Input } from '../../components/Input';
@@ -32,13 +32,18 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Payment'>;
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { orderId, amount } = route.params;
   const { fetchCart, clearCartLocal } = useCart();
-  const { tenantName, tenantSlug } = useTenant();
+  const { tenantName } = useTenant();
   const { t } = useTranslation();
   const { user } = useAuth();
   const userId = (user as { id?: string } | null)?.id;
   // processing / 3DS: el servidor aún no tiene evidencia del pago. Nunca se muestra como pagado.
   const [isPaymentPending, setIsPaymentPending] = useState<boolean>(false);
   const [simulatedQrEnabled, setSimulatedQrEnabled] = useState<boolean>(false);
+  // Tarjeta: la tienda tiene Stripe Connect habilitado Y la API ofrece la simulación de desarrollo (la app
+  // no tiene SDK de Stripe). null = todavía no se sabe. Sin esto no se ofrece ni se crea el PaymentIntent.
+  const [cardSimulation, setCardSimulation] = useState<boolean | null>(null);
+  // Cuenta de cobro configurada por la tienda; null = la billetera no se ofrece
+  const [walletOption, setWalletOption] = useState<WalletPaymentOption | null>(null);
 
 
   const [currentAmount, setCurrentAmount] = useState<number>(() => {
@@ -46,7 +51,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     return isNaN(val) || val <= 0 ? 0 : val;
   });
   const [selectedMethod, setSelectedMethod] = useState<'stripe' | 'qr' | 'wallet'>('stripe');
-  const [walletProvider, setWalletProvider] = useState<'Airtm' | 'Takenos' | 'Wallbit'>('Airtm');
   const [walletTxId, setWalletTxId] = useState<string>('');
   const [isSubmittingWallet, setIsSubmittingWallet] = useState<boolean>(false);
   const [clientSecret, setClientSecret] = useState<string>('');
@@ -101,8 +105,19 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   useEffect(() => {
     paymentsApi
       .getOptions()
-      .then((options) => setSimulatedQrEnabled(Boolean(options.simulatedQr)))
-      .catch(() => setSimulatedQrEnabled(false));
+      .then((options) => {
+        const card = Boolean(options.card && options.simulatedCard);
+        setSimulatedQrEnabled(Boolean(options.simulatedQr));
+        setWalletOption(options.wallet ?? null);
+        setCardSimulation(card);
+        if (!card) setSelectedMethod(options.wallet ? 'wallet' : 'qr');
+      })
+      .catch(() => {
+        setSimulatedQrEnabled(false);
+        setWalletOption(null);
+        setCardSimulation(false);
+        setSelectedMethod('qr');
+      });
   }, []);
 
   useEffect(() => {
@@ -110,6 +125,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [isSuccess, userId, orderId]);
 
   useEffect(() => {
+    if (cardSimulation === null) return;
     const initPayment = async () => {
       try {
         setIsLoadingIntent(true);
@@ -123,6 +139,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         if (validAmount <= 0) {
           throw new Error('El monto del pedido no es válido para procesar el pago.');
         }
+
+        // Sin tarjeta disponible no se pide un PaymentIntent (la API lo rechazaría de todos modos)
+        if (!cardSimulation) return;
 
         // Reintentar recupera el MISMO PaymentIntent: importe y moneda los fija el servidor
         const res = await paymentsApi.createIntent({
@@ -150,7 +169,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     };
 
     initPayment();
-  }, [orderId, amount]);
+  }, [orderId, amount, cardSimulation]);
 
   const loadQr = useCallback(async () => {
     try {
@@ -167,10 +186,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [orderId]);
 
   useEffect(() => {
-    if (selectedMethod === 'qr' && !qrData && !isLoadingQr) {
+    if (selectedMethod === 'qr' && simulatedQrEnabled && !qrData && !isLoadingQr) {
       loadQr();
     }
-  }, [selectedMethod, qrData, isLoadingQr, loadQr]);
+  }, [selectedMethod, simulatedQrEnabled, qrData, isLoadingQr, loadQr]);
 
   // Polling para QR
   useEffect(() => {
@@ -290,7 +309,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
           <Text style={styles.successDesc}>
             {selectedMethod === 'wallet'
-              ? `Tu comprobante de pago por Bs ${currentAmount.toFixed(2)} mediante ${walletProvider} ha sido registrado. La tienda verificará la transferencia para procesar tu pedido.`
+              ? `Tu comprobante de pago por Bs ${currentAmount.toFixed(2)} mediante ${walletOption?.provider ?? 'billetera digital'} ha sido registrado. La tienda verificará la transferencia para procesar tu pedido.`
               : `Tu pago por un monto de Bs ${currentAmount.toFixed(2)} ha sido procesado satisfactoriamente con ${selectedMethod === 'qr' ? 'código QR' : 'Stripe'}. Tu pedido ya está en preparación.`}
           </Text>
 
@@ -298,7 +317,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Método</Text>
               <Text style={styles.receiptValue}>
-                {selectedMethod === 'wallet' ? `Billetera (${walletProvider})` : selectedMethod === 'qr' ? 'QR Simple' : 'Tarjeta Stripe'}
+                {selectedMethod === 'wallet' ? `Billetera (${walletOption?.provider ?? ''})` : selectedMethod === 'qr' ? 'QR Simple' : 'Tarjeta Stripe'}
               </Text>
             </View>
             <View style={styles.receiptRow}>
@@ -373,6 +392,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* Method Selector Tabs */}
         <View style={styles.methodSelector}>
+          {cardSimulation && (
           <TouchableOpacity
             style={[styles.methodTab, selectedMethod === 'stripe' && styles.methodTabActive]}
             onPress={() => setSelectedMethod('stripe')}
@@ -389,9 +409,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                 selectedMethod === 'stripe' && styles.methodTabTextActive,
               ]}
             >
-              Tarjeta Stripe
+              Tarjeta (simulación)
             </Text>
           </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.methodTab, selectedMethod === 'qr' && styles.methodTabActive]}
@@ -414,6 +435,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             </Text>
           </TouchableOpacity>
 
+          {walletOption && (
           <TouchableOpacity
             style={[styles.methodTab, selectedMethod === 'wallet' && styles.methodTabActive]}
             onPress={() => setSelectedMethod('wallet')}
@@ -433,10 +455,14 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               Billetera P2P
             </Text>
           </TouchableOpacity>
+          )}
         </View>
 
-        {selectedMethod === 'stripe' ? (
+        {selectedMethod === 'stripe' && cardSimulation ? (
           <>
+            <Text style={styles.stripeBadgeText}>
+              Simulación de desarrollo: se usa la tarjeta de prueba de Stripe, no es un cobro real.
+            </Text>
             {/* Credit Card Simulation Card */}
             <View style={styles.creditCard}>
               <View style={styles.cardChipRow}>
@@ -559,37 +585,21 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               />
             )}
           </View>
-        ) : (
+        ) : walletOption ? (
           <View style={styles.walletCard}>
-            <Text style={styles.walletTitle}>Billetera Digital (Airtm, Takenos, Wallbit)</Text>
+            <Text style={styles.walletTitle}>Billetera Digital</Text>
             <Text style={styles.walletSubtitle}>
-              Selecciona tu plataforma, transfiere el monto exacto a nuestra cuenta y registra el ID de la transacción para su aprobación.
+              Transfiere el monto exacto a la cuenta de la tienda y registra el ID de la transacción para su aprobación.
             </Text>
-
-            <View style={styles.providerRow}>
-              {(['Airtm', 'Takenos', 'Wallbit'] as const).map((prov) => (
-                <TouchableOpacity
-                  key={prov}
-                  style={[styles.providerPill, walletProvider === prov && styles.providerPillActive]}
-                  onPress={() => setWalletProvider(prov)}
-                >
-                  <Text style={[styles.providerText, walletProvider === prov && styles.providerTextActive]}>
-                    {prov}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
 
             <View style={styles.accountBox}>
               <View style={styles.accountRow}>
-                <Text style={styles.accountLabel}>Cuenta de Destino ({walletProvider}):</Text>
-                <Text style={styles.accountValue}>
-                  {walletProvider === 'Airtm'
-                    ? `pagos@${tenantSlug || 'tienda'}.com`
-                    : walletProvider === 'Takenos'
-                    ? `@${tenantSlug || 'tienda'}`
-                    : `${tenantSlug || 'tienda'}.wallbit`}
-                </Text>
+                <Text style={styles.accountLabel}>Billetera aceptada:</Text>
+                <Text style={styles.accountValue}>{walletOption.provider}</Text>
+              </View>
+              <View style={styles.accountRow}>
+                <Text style={styles.accountLabel}>Cuenta de Destino:</Text>
+                <Text style={styles.accountValue} selectable>{walletOption.account}</Text>
               </View>
               <View style={styles.accountRow}>
                 <Text style={styles.accountLabel}>Monto a transferir:</Text>
@@ -598,7 +608,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                 </Text>
               </View>
               <Text style={styles.accountNote}>
-                💡 Realiza la transferencia en tu app de {walletProvider} y copia el ID o código de referencia.
+                💡 {walletOption.instructions || 'Realiza la transferencia en tu app de billetera y copia el ID o código de referencia.'}
               </Text>
             </View>
 
@@ -607,7 +617,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                 label="ID de Transacción / Código de Referencia"
                 value={walletTxId}
                 onChangeText={setWalletTxId}
-                placeholder={`Ej. ${walletProvider.toUpperCase()}-849201`}
+                placeholder="Ej. REF-849201"
                 icon="receipt-outline"
               />
 
@@ -622,7 +632,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               />
             </View>
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -694,33 +704,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
     marginBottom: 16,
-  },
-  providerRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  providerPill: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.surfaceSubtle,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  providerPillActive: {
-    backgroundColor: Colors.primaryLight,
-    borderColor: Colors.primary,
-  },
-  providerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  providerTextActive: {
-    color: Colors.primary,
-    fontWeight: '700',
   },
   accountBox: {
     backgroundColor: Colors.surfaceSubtle,

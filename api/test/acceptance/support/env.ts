@@ -39,5 +39,17 @@ export const ACCEPTANCE_ENV: Record<string, string> = {
   TRUST_PROXY_HOPS: '1',
   // Los crons no corren solos durante las pruebas: cada prueba invoca los barridos a mano
   DISABLE_BACKGROUND_JOBS: 'true',
+  // Atajos y proveedores que cambian el resultado de una prueba: apagados por defecto aunque el api/.env
+  // local (p. ej. el de la demo) los active. Cada suite que los necesita los enciende y los restaura.
+  ALLOW_SIMULATED_PAYMENTS: 'false',
+  // Moneda fija para las suites de mecánica de cobro; stripe-connect-destination prueba el valor por defecto
+  PAYMENT_CURRENCY: 'usd',
+  MOBILE_ATTESTATION_DEV_BYPASS: 'false',
+  PLAY_INTEGRITY_PACKAGE_NAME: '',
+  PLAY_INTEGRITY_SERVICE_ACCOUNT_JSON: '',
+  PLAY_INTEGRITY_CERT_SHA256: '',
+  APP_ATTEST_APP_ID: '',
+  APP_ATTEST_ROOT_CA_PEM: '',
+  APP_ATTEST_ALLOW_DEVELOPMENT: 'false',
 };
 for (const [key, value] of Object.entries(ACCEPTANCE_ENV)) process.env[key] = value;

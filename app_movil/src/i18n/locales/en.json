@@ -28,10 +28,11 @@
     "logout": "Log Out",
     "logoutConfirm": "Are you sure you want to log out of your account?",
     "apiModalTitle": "Configure API Server",
-    "apiModalDesc": "Connect to the cloud API (Azure) or set the URL for local development.",
+    "apiModalDesc": "Connect to the server configured for this build or set the URL for local development.",
     "apiUrlLabel": "API Base URL",
-    "cloudServer": "Cloud Server (Azure Production)",
+    "cloudServer": "Configured server (production)",
     "localServer": "Local Server (PC): {{address}}",
+    "urlInvalid": "Invalid URL",
     "urlSaved": "URL Saved",
     "urlSavedBody": "Connecting to: {{url}}",
     "urlRestored": "URL Restored",
@@ -45,5 +46,13 @@
     "storageFailed": "We couldn’t save your purchase on this device, so we didn’t send it. Free up space and try again.",
     "pendingTitle": "Payment processing",
     "pending": "Your payment isn’t confirmed yet. We’ll update your order when the bank responds. There’s no need to pay again."
+  },
+  "mobileAccess": {
+    "noStore": "Choose a store to continue.",
+    "notConfigured": "This version of the app is not set up to verify the device.",
+    "serverNotConfigured": "Mobile app verification is not available yet. You can shop on the web store.",
+    "deviceUnsupported": "We could not verify this device. The app requires a phone that supports Google Play or Apple verification; you can keep shopping on the web store in your browser.",
+    "planNotIncluded": "This store's current plan does not include the mobile app (available on the Pro plan). You can shop on the web store, including from your phone's browser.",
+    "storeUnavailable": "The saved store is no longer available or its current plan does not include the mobile app."
   }
 }

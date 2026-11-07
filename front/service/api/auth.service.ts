@@ -12,38 +12,12 @@ export interface PublicTenant {
     mobileApp?: boolean;
 }
 
-export interface TenantMatchOption {
-    id: string;
-    slug: string;
-    name: string;
-    plan: string;
-    role: string;
+// POST /platform/auth/tenant-login: la tienda se elige antes de autenticar y es la única donde el
+// backend consulta el correo. Los administradores de NovaSoft usan platformAdminService.login.
+export interface TenantLoginResponse {
+    tenant: PublicTenant;
+    auth: AutoResponse;
 }
-
-export type TenantDiscoveryLoginResponse =
-    | {
-          isPlatformAdmin?: false;
-          requiresTenantSelection: false;
-          tenant: PublicTenant;
-          auth: AutoResponse;
-      }
-    | {
-          isPlatformAdmin?: false;
-          requiresTenantSelection: true;
-          tenants: TenantMatchOption[];
-      }
-    | {
-          isPlatformAdmin: true;
-          requiresTenantSelection: false;
-          accessToken: string;
-          expiresIn: number;
-          admin: {
-              id: string;
-              email: string;
-              name: string | null;
-          };
-          redirectUrl: string;
-      };
 
 const tenantHeaderConfig = (tenantId?: string) =>
     tenantId ? { headers: { [TENANT_HEADER]: tenantId } } : undefined;
@@ -57,10 +31,9 @@ export const authService = {
     tenantLogin: async (payload: {
         email: string;
         password: string;
-        tenantId?: string;
-        preferredTenantId?: string;
-    }): Promise<TenantDiscoveryLoginResponse> => {
-        const response = await apiClient.post<{ data: TenantDiscoveryLoginResponse }>(
+        tenantId: string;
+    }): Promise<TenantLoginResponse> => {
+        const response = await apiClient.post<{ data: TenantLoginResponse }>(
             "/platform/auth/tenant-login",
             payload,
         );

@@ -28,10 +28,11 @@
     "logout": "退出登录",
     "logoutConfirm": "确定要退出你的账户吗？",
     "apiModalTitle": "配置 API 服务器",
-    "apiModalDesc": "连接云端 API（Azure），或为本地开发设置 URL。",
+    "apiModalDesc": "连接此版本配置的服务器，或为本地开发设置 URL。",
     "apiUrlLabel": "API 基础 URL",
-    "cloudServer": "云端服务器（Azure 生产环境）",
+    "cloudServer": "已配置的服务器（生产环境）",
     "localServer": "本地服务器（电脑）：{{address}}",
+    "urlInvalid": "URL 无效",
     "urlSaved": "URL 已保存",
     "urlSavedBody": "正在连接：{{url}}",
     "urlRestored": "URL 已恢复",
@@ -45,5 +46,13 @@
     "storageFailed": "无法在此设备上保存您的购买，因此未发送。请释放空间后重试。",
     "pendingTitle": "付款处理中",
     "pending": "您的付款尚未确认。银行回复后我们会更新您的订单，无需再次付款。"
+  },
+  "mobileAccess": {
+    "noStore": "请选择一家店铺以继续。",
+    "notConfigured": "此版本的应用未配置设备验证。",
+    "serverNotConfigured": "移动应用验证暂不可用。您可以在网页商店购物。",
+    "deviceUnsupported": "无法验证此设备。该应用需要支持 Google Play 或 Apple 验证的手机；您可以继续在浏览器中的网页商店购物。",
+    "planNotIncluded": "该店铺当前套餐不包含移动应用（Pro 套餐提供）。您可以在网页商店购物，包括使用手机浏览器。",
+    "storeUnavailable": "已保存的店铺不再可用，或其当前套餐不包含移动应用。"
   }
 }

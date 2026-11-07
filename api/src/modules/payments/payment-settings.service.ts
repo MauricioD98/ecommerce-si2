@@ -1,10 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { simulatedPaymentsEnabled } from '../../common/checkout/checkout-policy';
+import { paymentCurrency, simulatedPaymentsEnabled } from '../../common/checkout/checkout-policy';
 import { UsdtNetwork } from '@prisma/client';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ControlPrismaService } from '../../tenancy/control-prisma.service';
-import { tenantStorage } from '../../tenancy/tenant-context';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { assertPlanFeature, currentPlanFeatures } from '../platform/plans';
 import { StripeConnectService } from './stripe-connect.service';
@@ -59,62 +57,34 @@ export function isValidTxId(network: UsdtNetwork | null, txId: string): boolean 
   return /^(0x)?[a-fA-F0-9]{64}$/.test(txId);
 }
 
+type WalletFields = { walletEnabled?: boolean | null; walletProvider?: string | null; walletAccount?: string | null };
+
+// Billetera con los datos que necesita el cliente para transferir: proveedor y cuenta de cobro
+export function isWalletComplete(s?: WalletFields | null): boolean {
+  return Boolean(s?.walletProvider?.trim() && s.walletAccount?.trim());
+}
+
+// Se ofrece solo si la tienda la activó y está completa (el plan se valida aparte con digitalWallet)
+export function isWalletReady(s?: WalletFields | null): boolean {
+  return Boolean(s?.walletEnabled) && isWalletComplete(s);
+}
+
 @Injectable()
 export class PaymentSettingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly connect: StripeConnectService,
-    private readonly control: ControlPrismaService,
   ) {}
 
-  private async read(tenantId?: string) {
-    let settings = await this.prisma.paymentSettings.findUnique({ where: { id: SETTINGS_ID }, select: SETTINGS_SELECT });
-    const walletAllowed = currentPlanFeatures().digitalWallet;
-
-    if (walletAllowed && (!settings || !settings.walletAccount)) {
-      const resolvedTenantId = tenantId ?? tenantStorage.getStore()?.tenantId;
-      let slug = 'mitienda';
-      if (resolvedTenantId) {
-        try {
-          const tenant = await this.control.tenant.findUnique({
-            where: { id: resolvedTenantId },
-            select: { slug: true },
-          });
-          if (tenant?.slug) slug = tenant.slug;
-        } catch {}
-      }
-
-      const defaultAccount = `@${slug} / pagos@${slug}.com`;
-      const defaultProvider = 'Airtm / Takenos / Wallbit';
-      const defaultInstructions =
-        'Transfiere el monto desde tu cuenta Airtm, Takenos o Wallbit a nuestro usuario/correo. Luego ingresa el ID de transacción o referencia de la transferencia.';
-
-      settings = await this.prisma.paymentSettings.upsert({
-        where: { id: SETTINGS_ID },
-        create: {
-          id: SETTINGS_ID,
-          walletEnabled: true,
-          walletProvider: defaultProvider,
-          walletAccount: defaultAccount,
-          walletInstructions: defaultInstructions,
-        },
-        update: {
-          walletEnabled: settings?.walletEnabled ?? true,
-          walletProvider: settings?.walletProvider || defaultProvider,
-          walletAccount: settings?.walletAccount || defaultAccount,
-          walletInstructions: settings?.walletInstructions || defaultInstructions,
-        },
-        select: SETTINGS_SELECT,
-      });
-    }
-
-    return settings;
+  // Solo lectura: nunca completa ni activa medios por su cuenta. Sin fila = todo desactivado.
+  private read() {
+    return this.prisma.paymentSettings.findUnique({ where: { id: SETTINGS_ID }, select: SETTINGS_SELECT });
   }
 
   /** Panel de la tienda: los medios de cobro y si el plan incluye QR. */
   async getForAdmin(tenantId: string) {
     const [settings, stripe, accountId] = await Promise.all([
-      this.read(tenantId),
+      this.read(),
       this.connect.getStatus(tenantId),
       this.connect.getAccountId(tenantId),
     ]);
@@ -136,7 +106,7 @@ export class PaymentSettingsService {
       wallet: {
         allowed: walletAllowed,
         enabled: walletAllowed ? (settings?.walletEnabled ?? false) : false,
-        provider: settings?.walletProvider ?? 'AIRTM, TAKENOS, WALLBIT',
+        provider: settings?.walletProvider ?? '',
         account: settings?.walletAccount ?? '',
         instructions: settings?.walletInstructions ?? '',
       },
@@ -144,8 +114,8 @@ export class PaymentSettingsService {
   }
 
   /**
-   * Guarda QR, USDT y Billetera Digital. Un medio solo se puede activar completo: QR con imagen (solo Plan Pro),
-   * USDT con red y una dirección válida para esa red.
+   * Guarda QR, USDT y Billetera Digital. Un medio solo se puede activar completo: QR con imagen,
+   * USDT con red y una dirección válida para esa red, billetera con proveedor y cuenta de cobro.
    */
   async update(dto: UpdatePaymentSettingsDto): Promise<void> {
     if (dto.qrEnabled !== undefined || dto.qrInstructions !== undefined) {
@@ -174,8 +144,8 @@ export class PaymentSettingsService {
       walletInstructions: dto.walletInstructions !== undefined ? dto.walletInstructions.trim() || null : current?.walletInstructions ?? null,
     };
 
-    if (next.walletEnabled && !next.walletAccount) {
-      throw new BadRequestException('Debes ingresar la cuenta o alias de cobro para activar la billetera digital');
+    if (next.walletEnabled && !isWalletComplete(next)) {
+      throw new BadRequestException('Debes ingresar la billetera aceptada y la cuenta o alias de cobro para activar la billetera digital');
     }
 
     if (next.qrEnabled && !current?.qrImageType) throw new BadRequestException(i18nMessage('errors.QR_IMAGE_MISSING'));
@@ -221,14 +191,19 @@ export class PaymentSettingsService {
 
   /** Checkout público: solo los medios activos y permitidos por el plan actual de la tienda. */
   async getPublicOptions(tenantId: string) {
-    const [settings, cardEnabled] = await Promise.all([this.read(tenantId), this.connect.isCardEnabled(tenantId)]);
+    const [settings, cardEnabled] = await Promise.all([this.read(), this.connect.isCardEnabled(tenantId)]);
     const qrAllowed = currentPlanFeatures().qrPayments;
     const walletAllowed = currentPlanFeatures().digitalWallet;
     const qrReady = qrAllowed && Boolean(settings?.qrEnabled && settings.qrImageType);
     const usdtReady = Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress);
-    const walletReady = walletAllowed && Boolean(settings?.walletEnabled && settings.walletAccount);
+    const walletReady = walletAllowed && isWalletReady(settings);
     return {
       card: cardEnabled,
+      // Moneda real del cobro con tarjeta: el checkout la compara con la que muestra antes de ofrecerla
+      currency: paymentCurrency(),
+      // Tarjeta de prueba confirmada por el servidor (app móvil sin SDK de Stripe): solo una simulación de
+      // desarrollo, y solo sobre una tienda que ya cobra con Connect
+      simulatedCard: cardEnabled && simulatedPaymentsEnabled(),
       qrAllowed,
       walletAllowed,
       simulatedQr: simulatedPaymentsEnabled(),
@@ -242,7 +217,7 @@ export class PaymentSettingsService {
         : null,
       wallet: walletReady
         ? {
-            provider: settings!.walletProvider ?? 'AIRTM, TAKENOS, WALLBIT',
+            provider: settings!.walletProvider!,
             account: settings!.walletAccount!,
             instructions: settings!.walletInstructions ?? '',
           }

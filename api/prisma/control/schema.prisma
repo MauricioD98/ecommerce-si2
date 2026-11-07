@@ -215,3 +215,37 @@ model ProviderEventInbox {
   @@index([status, nextAttemptAt])
   @@map("provider_event_inbox")
 }
+
+// Desafío de un solo uso para la verificación de integridad de la app móvil oficial (Play Integrity /
+// App Attest). Lo emite POST /auth/mobile/challenge solo si el plan VIGENTE de la tienda incluye
+// mobileApp, queda atado a esa tienda y vence en minutos. Se consume con un UPDATE condicionado
+// (consumed_at IS NULL): una prueba de integridad capturada no sirve para abrir una segunda sesión.
+model MobileAttestationChallenge {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  // 32 bytes aleatorios en base64url. Se guarda en claro: es público (viaja al dispositivo) y el
+  // servidor necesita recomputar el requestHash / clientDataHash que lo liga a la tienda
+  challenge  String    @unique
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("mobile_attestation_challenges")
+}
+
+// Claves de App Attest (iOS) ya atestiguadas. Una por instalación de la app: sirven para cualquier
+// tienda (la tienda va dentro de cada desafío). sign_count solo puede crecer: una aserción repetida
+// (mismo contador) se rechaza.
+model MobileAppAttestKey {
+  keyId       String    @id @map("key_id") // base64 de SHA-256 de la clave pública (lo da el SO)
+  publicKey   String    @map("public_key") // SPKI en PEM
+  signCount   Int       @default(0) @map("sign_count")
+  // "production" o "development" según el aaguid de la atestación
+  environment String
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  lastUsedAt  DateTime? @map("last_used_at")
+
+  @@map("mobile_app_attest_keys")
+}

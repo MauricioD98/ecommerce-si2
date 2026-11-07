@@ -24,7 +24,7 @@ import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
   resetApiBaseUrl,
-  CLOUD_API_URL,
+  CONFIGURED_API_URL,
   LOCAL_DEV_API_URL,
 } from '../../config/env';
 
@@ -71,7 +71,12 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSaveApiUrl = async () => {
     if (!apiUrlInput.trim()) return;
-    await setCustomApiBaseUrl(apiUrlInput.trim());
+    try {
+      await setCustomApiBaseUrl(apiUrlInput.trim());
+    } catch (err) {
+      Alert.alert('URL no válida', getErrorMessage(err));
+      return;
+    }
     const updated = await getApiBaseUrl();
     setCurrentUrlDisplay(updated);
     setShowConfigModal(false);
@@ -205,36 +210,40 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.modalTitle}>Configurar Servidor API</Text>
             </View>
             <Text style={styles.modalDesc}>
-              Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.
+              Conéctate al servidor configurado para esta versión o ajusta la URL para desarrollo local.
             </Text>
 
             <Input
               label="URL Base de la API"
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
-              placeholder={CLOUD_API_URL}
+              placeholder={CONFIGURED_API_URL || 'https://api.example.com/api/v1'}
               autoCapitalize="none"
             />
 
-            <TouchableOpacity
-              style={styles.presetIpBtn}
-              onPress={() => setApiUrlInput(CLOUD_API_URL)}
-            >
-              <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
-              <Text style={styles.presetIpText}>
-                Servidor en la Nube (Azure Producción)
-              </Text>
-            </TouchableOpacity>
+            {CONFIGURED_API_URL ? (
+              <TouchableOpacity
+                style={styles.presetIpBtn}
+                onPress={() => setApiUrlInput(CONFIGURED_API_URL ?? '')}
+              >
+                <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
+                <Text style={styles.presetIpText}>
+                  Servidor configurado (EXPO_PUBLIC_API_URL)
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
-            <TouchableOpacity
-              style={[styles.presetIpBtn, { marginTop: 6 }]}
-              onPress={() => setApiUrlInput(LOCAL_DEV_API_URL)}
-            >
-              <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
-              <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
-                Servidor Local (PC): 192.168.100.240:3001
-              </Text>
-            </TouchableOpacity>
+            {LOCAL_DEV_API_URL ? (
+              <TouchableOpacity
+                style={[styles.presetIpBtn, { marginTop: 6 }]}
+                onPress={() => setApiUrlInput(LOCAL_DEV_API_URL ?? '')}
+              >
+                <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
+                <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
+                  Servidor Local (PC): {LOCAL_DEV_API_URL.replace(/^https?:\/\//, '').replace(/\/api\/v1$/, '')}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.modalButtonsRow}>
               <Button

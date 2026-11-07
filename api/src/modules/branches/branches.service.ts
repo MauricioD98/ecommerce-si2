@@ -6,6 +6,7 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 import { hasAllBranches } from '../../common/utils/permission.util';
 import { currentPlanFeatures } from '../platform/plans';
+import { i18nMessage } from '../../i18n/i18n-message';
 
 @Injectable()
 export class BranchesService {
@@ -17,9 +18,7 @@ export class BranchesService {
       const currentCount = await this.prisma.branch.count();
       if (currentCount >= features.maxBranches) {
         throw new ForbiddenException(
-          `Tu plan ${features.planName} permite crear hasta ${features.maxBranches} ${
-            features.maxBranches === 1 ? 'sucursal' : 'sucursales'
-          }. Actualiza tu plan en Suscripción para agregar más sucursales.`,
+          i18nMessage('errors.PLAN_BRANCH_LIMIT', { plan: features.planName, count: features.maxBranches }),
         );
       }
     }
@@ -100,9 +99,7 @@ export class BranchesService {
         const activeCount = await this.prisma.branch.count({ where: { isActive: true } });
         if (activeCount >= features.maxBranches) {
           throw new ForbiddenException(
-            `Tu plan ${features.planName} permite mantener hasta ${features.maxBranches} ${
-              features.maxBranches === 1 ? 'sucursal activa' : 'sucursales activas'
-            }. Actualiza tu plan en Suscripción.`,
+            i18nMessage('errors.PLAN_ACTIVE_BRANCH_LIMIT', { plan: features.planName, count: features.maxBranches }),
           );
         }
       }

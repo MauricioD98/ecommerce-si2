@@ -14,6 +14,7 @@
   "REGISTER_FAILED": "Une erreur s'est produite lors de l'inscription",
   "USER_NOT_FOUND": "Utilisateur introuvable",
   "INVALID_CREDENTIALS": "E-mail ou mot de passe invalide",
+  "LOGIN_FAILED": "E-mail ou mot de passe incorrect. Si vous avez échoué plusieurs fois, attendez quelques minutes avant de réessayer",
   "TOO_MANY_ATTEMPTS": {
     "one": "Trop de tentatives échouées. Veuillez réessayer dans {count} minute",
     "other": "Trop de tentatives échouées. Veuillez réessayer dans {count} minutes"
@@ -66,5 +67,42 @@
   "PAYMENT_MISMATCH": "Le paiement ne correspond pas à cette commande.",
   "PAYMENT_SIMULATION_DISABLED": "Ce moyen de paiement n’est pas disponible.",
   "INVENTORY_VERSION_CONFLICT": "Le stock a changé depuis votre lecture. Vérifiez la valeur actuelle avant d’ajuster.",
-  "PROVIDER_UNAVAILABLE": "Le prestataire de paiement ne répond pas. Réessayez dans un instant."
+  "PROVIDER_UNAVAILABLE": "Le prestataire de paiement ne répond pas. Réessayez dans un instant.",
+  "MOBILE_APP_NOT_IN_PLAN": "L'offre actuelle de cette boutique n'inclut pas l'application mobile (disponible avec l'offre Pro). Vous pouvez continuer vos achats sur la boutique web, y compris depuis le navigateur de votre téléphone.",
+  "MOBILE_ATTESTATION_REQUIRED": "Par sécurité, l'application doit vérifier à nouveau cet appareil.",
+  "MOBILE_ATTESTATION_INVALID": "Nous n'avons pas pu vérifier qu'il s'agit de l'application officielle sur un appareil sûr.",
+  "MOBILE_ATTESTATION_UNAVAILABLE": "La vérification de l'appareil n'est pas disponible pour le moment. Réessayez plus tard.",
+  "MOBILE_CHANNEL_MISMATCH": "Cette session ne correspond pas à ce canal. Veuillez vous reconnecter.",
+  "PLAN_FEATURE": {
+    "pos": "Le point de vente (POS) est disponible à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "returns": "La gestion des retours et des pertes est disponible à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "multiBranchInventory": "La gestion de l'inventaire multi-boutiques et des remises globales est disponible à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "customDomain": "Le domaine personnalisé est disponible à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "aiReports": "Les rapports avec IA sont disponibles à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "virtualTryOn": "La cabine d'essayage virtuelle est disponible à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "campaigns": "Les campagnes e-mail et les notifications push sont disponibles à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "qrPayments": "Les paiements par QR sont disponibles dans tous les forfaits.",
+    "digitalWallet": "Les paiements par portefeuille numérique (Airtm, Takenos, Wallbit) sont disponibles à partir du forfait {plan}. Mettez à niveau votre forfait dans Abonnement.",
+    "mobileApp": "Cette boutique n'a pas l'application mobile clients activée dans son forfait actuel (disponible à partir du forfait {plan})."
+  },
+  "PLAN_BRANCH_LIMIT": {
+    "one": "Votre forfait {plan} permet de créer jusqu'à {count} boutique. Mettez à niveau votre forfait dans Abonnement pour en ajouter davantage.",
+    "other": "Votre forfait {plan} permet de créer jusqu'à {count} boutiques. Mettez à niveau votre forfait dans Abonnement pour en ajouter davantage."
+  },
+  "PLAN_ACTIVE_BRANCH_LIMIT": {
+    "one": "Votre forfait {plan} permet de conserver jusqu'à {count} boutique active. Mettez à niveau votre forfait dans Abonnement.",
+    "other": "Votre forfait {plan} permet de conserver jusqu'à {count} boutiques actives. Mettez à niveau votre forfait dans Abonnement."
+  },
+  "PLAN_PRODUCT_LIMIT": {
+    "one": "Votre forfait {plan} permet jusqu'à {count} produit actif. Passez au forfait {upgradePlan} ou supérieur pour des produits illimités.",
+    "other": "Votre forfait {plan} permet jusqu'à {count} produits actifs. Passez au forfait {upgradePlan} ou supérieur pour des produits illimités."
+  },
+  "PLAN_STORE_MOBILE_APP": "La boutique « {store} » n'a pas l'application mobile activée dans son forfait actuel ({currentPlan}). Disponible à partir du forfait {plan}.",
+  "PLAN_STORE_CUSTOM_DOMAIN": "Le forfait actuel de la boutique ({currentPlan}) n'inclut pas de domaine personnalisé. Le forfait {plan} ou supérieur est requis.",
+  "PLAN_SIGNUP_CUSTOM_DOMAIN": "Le domaine personnalisé est disponible à partir du forfait {plan}.",
+  "PROFILE_CONFLICT": "Votre profil a été modifié sur un autre appareil pendant que vous étiez hors ligne. Vérifiez les modifications avant de les enregistrer.",
+  "PROFILE_SYNC_EMPTY": "Aucune modification du profil à synchroniser.",
+  "PROFILE_SYNC_EXPECTED_MISSING": "La valeur précédente du champ {field} est manquante : impossible de synchroniser sans vérifier qu'elle n'a pas changé.",
+  "PROFILE_SYNC_CHANGE_REUSED": "Cette modification appartient à un autre compte.",
+  "PROFILE_FIRST_NAME_REQUIRED": "Le prénom est obligatoire."
 }

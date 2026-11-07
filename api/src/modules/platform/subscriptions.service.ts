@@ -17,7 +17,7 @@ import { withTenantParam } from '../../tenancy/tenant-context';
 import { MailService } from '../mail/mail.service';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
-import { PLANS, type PlanKey, getPlanFeatures, missingBillingEnv, planForPrice, priceIdFor } from './plans';
+import { PLANS, type PlanKey, getPlanFeatures, minimumPlanName, missingBillingEnv, planForPrice, priceIdFor } from './plans';
 
 // metadata.kind distingue estas sesiones de cualquier otro Checkout de la misma cuenta de Stripe
 const SIGNUP_KIND = 'tenant_signup';
@@ -75,7 +75,9 @@ export class SubscriptionsService implements OnModuleInit {
     const planFeatures = getPlanFeatures(dto.plan);
     const normalizedDomain = planFeatures.customDomain ? (dto.domain ?? null) : null;
     if (dto.domain && !planFeatures.customDomain) {
-      throw new BadRequestException('El dominio propio está disponible desde el plan Growth.');
+      throw new BadRequestException(
+        i18nMessage('errors.PLAN_SIGNUP_CUSTOM_DOMAIN', { plan: minimumPlanName((plan) => plan.customDomain) }),
+      );
     }
 
     // Se valida ANTES de cobrar: después del pago ya no se le puede decir "ese email está tomado"

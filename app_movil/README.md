@@ -61,12 +61,45 @@ Puedes ingresar rápidamente con cualquiera de las cuentas ya existentes en tu b
 
 ## ⚙️ Configuración del Servidor API
 
-Por defecto, la app detecta automáticamente el entorno:
-- **Android Emulator**: `http://10.0.2.2:3001/api/v1`
-- **Web / iOS Simulator**: `http://localhost:3001/api/v1`
-- **Dispositivo físico (Expo Go)**: `http://TU_IP_LOCAL:3001/api/v1` (ej. `http://192.168.1.50:3001/api/v1`)
+La URL base sale de `EXPO_PUBLIC_API_URL` (ver `.env.example`). Siempre termina en `/api/v1`
+(prefijo global de la API): si no lo pones la app lo agrega y nunca lo duplica. Los endpoints se
+concatenan como `/auth/login`, `/products`, etc. Lógica en `src/config/env.ts` y `src/config/apiUrl.js`.
 
-> 💡 **Nota**: Puedes cambiar o restaurar la URL de la API en cualquier momento haciendo clic en **"Servidor: [URL]"** en la parte inferior del Login o desde la pestaña de **Perfil**.
+### Desarrollo (`npx expo start`)
+`EXPO_PUBLIC_API_URL` es opcional. Sin ella la app elige sola:
+
+| Dónde corre la app | URL usada | Notas |
+|---|---|---|
+| Dispositivo físico (Expo Go) | `http://<IP de la PC que muestra Metro>:3001/api/v1` | Misma Wi-Fi; permite el puerto 3001 en el firewall |
+| Emulador Android | `http://10.0.2.2:3001/api/v1` | `10.0.2.2` es la PC anfitriona; `localhost` sería el emulador |
+| Simulador iOS / web | `http://localhost:3001/api/v1` | |
+
+Para forzar otra dirección, crea `.env.local` con `EXPO_PUBLIC_API_URL=http://192.168.1.50:3001/api/v1`
+y reinicia con `npx expo start -c` (las variables se embeben al empaquetar).
+
+> 💡 En desarrollo puedes cambiar o restaurar la URL desde **"Servidor: [URL]"** en el Login o desde
+> **Perfil**. En un build de producción esa opción solo acepta URLs `https` públicas.
+
+### Producción (`npx expo export`, EAS `preview` / `production`)
+`EXPO_PUBLIC_API_URL` es **obligatoria**, con `https` y dominio público. `app.config.js` detiene el
+build si falta, si el formato es inválido o si apunta a `localhost` / una IP privada. Si aun así un
+build llegara sin URL, la app no cae en una IP de desarrollo: las peticiones fallan con un mensaje claro.
+
+```bash
+# local: .env.production (no se versiona)
+EXPO_PUBLIC_API_URL=https://api.example.com/api/v1   # ← ejemplo, reemplázalo por tu API real
+
+# EAS (no hace falta subir .env): crear la variable en el entorno del perfil
+eas env:create --environment production --name EXPO_PUBLIC_API_URL --value https://<tu-api>/api/v1 --visibility plaintext
+```
+
+Perfiles en `eas.json`: `development` (dev client, API local; requiere instalar `expo-dev-client`
+antes de usarlo), `preview` (APK interno, exige URL pública) y `production`. Cada uno fija
+`APP_ENV`, que es lo que lee la validación.
+
+> ⚠️ Todo `EXPO_PUBLIC_*` queda embebido en la app y es público: nunca guardes secretos ahí.
+
+Pruebas del validador: `npm run test:config`.
 
 ---
 

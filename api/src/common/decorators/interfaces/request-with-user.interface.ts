@@ -12,6 +12,8 @@ export interface AuthUser {
   branchId: string | null;
   // Tienda que emitió el token; JwtStrategy garantiza que coincide con req.tenant
   tenantId: string;
+  // "mobile" solo si el token lo emitió el canal móvil (plan con app + prueba de integridad)
+  channel?: 'web' | 'mobile';
 }
 
 export interface RequestWithUser extends Request {

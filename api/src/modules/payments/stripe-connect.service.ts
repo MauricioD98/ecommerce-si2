@@ -15,9 +15,8 @@ export interface PayoutAccount {
  * tienda, así que los fondos se liquidan en la cuenta bancaria de la tienda y la plataforma solo
  * retiene application_fee_amount.
  *
- * En entorno de pruebas (STRIPE_SECRET_KEY = sk_test_*), si una tienda todavía no vinculó una cuenta
- * Stripe Connect Express propia, se permite cobrar directamente con la cuenta test de la plataforma
- * para que todas las tiendas nuevas puedan procesar pagos con tarjeta desde el primer momento.
+ * Sin cuenta conectada Y habilitada no hay tarjeta, con cualquier clave (sk_test_ o sk_live_) y para
+ * cualquier tienda, la legacy incluida: nunca se cobra a la cuenta central como alternativa.
  */
 @Injectable()
 export class StripeConnectService {
@@ -25,14 +24,6 @@ export class StripeConnectService {
   private readonly stripe = createStripeClient();
 
   constructor(private readonly control: ControlPrismaService) {}
-
-  private isDirectPlatformFallbackAllowed(tenantId: string): boolean {
-    const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) return false;
-    if (key.startsWith('sk_test_')) return true;
-    const legacyId = process.env.LEGACY_TENANT_ID;
-    return Boolean(legacyId && tenantId === legacyId);
-  }
 
   /** Cuenta destino para cobrar en nombre de la tienda; null si no tiene Connect activo. */
   async getPayoutAccountOrNull(tenantId: string): Promise<PayoutAccount | null> {
@@ -67,18 +58,19 @@ export class StripeConnectService {
 
     let accountId = tenant.stripeAccountId;
     if (!accountId) {
-      const account = await this.stripe.accounts.create(
-        {
-          type: 'express',
-          metadata: { tenantId },
-          business_profile: { name: tenant.name },
-          capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-        },
-        // Dos clicks seguidos en "Configurar pagos" no crean dos cuentas
-        { idempotencyKey: `connect-account-${tenantId}` },
-      );
-      accountId = account.id;
-      await this.control.tenant.update({ where: { id: tenantId }, data: { stripeAccountId: accountId } });
+      accountId = await this.createExpressAccount(tenantId, tenant.name);
+      // Condicional: si otra petición ya vinculó una cuenta, se respeta esa y no se pisa
+      const { count } = await this.control.tenant.updateMany({
+        where: { id: tenantId, stripeAccountId: null },
+        data: { stripeAccountId: accountId },
+      });
+      if (count === 0) {
+        const current = await this.control.tenant.findUnique({ where: { id: tenantId }, select: { stripeAccountId: true } });
+        if (current?.stripeAccountId && current.stripeAccountId !== accountId) {
+          this.logger.warn(`Tienda ${tenantId}: ya tenía otra cuenta conectada; la recién creada queda sin usar`);
+          accountId = current.stripeAccountId;
+        }
+      }
     }
 
     const link = await this.stripe.accountLinks.create({
@@ -88,6 +80,29 @@ export class StripeConnectService {
       refresh_url: refreshUrl,
     });
     return { url: link.url };
+  }
+
+  // Dos clicks seguidos en "Configurar pagos" no crean dos cuentas: misma clave idempotente. Pero Stripe
+  // también guarda (24 h) la respuesta de un intento FALLIDO con esa clave, p. ej. "Connect no activado":
+  // corregida la causa, cada reintento recibía el mismo error. Si Stripe repite un error guardado (4xx,
+  // cabecera Idempotent-Replayed), se reintenta una vez con una clave nueva, estable durante el minuto
+  // para que los clicks simultáneos sigan compartiéndola.
+  private async createExpressAccount(tenantId: string, name: string): Promise<string> {
+    const params: Stripe.AccountCreateParams = {
+      type: 'express',
+      metadata: { tenantId },
+      business_profile: { name },
+      capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+    };
+    try {
+      return (await this.stripe.accounts.create(params, { idempotencyKey: `connect-account-${tenantId}` })).id;
+    } catch (error) {
+      const replayed = error instanceof Stripe.errors.StripeError && error.headers?.['idempotent-replayed'] === 'true';
+      if (!replayed || (error.statusCode ?? 500) >= 500) throw error;
+      this.logger.warn(`Tienda ${tenantId}: Stripe repitió un error guardado del onboarding; se reintenta con otra clave`);
+      const retryKey = `connect-account-${tenantId}-r${Math.floor(Date.now() / 60_000)}`;
+      return (await this.stripe.accounts.create(params, { idempotencyKey: retryKey })).id;
+    }
   }
 
   /**
@@ -101,9 +116,6 @@ export class StripeConnectService {
     });
     if (!tenant) throw new NotFoundException('Tienda no encontrada');
     if (!tenant.stripeAccountId) {
-      if (this.isDirectPlatformFallbackAllowed(tenantId)) {
-        return { connected: true, chargesEnabled: true, detailsSubmitted: true, pendingRequirements: 0 };
-      }
       return { connected: false, chargesEnabled: false, detailsSubmitted: false, pendingRequirements: 0 };
     }
 
@@ -124,7 +136,7 @@ export class StripeConnectService {
   }
 
   /**
-   * Desvincula la cuenta conectada: la tienda deja de cobrar con tarjeta (salvo fallback sk_test_).
+   * Desvincula la cuenta conectada: la tienda deja de cobrar con tarjeta.
    */
   async disconnect(tenantId: string): Promise<void> {
     const { count } = await this.control.tenant.updateMany({
@@ -140,19 +152,9 @@ export class StripeConnectService {
     return tenant?.stripeAccountId ?? null;
   }
 
-  /** Para el checkout de la tienda: ofrece tarjeta si tiene Connect activo o fallback de prueba/legacy. */
+  /** Para el checkout de la tienda: tarjeta solo con la misma condición que exige createPaymentIntent. */
   async isCardEnabled(tenantId: string): Promise<boolean> {
-    const tenant = await this.control.tenant.findUnique({
-      where: { id: tenantId },
-      select: { stripeAccountId: true, stripeChargesEnabled: true },
-    });
-    if (tenant?.stripeAccountId && tenant.stripeChargesEnabled) {
-      return true;
-    }
-    if (!tenant?.stripeAccountId && this.isDirectPlatformFallbackAllowed(tenantId)) {
-      return true;
-    }
-    return false;
+    return (await this.getPayoutAccountOrNull(tenantId)) !== null;
   }
 
   /** account.updated: Stripe avisa cuando la tienda completa (o pierde) la verificación. */
@@ -171,12 +173,18 @@ export class StripeConnectService {
     const tenantId = pi.metadata?.tenantId;
     if (!tenantId) return this.resolveLegacyTenant(pi);
 
-    if (!pi.transfer_data && this.isDirectPlatformFallbackAllowed(tenantId)) {
+    // PaymentIntents ya creados sin destino (cobro a la cuenta central, el comportamiento anterior con
+    // sk_test_ o con la tienda legacy): ya no se crean, pero un cliente pudo haberlos pagado y su evento
+    // tiene que seguir llegando a su tienda. reconcileIntent lo valida contra el intento durable (que
+    // tampoco tiene destino) y deja una anomalía para transferirle el importe a la tienda.
+    if (!pi.transfer_data) {
       const tenant = await this.control.tenant.findUnique({
         where: { id: tenantId },
         select: { id: true, schemaName: true },
       });
-      if (tenant) return { tenantId: tenant.id, schemaName: tenant.schemaName };
+      if (!tenant) return null;
+      this.logger.warn(`PaymentIntent ${pi.id} sin destino Connect (tienda ${tenantId}): cobrado en la cuenta central`);
+      return { tenantId: tenant.id, schemaName: tenant.schemaName };
     }
 
     const tenant = await this.control.tenant.findUnique({

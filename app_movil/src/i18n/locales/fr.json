@@ -28,10 +28,11 @@
     "logout": "Se déconnecter",
     "logoutConfirm": "Voulez-vous vraiment vous déconnecter de votre compte ?",
     "apiModalTitle": "Configurer le serveur API",
-    "apiModalDesc": "Connectez-vous à l'API dans le cloud (Azure) ou réglez l'URL pour le développement local.",
+    "apiModalDesc": "Connectez-vous au serveur configuré pour cette version ou réglez l'URL pour le développement local.",
     "apiUrlLabel": "URL de base de l'API",
-    "cloudServer": "Serveur cloud (Azure Production)",
+    "cloudServer": "Serveur configuré (production)",
     "localServer": "Serveur local (PC) : {{address}}",
+    "urlInvalid": "URL invalide",
     "urlSaved": "URL enregistrée",
     "urlSavedBody": "Connexion à : {{url}}",
     "urlRestored": "URL restaurée",
@@ -45,5 +46,13 @@
     "storageFailed": "Impossible d’enregistrer votre achat sur cet appareil, il n’a donc pas été envoyé. Libérez de l’espace et réessayez.",
     "pendingTitle": "Paiement en cours",
     "pending": "Votre paiement n’est pas encore confirmé. Nous mettrons à jour votre commande dès la réponse de la banque. Inutile de payer à nouveau."
+  },
+  "mobileAccess": {
+    "noStore": "Choisissez une boutique pour continuer.",
+    "notConfigured": "Cette version de l'application n'est pas configurée pour vérifier l'appareil.",
+    "serverNotConfigured": "La vérification de l'application mobile n'est pas encore disponible. Vous pouvez acheter sur la boutique web.",
+    "deviceUnsupported": "Nous n'avons pas pu vérifier cet appareil. L'application nécessite un téléphone compatible avec la vérification Google Play ou Apple ; vous pouvez continuer vos achats sur la boutique web dans votre navigateur.",
+    "planNotIncluded": "L'offre actuelle de cette boutique n'inclut pas l'application mobile (disponible avec l'offre Pro). Vous pouvez acheter sur la boutique web, y compris depuis le navigateur de votre téléphone.",
+    "storeUnavailable": "La boutique enregistrée n'est plus disponible ou son offre actuelle n'inclut pas l'application mobile."
   }
 }

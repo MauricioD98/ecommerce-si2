@@ -4,6 +4,8 @@ import { authService } from "./auth.service";
 import { setTokens, clearAuth } from "@/store/slices/authSlices";
 import { TENANT_HEADER, TENANT_REQUIRED, getCurrentTenantId, requestTenantSelection } from "@/utils/tenant";
 import { getClientLocale } from "@/i18n/client";
+import { clearProfileSnapshots } from "@/utils/offlineProfile";
+import { clearOrdersCache } from "@/utils/offlineOrders";
 import { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 
 const isPlatformRequest = (url?: string) => Boolean(url?.startsWith("/platform/"));
@@ -82,10 +84,14 @@ function forceLogout(): void {
     store.dispatch(clearAuth());
     if (typeof window === "undefined") return;
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_USER_CACHE" });
-    // Si ya estamos en el login, redirigir de nuevo solo recargaría la página y repetiría el 401
-    if (!window.location.pathname.startsWith("/auth/login")) {
-        window.location.href = "/auth/login";
-    }
+    // Copia local del perfil fuera; el cambio pendiente queda para cuando vuelva a entrar la misma cuenta.
+    // Se navega después de borrarla: salir de la página podría cortar la transacción de IndexedDB.
+    void Promise.all([clearProfileSnapshots(), clearOrdersCache()]).finally(() => {
+        // Si ya estamos en el login, redirigir de nuevo solo recargaría la página y repetiría el 401
+        if (!window.location.pathname.startsWith("/auth/login")) {
+            window.location.href = "/auth/login";
+        }
+    });
 }
 
 apiClient.interceptors.request.use(

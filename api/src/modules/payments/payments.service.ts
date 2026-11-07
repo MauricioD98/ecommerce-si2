@@ -60,13 +60,11 @@ export class PaymentsService {
   }> {
     const { orderId } = createPaymentIntentDto;
     const { tenantId } = requireTenant();
-    const legacyId = process.env.LEGACY_TENANT_ID;
-    const isLegacy = Boolean(legacyId && tenantId === legacyId);
-    const isTestKey = Boolean(process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'));
-    const payout = await this.stripeConnect.getPayoutAccountOrNull(tenantId);
-    if (!payout && !isLegacy && !isTestKey) {
-      throw new BadRequestException('Esta tienda todavía no tiene habilitados los pagos con tarjeta');
-    }
+    // Stripe Connect (destination charge): los fondos van a la cuenta conectada y habilitada de ESTA
+    // tienda y la plataforma retiene solo su comisión. Sin ella responde 400, con cualquier clave
+    // (sk_test_ incluida) y para cualquier tienda: nunca se cobra a la cuenta central como alternativa.
+    const payout = await this.stripeConnect.getPayoutAccount(tenantId);
+    await this.retireAttemptWithOtherDestination(orderId, userId, payout.accountId);
 
     for (let round = 0; round < 3; round += 1) {
       const { attempt, payment } = await withTxRetry(() =>
@@ -79,6 +77,8 @@ export class PaymentsService {
           let current = await tx.paymentAttempt.findFirst({
             where: { orderId, status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] } },
           });
+          // Otra petición abrió un intento con otro destino mientras se retiraba el anterior: no se reusa
+          if (current && current.destinationAccount !== payout.accountId) throw new CheckoutException(CheckoutCode.ATTEMPT_IN_PROGRESS);
           if (!current) {
             // El monto SIEMPRE se calcula desde la orden guardada: nunca se confía en el cliente
             const currency = paymentCurrency();
@@ -93,8 +93,8 @@ export class PaymentsService {
                 attemptNumber,
                 amountMinor,
                 currency,
-                destinationAccount: payout?.accountId ?? null,
-                feeAmountMinor: payout ? this.stripeConnect.feeFor(amountMinor, payout.feeBps) : null,
+                destinationAccount: payout.accountId,
+                feeAmountMinor: this.stripeConnect.feeFor(amountMinor, payout.feeBps) ?? null,
                 idempotencyKey: `sf-pi-${tenantId}-${orderId}-${id}`,
               },
             });
@@ -165,6 +165,31 @@ export class PaymentsService {
     }
   }
 
+  // Un intento abierto con otro destino no se reutiliza: su client_secret cobraría fuera de la cuenta
+  // conectada de la tienda. Pasa con los intentos creados sin Connect por el comportamiento anterior
+  // (sk_test_ o tienda legacy), con los heredados del backfill y si la tienda cambió de cuenta. Se retira
+  // con la misma lógica que antes de liberar una orden: si el cliente ya pagó se concilia, si es
+  // incierto no se toca, y solo si no hay dinero en juego se cancela y se abre uno nuevo.
+  private async retireAttemptWithOtherDestination(orderId: string, userId: string, accountId: string): Promise<void> {
+    const stale = await this.prisma.paymentAttempt.findFirst({
+      where: {
+        orderId,
+        userId,
+        status: { in: [PaymentAttemptStatus.CREATED, PaymentAttemptStatus.OPEN] },
+        OR: [{ destinationAccount: null }, { destinationAccount: { not: accountId } }],
+      },
+    });
+    if (!stale) return;
+    const outcome = await this.resolveProviderBeforeRelease(orderId);
+    if (outcome === 'PAID') throw new CheckoutException(CheckoutCode.ORDER_ALREADY_PAID);
+    if (outcome === 'HOLD') throw new CheckoutException(CheckoutCode.PAYMENT_PENDING, HttpStatus.CONFLICT);
+    await this.prisma.paymentAttempt.updateMany({
+      where: { id: stale.id, status: PaymentAttemptStatus.OPEN },
+      data: { status: PaymentAttemptStatus.CANCELED, providerStatus: 'canceled' },
+    });
+    this.logger.warn(`Intento ${stale.id} retirado: su destino (${stale.destinationAccount ?? 'cuenta central'}) no es la cuenta de la tienda`);
+  }
+
   // Recupera el PaymentIntent del intento durable o lo crea. 'RETRY' = este intento ya terminó: hace falta otro.
   private async obtainIntent(attempt: {
     id: string;
@@ -203,6 +228,22 @@ export class PaymentsService {
       return 'RETRY';
     }
 
+    // Defensa en profundidad: con un intento sin destino (anterior a esta corrección) nunca se crea un
+    // cobro a la cuenta central. Si Stripe ya lo había creado se recupera; si no, el intento se abandona.
+    const destination = attempt.destinationAccount;
+    if (!destination) {
+      const found = await this.callProvider(() => this.gateway.findByAttempt(attempt.id));
+      if (found) {
+        await this.linkIntent(attempt.id, found);
+        return found;
+      }
+      await this.prisma.paymentAttempt.updateMany({
+        where: { id: attempt.id, status: PaymentAttemptStatus.CREATED },
+        data: { status: PaymentAttemptStatus.ABANDONED },
+      });
+      return 'RETRY';
+    }
+
     const { tenantId } = requireTenant();
     const intent = await this.callProvider(() =>
       this.gateway.createPaymentIntent(
@@ -213,8 +254,8 @@ export class PaymentsService {
           metadata: { orderId: attempt.orderId, userId: attempt.userId, tenantId, attemptId: attempt.id },
           automatic_payment_methods: { enabled: true },
           // La tienda figura como comerciante (extracto bancario del cliente, disputas, liquidación)
-          on_behalf_of: attempt.destinationAccount ?? undefined,
-          transfer_data: attempt.destinationAccount ? { destination: attempt.destinationAccount } : undefined,
+          on_behalf_of: destination,
+          transfer_data: { destination },
           application_fee_amount: attempt.feeAmountMinor ?? undefined,
         },
         attempt.idempotencyKey,
@@ -262,7 +303,7 @@ export class PaymentsService {
   async confirmPayment(
     userId: string,
     confirmPaymentDto: ConfirmPaymentDto,
-  ): Promise<{ success: boolean; data: PaymentResponseDto; message: string }> {
+  ): Promise<{ success: boolean; data: PaymentResponseDto; message: string; simulated?: true }> {
     const { paymentIntentId, orderId } = confirmPaymentDto;
 
     const order = await this.prisma.order.findFirst({ where: { id: orderId, userId }, select: { id: true } });
@@ -279,8 +320,15 @@ export class PaymentsService {
 
     const attempt = await this.prisma.paymentAttempt.findFirst({ where: { orderId, userId, stripePaymentIntentId: paymentIntentId } });
     let intent = await this.callProvider(() => this.gateway.retrieve(paymentIntentId));
-    // Demostración sin SDK nativo (app móvil): nunca en producción, ver simulatedPaymentsEnabled()
-    if (attempt && intent.status === 'requires_payment_method' && (simulatedPaymentsEnabled() || process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'))) {
+    // Demostración sin SDK nativo (app móvil): pagar con la tarjeta de prueba de Stripe es una SIMULACIÓN y
+    // pasa por la única puerta de simulatedPaymentsEnabled() (opt-in explícito, fuera de producción). Una
+    // clave sk_test_ sola no alcanza: no dice que el cliente haya pagado nada.
+    // El PaymentIntent es el del flujo normal (destino y comisión de la tienda ya fijados): la simulación
+    // solo reemplaza la tarjeta del cliente y la respuesta lo dice (simulated: true).
+    let simulated = false;
+    if (attempt && intent.status === 'requires_payment_method' && simulatedPaymentsEnabled()) {
+      simulated = true;
+      this.logger.warn(`SIMULACIÓN de desarrollo: PaymentIntent ${paymentIntentId} confirmado con la tarjeta de prueba pm_card_visa`);
       const publicUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
       intent = await this.callProvider(() =>
         this.gateway.client.paymentIntents.confirm(paymentIntentId, {
@@ -311,6 +359,14 @@ export class PaymentsService {
     }
 
     const payment = await this.prisma.payment.findFirstOrThrow({ where: { orderId, userId } });
+    if (simulated) {
+      return {
+        success: true,
+        data: this.mapToPaymentResponse(payment),
+        message: 'Simulated payment with the Stripe test card (development only, not a real charge)',
+        simulated: true,
+      };
+    }
     return { success: true, data: this.mapToPaymentResponse(payment), message: 'Payment confirmed successfully' };
   }
 
@@ -342,6 +398,7 @@ export class PaymentsService {
     if (intent.livemode !== this.gateway.livemode) problems.push('mode');
     const destination = typeof intent.transfer_data?.destination === 'string' ? intent.transfer_data.destination : intent.transfer_data?.destination?.id;
     if (attempt.destinationAccount && destination !== attempt.destinationAccount) problems.push('destination');
+    if (!isLegacy && !attempt.destinationAccount && destination) problems.push('destination');
     if (problems.length > 0) {
       await this.auditMismatch(intent, 'INTENT_VALIDATION_FAILED', { attemptId: attempt.id, problems });
       return 'MISMATCH';
@@ -358,6 +415,17 @@ export class PaymentsService {
         paymentIntentId: intent.id,
         amountMinor: intent.amount,
       });
+      // Cobro anterior a esta corrección, hecho sin Connect: el pedido está pagado, pero el dinero quedó
+      // en la cuenta central y hay que transferírselo a la tienda a mano
+      if (!destination && !isLegacy) {
+        await this.settlement.recordIssue(
+          this.prisma,
+          'PAYMENT_WITHOUT_DESTINATION',
+          `no-destination:${intent.id}`,
+          { paymentIntentId: intent.id, orderId: attempt.orderId, tenantId, amount: intent.amount, currency: intent.currency },
+          'ERROR',
+        );
+      }
       return outcome === 'COMPENSATION' ? 'COMPENSATION' : 'SETTLED';
     }
 

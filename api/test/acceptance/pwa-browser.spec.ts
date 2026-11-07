@@ -52,9 +52,11 @@ describe('PWA en navegador real', { skip: !PLAYWRIGHT || !FRONT_DIR }, () => {
     return { context, page };
   };
 
-  // Desde un recurso sin la app: en una página viva, redux-persist volvería a escribir su propio estado encima
+  // Desde un recurso sin la app: en una página viva, redux-persist volvería a escribir su propio estado encima.
+  // No /favicon.ico: con context.route activo, Playwright aborta toda petición a */favicon.ico (ERR_ABORTED).
+  const NEUTRAL_PAGE = `${FRONT}/file.svg`;
   const signIn = async (page: any, state: string, tenantId = tenant) => {
-    await page.goto(`${FRONT}/favicon.ico`);
+    await page.goto(NEUTRAL_PAGE);
     await page.evaluate(
       ([k, v, t]: string[]) => {
         localStorage.setItem('sf_tenant_id', t);
@@ -114,7 +116,9 @@ describe('PWA en navegador real', { skip: !PLAYWRIGHT || !FRONT_DIR }, () => {
     stripe = new FakeStripe();
     const stripeBase = await stripe.start();
     fx = await seedTenant(schema);
-    replica = await spawnReplica(API_PORT, { STRIPE_API_BASE: stripeBase, ALLOWED_ORIGINS: FRONT });
+    // El front muestra Bs y solo ofrece tarjeta si la API cobra en "bob" (CheckoutClient): support/env.ts fija
+    // "usd" para las suites de mecánica de cobro, pero aquí se prueba el front real con la moneda de producción.
+    replica = await spawnReplica(API_PORT, { STRIPE_API_BASE: stripeBase, ALLOWED_ORIGINS: FRONT, PAYMENT_CURRENCY: 'bob' });
     const nextBin = join(FRONT_DIR!, 'node_modules', 'next', 'dist', 'bin', 'next');
     front = spawn(process.execPath, [nextBin, 'start', '-p', String(FRONT_PORT)], {
       cwd: FRONT_DIR!,
@@ -363,7 +367,7 @@ describe('PWA en navegador real', { skip: !PLAYWRIGHT || !FRONT_DIR }, () => {
     const productId = await createProduct(schema, fx, { [fx.branchA]: { M: 5 } });
     const { context, page } = await openContext();
     // Sin la app cargada: ella crearía la base en la versión nueva antes de sembrar la vieja
-    await page.goto(`${FRONT}/favicon.ico`);
+    await page.goto(NEUTRAL_PAGE);
     await page.evaluate(
       ([name, pid]: string[]) =>
         new Promise<void>((resolve, reject) => {

@@ -7,6 +7,7 @@ import { useSelector } from 'react-redux';
 import type { IRootState } from '@/store';
 import { useCheckoutRecovery } from '@/hooks/useCheckoutRecovery';
 import { useOfflineInventorySync } from '@/hooks/useOfflineInventorySync';
+import { useProfileSyncRunner } from '@/hooks/useProfileSync';
 import { SW_UPDATE_EVENT, applyServiceWorkerUpdate, useRegisterServiceWorker } from '@/hooks/useRegisterServiceWorker';
 import { getOrderDrafts } from '@/utils/offlineOrderQueue';
 import styles from './offline-sync.module.scss';
@@ -17,6 +18,8 @@ import styles from './offline-sync.module.scss';
 export default function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
     useRegisterServiceWorker();
     useOfflineInventorySync();
+    // Cambios de perfil hechos sin conexión: se envían solos al volver la red (los borradores de compra no)
+    useProfileSyncRunner();
     const { inDoubt, recoverNow } = useCheckoutRecovery();
     const t = useTranslations('Offline');
     const userId = useSelector((state: IRootState) => state.auth.user?.id ?? null);

@@ -34,7 +34,10 @@ export interface PaymentSettingsUpdate {
 }
 
 export interface PaymentOptions {
+    // La tienda cobra con su cuenta Stripe Connect habilitada
     card: boolean;
+    // Moneda real del cobro con tarjeta (ISO en minúsculas); los precios se muestran en Bs ("bob")
+    currency?: string;
     qrAllowed?: boolean;
     walletAllowed?: boolean;
     simulatedQr?: boolean;

@@ -866,3 +866,15 @@ model OperationalIssue {
   @@index([type, resolvedAt])
   @@map("operational_issues")
 }
+
+// Cambios de perfil hechos sin conexión (PWA) que ya se aplicaron. El cliente reenvía el mismo changeId
+// si no vio la respuesta: con el recibo, el reintento confirma sin volver a escribir y nunca pisa lo que
+// otro dispositivo cambió después. Sin FK a users: el recibo no debe impedir borrar la cuenta.
+model ProfileSyncReceipt {
+  changeId  String   @id
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("profile_sync_receipts")
+}

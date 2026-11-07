@@ -20,11 +20,12 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { LanguageSelector } from '../../components/LanguageSelector';
 import { Colors, Shadows } from '../../theme/colors';
+import { getErrorMessage } from '../../api/client';
 import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
   resetApiBaseUrl,
-  CLOUD_API_URL,
+  CONFIGURED_API_URL,
   LOCAL_DEV_API_URL,
 } from '../../config/env';
 
@@ -83,7 +84,12 @@ export const ProfileScreen: React.FC = () => {
 
   const handleSaveApiUrl = async () => {
     if (!apiUrlInput.trim()) return;
-    await setCustomApiBaseUrl(apiUrlInput.trim());
+    try {
+      await setCustomApiBaseUrl(apiUrlInput.trim());
+    } catch (err) {
+      Alert.alert(t('profile.urlInvalid'), getErrorMessage(err));
+      return;
+    }
     const updated = await getApiBaseUrl();
     setCurrentUrlDisplay(updated);
     setShowConfigModal(false);
@@ -267,27 +273,33 @@ export const ProfileScreen: React.FC = () => {
               label={t('profile.apiUrlLabel')}
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
-              placeholder={CLOUD_API_URL}
+              placeholder={CONFIGURED_API_URL || 'https://api.example.com/api/v1'}
               autoCapitalize="none"
             />
 
-            <TouchableOpacity
-              style={styles.presetIpBtn}
-              onPress={() => setApiUrlInput(CLOUD_API_URL)}
-            >
-              <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
-              <Text style={styles.presetIpText}>{t('profile.cloudServer')}</Text>
-            </TouchableOpacity>
+            {CONFIGURED_API_URL ? (
+              <TouchableOpacity
+                style={styles.presetIpBtn}
+                onPress={() => setApiUrlInput(CONFIGURED_API_URL ?? '')}
+              >
+                <Ionicons name="cloud-outline" size={16} color={Colors.primary} />
+                <Text style={styles.presetIpText}>{t('profile.cloudServer')}</Text>
+              </TouchableOpacity>
+            ) : null}
 
-            <TouchableOpacity
-              style={[styles.presetIpBtn, { marginTop: 6, marginBottom: 12 }]}
-              onPress={() => setApiUrlInput(LOCAL_DEV_API_URL)}
-            >
-              <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
-              <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
-                {t('profile.localServer', { address: '192.168.100.240:3001' })}
-              </Text>
-            </TouchableOpacity>
+            {LOCAL_DEV_API_URL ? (
+              <TouchableOpacity
+                style={[styles.presetIpBtn, { marginTop: 6, marginBottom: 12 }]}
+                onPress={() => setApiUrlInput(LOCAL_DEV_API_URL ?? '')}
+              >
+                <Ionicons name="laptop-outline" size={16} color={Colors.textSecondary} />
+                <Text style={[styles.presetIpText, { color: Colors.textSecondary }]}>
+                  {t('profile.localServer', {
+                    address: LOCAL_DEV_API_URL.replace(/^https?:\/\//, '').replace(/\/api\/v1$/, ''),
+                  })}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.modalButtonsRow}>
               <Button

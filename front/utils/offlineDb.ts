@@ -5,13 +5,18 @@ import { requireTenantId } from "./tenant";
 // el pedido o el ajuste de stock de una en la otra.
 
 const DB_PREFIX = "stella-femme-offline";
-const DB_VERSION = 3;
+const DB_VERSION = 5;
 
 // Solo existe en bases anteriores a la v3: su contenido se migra a DRAFTS_STORE (ver upgrade)
 export const LEGACY_ORDERS_STORE = "orders";
 export const DRAFTS_STORE = "order_drafts";
 export const ATTEMPTS_STORE = "checkout_attempts";
 export const INVENTORY_STORE = "inventory_queue";
+// v4: perfil sin conexión. Copia del último perfil leído del servidor y el cambio pendiente, uno por usuario
+export const PROFILE_SNAPSHOT_STORE = "profile_snapshots";
+export const PROFILE_CHANGES_STORE = "profile_changes";
+// v5: copia de solo lectura de "Mis pedidos" (lista y detalles ya vistos), una por usuario
+export const ORDERS_CACHE_STORE = "orders_cache";
 
 export const isOfflineDbSupported = () => typeof window !== "undefined" && "indexedDB" in window;
 
@@ -65,6 +70,15 @@ function openDb(): Promise<IDBDatabase> {
             }
             if (!db.objectStoreNames.contains(ATTEMPTS_STORE)) {
                 db.createObjectStore(ATTEMPTS_STORE, { keyPath: "attemptId" });
+            }
+            if (!db.objectStoreNames.contains(PROFILE_SNAPSHOT_STORE)) {
+                db.createObjectStore(PROFILE_SNAPSHOT_STORE, { keyPath: "userId" });
+            }
+            if (!db.objectStoreNames.contains(PROFILE_CHANGES_STORE)) {
+                db.createObjectStore(PROFILE_CHANGES_STORE, { keyPath: "userId" });
+            }
+            if (!db.objectStoreNames.contains(ORDERS_CACHE_STORE)) {
+                db.createObjectStore(ORDERS_CACHE_STORE, { keyPath: "userId" });
             }
             const drafts = db.objectStoreNames.contains(DRAFTS_STORE)
                 ? tx.objectStore(DRAFTS_STORE)
@@ -144,6 +158,40 @@ export async function patchInOfflineStore<T>(storeName: string, key: IDBValidKey
             tx.oncomplete = () => {
                 db.close();
                 resolve(saved);
+            };
+            tx.onabort = () => {
+                db.close();
+                reject(toStorageError(tx.error));
+            };
+        } catch (error) {
+            db.close();
+            reject(toStorageError(error));
+        }
+    });
+}
+
+// Como patchInOfflineStore, pero también crea (sin registro previo) o borra (si `update` devuelve null).
+// undefined = no tocar nada. Lectura y escritura en la misma transacción: dos pestañas no se pisan.
+export async function upsertInOfflineStore<T>(
+    storeName: string,
+    key: IDBValidKey,
+    update: (current: T | undefined) => T | null | undefined,
+): Promise<T | null | undefined> {
+    const db = await openDb();
+    return new Promise<T | null | undefined>((resolve, reject) => {
+        try {
+            const tx = db.transaction(storeName, "readwrite");
+            const store = tx.objectStore(storeName);
+            const read = store.get(key);
+            let result: T | null | undefined;
+            read.onsuccess = () => {
+                result = update(read.result as T | undefined);
+                if (result === null) store.delete(key);
+                else if (result !== undefined) store.put(result);
+            };
+            tx.oncomplete = () => {
+                db.close();
+                resolve(result);
             };
             tx.onabort = () => {
                 db.close();

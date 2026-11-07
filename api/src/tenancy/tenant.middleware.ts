@@ -1,11 +1,14 @@
-import { ForbiddenException, Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { ControlPrismaService } from './control-prisma.service';
 import { TenantContext, tenantStorage } from './tenant-context';
 import { TenantResolutionCache } from './tenant-resolution-cache.service';
 import { getPlanFeatures } from '../modules/platform/plans';
+import { mobilePlanForbidden } from '../modules/mobile-access/mobile-access.errors';
 
 export const TENANT_HEADER = 'x-tenant-id';
+// Pista de UX que manda la app, NO un control de seguridad: cualquiera la omite o la falsifica. La
+// autorización real del canal móvil es server-side (MobileAuthController + JwtStrategy, channel "mobile").
 export const CLIENT_PLATFORM_HEADER = 'x-client-platform';
 export const TENANT_REQUIRED = 'TENANT_REQUIRED';
 
@@ -51,13 +54,11 @@ export class TenantMiddleware implements NestMiddleware {
       if (!lookup) throw this.reject();
       ctx = await this.resolve(lookup);
 
-      // Si la petición proviene de la App Móvil (x-client-platform: mobile), se exige Plan Pro.
-      if (req.header(CLIENT_PLATFORM_HEADER)?.trim().toLowerCase() === 'mobile') {
-        if (!getPlanFeatures(ctx.plan).mobileApp) {
-          throw new ForbiddenException(
-            'Esta tienda no cuenta con App Móvil habilitada en su plan actual (disponible en el Plan Pro).',
-          );
-        }
+      // Compatibilidad con builds viejos de la app (que solo se identificaban con este header): les
+      // corta el paso temprano con un error claro. No protege nada por sí solo — omitir el header
+      // deja la request como una web más, que es lo que la tienda ofrece en todos los planes.
+      if (req.header(CLIENT_PLATFORM_HEADER)?.trim().toLowerCase() === 'mobile' && !getPlanFeatures(ctx.plan).mobileApp) {
+        throw mobilePlanForbidden();
       }
     } catch (err) {
       return next(err);

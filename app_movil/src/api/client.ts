@@ -1,13 +1,19 @@
 import axios, { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { appStorage } from '../utils/storage';
-import { getCurrentApiBaseUrl, getApiBaseUrl } from '../config/env';
+import { getCurrentApiBaseUrl, getApiBaseUrl, API_URL_CONFIG_ERROR } from '../config/env';
 import { TENANT_HEADER, TENANT_REQUIRED, getTenantId, notifyTenantRequired } from '../config/tenant';
 import { getCurrentLanguage } from '../i18n';
+import { withMobileAttestation } from '../security/mobileAttestation';
 
 export const ACCESS_TOKEN_KEY = '@access_token';
 export const REFRESH_TOKEN_KEY = '@refresh_token';
 export const USER_DATA_KEY = '@user_data';
+// Solo una pista para la API (corta antes a los builds viejos): NO es lo que autoriza el canal móvil.
+// Eso lo deciden los tokens con channel "mobile" que la API emite tras verificar plan e integridad.
 export const CLIENT_PLATFORM_HEADER = 'x-client-platform';
+// Códigos de la API para el canal móvil (api/src/modules/mobile-access/mobile-access.errors.ts)
+export const MOBILE_APP_NOT_IN_PLAN = 'MOBILE_APP_NOT_IN_PLAN';
+const MOBILE_ATTESTATION_REQUIRED = 'MOBILE_ATTESTATION_REQUIRED';
 
 const apiClient = axios.create({
   baseURL: getCurrentApiBaseUrl(),
@@ -22,6 +28,12 @@ const apiClient = axios.create({
 // Sync base URL dynamically
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const currentBase = await getApiBaseUrl();
+  // Build de producción sin EXPO_PUBLIC_API_URL válida: no hay a dónde mandar la petición
+  if (!currentBase) {
+    return Promise.reject(
+      new AxiosError(API_URL_CONFIG_ERROR || 'No hay una URL de API configurada.', 'ERR_API_URL_MISSING', config)
+    );
+  }
   config.baseURL = currentBase;
 
   const token = await appStorage.getItem(ACCESS_TOKEN_KEY);
@@ -51,6 +63,16 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   }
   return config;
 }, (error) => Promise.reject(error));
+
+const errorCode = (error: AxiosError): string | undefined =>
+  (error.response?.data as { code?: string } | undefined)?.code;
+
+const clearSession = () =>
+  Promise.all([
+    appStorage.removeItem(ACCESS_TOKEN_KEY),
+    appStorage.removeItem(REFRESH_TOKEN_KEY),
+    appStorage.removeItem(USER_DATA_KEY),
+  ]);
 
 const isTenantRequiredError = (error: AxiosError): boolean =>
   error.response?.status === 401 &&
@@ -102,11 +124,21 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // La tienda bajó de plan (o nunca tuvo app): la sesión móvil ya no vale. Se cierra y se muestra
+    // el selector con el aviso; la tienda web sigue disponible en el navegador.
+    if (error.response?.status === 403 && errorCode(error) === MOBILE_APP_NOT_IN_PLAN) {
+      await clearSession();
+      onAuthFailureCallback?.();
+      notifyTenantRequired();
+      return Promise.reject(error);
+    }
+
     // Don't retry auth endpoints
     if (
       originalRequest?.url?.includes('/auth/login') ||
       originalRequest?.url?.includes('/auth/register') ||
-      originalRequest?.url?.includes('/auth/refresh')
+      originalRequest?.url?.includes('/auth/refresh') ||
+      originalRequest?.url?.includes('/auth/mobile/')
     ) {
       return Promise.reject(error);
     }
@@ -138,17 +170,22 @@ apiClient.interceptors.response.use(
         // axios "limpio" (sin interceptores): el header de tienda va explícito. Sin él el backend
         // rechaza el refresh y caería al auto-logout aunque la sesión fuera válida.
         const tenantId = await getTenantId();
-        const refreshResponse = await axios.post(
-          `${currentBase}/auth/refresh`,
-          {},
-          {
+        const refresh = (body: object) =>
+          axios.post(`${currentBase}/auth/mobile/refresh`, body, {
             headers: {
               Authorization: `Bearer ${refreshToken}`,
               [CLIENT_PLATFORM_HEADER]: 'mobile',
               ...(tenantId ? { [TENANT_HEADER]: tenantId } : {}),
             },
+          });
+        // La API vuelve a mirar el plan en cada renovación y, cada cierto tiempo, pide una prueba de
+        // integridad nueva (MOBILE_ATTESTATION_REQUIRED): se genera y se reintenta una vez.
+        const refreshResponse = await refresh({}).catch((err: AxiosError) => {
+          if (err.response?.status === 401 && errorCode(err) === MOBILE_ATTESTATION_REQUIRED) {
+            return withMobileAttestation((attestation) => refresh({ attestation }));
           }
-        );
+          throw err;
+        });
 
         const { accessToken: newAccessToken, refreshToken: newRefreshToken, user } = refreshResponse.data;
 
@@ -169,11 +206,10 @@ apiClient.interceptors.response.use(
       } catch (refreshErr) {
         const friendlyErr = new Error('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
         processQueue(friendlyErr, null);
-        await Promise.all([
-          appStorage.removeItem(ACCESS_TOKEN_KEY),
-          appStorage.removeItem(REFRESH_TOKEN_KEY),
-          appStorage.removeItem(USER_DATA_KEY),
-        ]);
+        await clearSession();
+        if (axios.isAxiosError(refreshErr) && errorCode(refreshErr) === MOBILE_APP_NOT_IN_PLAN) {
+          notifyTenantRequired();
+        }
         if (onAuthFailureCallback) {
           try {
             onAuthFailureCallback();

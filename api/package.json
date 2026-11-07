@@ -24,7 +24,8 @@
     "postinstall": "prisma generate && prisma generate --config prisma.control.config.ts",
     "migrate:all": "node dist/scripts/migrate.js",
     "migrate:control": "prisma migrate deploy --config prisma.control.config.ts",
-    "platform:admin": "node dist/scripts/create-platform-admin.js"
+    "platform:admin": "node dist/scripts/create-platform-admin.js",
+    "wallet:audit": "node dist/scripts/audit-wallet-samples.js"
   },
   "dependencies": {
     "@decartai/sdk": "^0.2.3",

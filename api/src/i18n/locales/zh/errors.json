@@ -14,6 +14,7 @@
   "REGISTER_FAILED": "注册过程中发生错误",
   "USER_NOT_FOUND": "未找到用户",
   "INVALID_CREDENTIALS": "邮箱或密码无效",
+  "LOGIN_FAILED": "邮箱或密码错误。如果多次失败，请等待几分钟后再试",
   "TOO_MANY_ATTEMPTS": {
     "other": "失败次数过多，请在 {count} 分钟后重试"
   },
@@ -65,5 +66,39 @@
   "PAYMENT_MISMATCH": "付款与此订单不符。",
   "PAYMENT_SIMULATION_DISABLED": "此付款方式不可用。",
   "INVENTORY_VERSION_CONFLICT": "库存在您读取后已变更，请先查看当前值再调整。",
-  "PROVIDER_UNAVAILABLE": "支付服务商无响应，请稍后再试。"
+  "PROVIDER_UNAVAILABLE": "支付服务商无响应，请稍后再试。",
+  "MOBILE_APP_NOT_IN_PLAN": "该店铺当前的套餐不包含移动应用（Pro 套餐提供）。您仍可在网页商店购物，包括使用手机浏览器。",
+  "MOBILE_ATTESTATION_REQUIRED": "出于安全考虑，应用需要重新验证此设备。",
+  "MOBILE_ATTESTATION_INVALID": "无法验证这是运行在安全设备上的官方应用。",
+  "MOBILE_ATTESTATION_UNAVAILABLE": "设备验证暂时不可用，请稍后再试。",
+  "MOBILE_CHANNEL_MISMATCH": "此会话不属于该渠道，请重新登录。",
+  "PLAN_FEATURE": {
+    "pos": "销售点（POS）从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "returns": "退货与损耗管理从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "multiBranchInventory": "多门店库存与全局折扣管理从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "customDomain": "自定义域名从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "aiReports": "AI 报表从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "virtualTryOn": "虚拟试衣间从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "campaigns": "邮件营销与推送通知从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "qrPayments": "所有套餐均支持二维码支付。",
+    "digitalWallet": "数字钱包支付（Airtm、Takenos、Wallbit）从 {plan} 套餐起提供。请在“订阅”中升级套餐。",
+    "mobileApp": "该店铺当前套餐未开通客户移动应用（{plan} 套餐起提供）。"
+  },
+  "PLAN_BRANCH_LIMIT": {
+    "other": "你的 {plan} 套餐最多可创建 {count} 家门店。请在“订阅”中升级套餐以添加更多门店。"
+  },
+  "PLAN_ACTIVE_BRANCH_LIMIT": {
+    "other": "你的 {plan} 套餐最多可保留 {count} 家启用中的门店。请在“订阅”中升级套餐。"
+  },
+  "PLAN_PRODUCT_LIMIT": {
+    "other": "你的 {plan} 套餐最多可有 {count} 件在售商品。升级到 {upgradePlan} 或更高套餐即可不限商品数量。"
+  },
+  "PLAN_STORE_MOBILE_APP": "店铺“{store}”当前套餐（{currentPlan}）未开通移动应用。{plan} 套餐起提供。",
+  "PLAN_STORE_CUSTOM_DOMAIN": "该店铺当前套餐（{currentPlan}）不包含自定义域名，需要 {plan} 或更高套餐。",
+  "PLAN_SIGNUP_CUSTOM_DOMAIN": "自定义域名从 {plan} 套餐起提供。",
+  "PROFILE_CONFLICT": "您离线期间，个人资料已在另一台设备上被修改。请在保存前查看这些更改。",
+  "PROFILE_SYNC_EMPTY": "没有需要同步的个人资料更改。",
+  "PROFILE_SYNC_EXPECTED_MISSING": "缺少字段 {field} 的原值：无法在确认其未被修改的情况下同步。",
+  "PROFILE_SYNC_CHANGE_REUSED": "此更改属于另一个账户。",
+  "PROFILE_FIRST_NAME_REQUIRED": "名字为必填项。"
 }

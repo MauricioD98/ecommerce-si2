@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CloudOff } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import accountStyles from './account.module.scss';
 import styles from './orders.module.scss';
@@ -20,7 +20,7 @@ interface OrderDetailClientProps {
 // Detalle y seguimiento de un pedido propio: qué se compró (con talla), estado del pago,
 // método de entrega/dirección y el timeline de progreso
 export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
-    const { order, isLoading, error, reload } = useOrderDetail(orderId);
+    const { order, isLoading, error, offlineCopyAt, reload } = useOrderDetail(orderId);
     const { branches } = useBranches();
     const t = useTranslations('Account');
     const locale = useLocale();
@@ -53,6 +53,12 @@ export default function OrderDetailClient({ orderId }: OrderDetailClientProps) {
                 <div className={accountStyles.card}>
                     {isLoading && <p className={accountStyles.subheading}>{t('orders.loadingOne')}</p>}
                     {error && <div className={accountStyles.alertError}>{error}</div>}
+                    {offlineCopyAt && (
+                        <div className={accountStyles.alertInfo} role="status" data-testid="order-offline-copy" style={{ marginBottom: '1rem' }}>
+                            <CloudOff size={18} />
+                            <span>{t('orders.offlineCopy', { date: formatOrderDate(offlineCopyAt, locale) })}</span>
+                        </div>
+                    )}
 
                     {order && (
                         <>

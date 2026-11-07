@@ -10,12 +10,17 @@ const HOUR = 60 * 60 * 1000;
 // Política de vencimientos, siempre con el reloj del servidor. Valores por defecto:
 //  - carrito: 1 h sin actividad (la regla que ya existía)
 //  - tarjeta/QR: 1 h para pagar; un pago en `processing` extiende la reserva RECONCILIATION_HOLD
-//  - manual sin comprobante: 24 h. Con comprobante PENDIENTE no vence: decide la revisión de la tienda
+//  - manual (QR bancario, USDT, billetera) sin comprobante: 24 h. Con comprobante PENDIENTE no vence:
+//    decide la revisión de la tienda
 export const cartReservationTtlMs = () => envMs('CART_RESERVATION_TTL_MS', HOUR);
 export const reconciliationHoldMs = () => envMs('PAYMENT_RECONCILIATION_HOLD_MS', 6 * HOUR);
 
+// Medios que la tienda verifica a mano con un comprobante. Única lista: el vencimiento y la recepción del
+// comprobante no pueden discrepar sobre qué es un pago manual.
+export const MANUAL_PAYMENT_METHODS: readonly PaymentMethod[] = [PaymentMethod.BANK_QR, PaymentMethod.USDT, PaymentMethod.WALLET];
+
 export function orderPaymentTtlMs(method: PaymentMethod): number {
-  if (method === PaymentMethod.BANK_QR || method === PaymentMethod.USDT) return envMs('ORDER_TTL_MANUAL_MS', 24 * HOUR);
+  if (MANUAL_PAYMENT_METHODS.includes(method)) return envMs('ORDER_TTL_MANUAL_MS', 24 * HOUR);
   return envMs('ORDER_TTL_CARD_MS', HOUR);
 }
 
@@ -26,7 +31,10 @@ export const STRIPE_IDEMPOTENCY_HORIZON_MS = 23 * HOUR;
 export const MAX_LINE_QUANTITY = 100;
 
 // Moneda de cobro con tarjeta: la fija el servidor, jamás el cliente.
-export const paymentCurrency = () => (process.env.PAYMENT_CURRENCY ?? 'usd').toLowerCase();
+// Moneda en la que se cobra con Stripe. Los precios del catálogo están en bolivianos (la tienda los muestra
+// como "Bs"): cobrar el mismo número en otra moneda cambiaría el importe real. Por eso el valor por
+// defecto es BOB, y el checkout solo ofrece tarjeta si esta moneda coincide con la que muestra.
+export const paymentCurrency = () => (process.env.PAYMENT_CURRENCY?.trim() || 'bob').toLowerCase();
 
 const ZERO_DECIMAL = new Set(['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf']);
 const THREE_DECIMAL = new Set(['bhd', 'jod', 'kwd', 'omr', 'tnd']);

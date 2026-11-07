@@ -4,6 +4,7 @@ import { getApiErrorMessage } from "@/service/api/error.utils";
 import { useLocaleVersion } from "@/hooks/useLocaleVersion";
 import { useTranslations } from "next-intl";
 import { Order, PaginatedMyOrders } from "@/types/orders.types";
+import { cacheOrdersPage, getCachedOrdersPage, isNetworkFailure } from "@/utils/offlineOrders";
 
 const PAGE_SIZE = 10;
 
@@ -13,6 +14,8 @@ export function useMyOrders(page: number) {
     const [total, setTotal] = useState(0);
     const [loadedPage, setLoadedPage] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // Sin red: fecha de la copia guardada que se está mostrando (null = datos del servidor)
+    const [offlineCopyAt, setOfflineCopyAt] = useState<string | null>(null);
     // Los nombres de producto de cada pedido vienen traducidos: se recargan al cambiar de idioma
     const localeVersion = useLocaleVersion();
     const t = useTranslations("Account.orders");
@@ -26,9 +29,22 @@ export function useMyOrders(page: number) {
                 setOrders(response.data);
                 setTotal(response.total);
                 setError(null);
+                setOfflineCopyAt(null);
+                // Copia para consultarla sin conexión (IndexedDB, solo de esta cuenta y tienda)
+                void cacheOrdersPage(page, PAGE_SIZE, response.data, response.total);
             })
-            .catch((error) => {
-                if (active) setError(getApiErrorMessage(error, t("loadFailed")));
+            .catch(async (error) => {
+                // Sin respuesta del servidor: se muestra lo último que se vio, avisando que es una copia
+                const cached = isNetworkFailure(error) ? await getCachedOrdersPage(page) : null;
+                if (!active) return;
+                if (cached) {
+                    setOrders(cached.data);
+                    setTotal(cached.total);
+                    setOfflineCopyAt(cached.savedAt);
+                    setError(null);
+                } else {
+                    setError(isNetworkFailure(error) && !navigator.onLine ? t("offlineNoCopy") : getApiErrorMessage(error, t("loadFailed")));
+                }
             })
             .finally(() => {
                 if (active) setLoadedPage(page);
@@ -47,5 +63,6 @@ export function useMyOrders(page: number) {
         totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)),
         isLoading: loadedPage !== page,
         error,
+        offlineCopyAt,
     };
 }

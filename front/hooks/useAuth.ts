@@ -8,6 +8,8 @@ import { getApiErrorMessage } from "@/service/api/error.utils";
 import { LoginCredential, RegisterCredential } from "@/types/auth.types";
 import { clearAuth, setAuth, setUser } from "@/store/slices/authSlices";
 import { clearAllCart } from "@/store/slices/cartSlice";
+import { clearProfileSnapshots, saveProfileSnapshot } from "@/utils/offlineProfile";
+import { clearOrdersCache } from "@/utils/offlineOrders";
 
 
 export function useAuth() {
@@ -36,6 +38,10 @@ export function useAuth() {
             // podría ver por un instante (u offline, del todo) los datos de esta cuenta si no se
             // limpia acá. Ver public/sw.js: listener "message" -> CLEAR_USER_CACHE.
             navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_USER_CACHE' });
+            // La copia del perfil para usarlo sin conexión tampoco queda para la próxima persona. Los cambios
+            // de perfil pendientes sí se conservan: solo se envían cuando vuelve a entrar su dueño.
+            // Lo mismo para la copia de "Mis pedidos"
+            await Promise.all([clearProfileSnapshots(), clearOrdersCache()]);
             setIsLoading(false);
         }
     }
@@ -45,6 +51,9 @@ export function useAuth() {
         try {
             const profile = await authService.getProfile();
             dispatch(setUser(profile));
+            // La cabecera lo llama en cada página: así la copia para usar el perfil sin conexión siempre está
+            // al día, aunque el usuario nunca haya abierto "Mi cuenta" con conexión
+            void saveProfileSnapshot(profile);
         } catch (error) {
             if (axios.isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 401)) {
                 dispatch(clearAuth());

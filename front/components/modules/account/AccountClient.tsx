@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MapPin, Package, UserRound } from 'lucide-react';
+import { CloudOff, MapPin, Package, UserRound } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import styles from './account.module.scss';
 import { useAuth } from '@/hooks/useAuth';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import ProfileTab from './ProfileTab';
 import AddressesTab from './AddressesTab';
 import OrdersTab from './OrdersTab';
@@ -27,6 +28,7 @@ export default function AccountClient() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const t = useTranslations('Account');
+    const { isOnline } = useNetworkStatus();
     const initialTab = (searchParams.get('tab') as TabId | null);
     const [tab, setTab] = useState<TabId>(initialTab && TABS.some((t) => t.id === initialTab) ? initialTab : 'profile');
 
@@ -75,14 +77,34 @@ export default function AccountClient() {
                     {tab === 'profile' && (
                         <div className={styles.stack}>
                             <ProfileTab />
-                            <PushNotificationsCard />
-                            <ChangePasswordCard />
+                            {isOnline ? (
+                                <>
+                                    <PushNotificationsCard />
+                                    <ChangePasswordCard />
+                                </>
+                            ) : (
+                                // La contraseña exige la actual y la valida el servidor; las notificaciones
+                                // registran el dispositivo en el servidor. Ninguna se guarda para después.
+                                <RequiresConnectionCard />
+                            )}
                         </div>
                     )}
                     {tab === 'orders' && <OrdersTab />}
-                    {tab === 'addresses' && <AddressesTab />}
+                    {tab === 'addresses' && (isOnline ? <AddressesTab /> : <RequiresConnectionCard />)}
                 </div>
             </div>
         </section>
+    );
+}
+
+function RequiresConnectionCard() {
+    const t = useTranslations('Account.profile.sync');
+    return (
+        <div className={styles.card} data-testid="requires-connection">
+            <p className={styles.hint} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <CloudOff size={18} aria-hidden="true" />
+                {t('requiresConnection')}
+            </p>
+        </div>
     );
 }

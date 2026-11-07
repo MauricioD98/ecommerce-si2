@@ -597,11 +597,15 @@ describe('Pagos, webhooks, vencimientos y compensaciones', () => {
     assert.equal(qrOrder.status, 403);
     assert.equal((await orderRow(orderId)).paymentStatus, 'PENDIENTE');
 
-    // Tarjeta de prueba: un PI sin pagar no se autoconfirma
+    // Tarjeta de prueba: un PI sin pagar no se autoconfirma, aunque la clave sea sk_test_
+    assert.ok(process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_'));
+    const confirmsBefore = stripe.confirmCalls;
     const pi = (await createIntent(api, orderId)).body.data.paymentIntentId;
     const unpaid = await api.call('POST', '/payments/confirm', { body: { orderId, paymentIntentId: pi } });
     assert.equal(unpaid.status, 400);
     assert.equal(stripe.intents.get(pi)!.status, 'requires_payment_method');
+    assert.equal(stripe.confirmCalls, confirmsBefore, 'la API no pidió a Stripe confirmar con la tarjeta de prueba');
+    assert.notEqual((await orderRow(orderId)).paymentStatus, 'COMPLETADO');
 
     // Configuración productiva: ni con el opt-in se activa
     const saved = { env: process.env.NODE_ENV, flag: process.env.ALLOW_SIMULATED_PAYMENTS };
@@ -612,6 +616,37 @@ describe('Pagos, webhooks, vencimientos y compensaciones', () => {
     assert.equal(simulatedPaymentsEnabled(), true);
     process.env.NODE_ENV = saved.env;
     delete process.env.ALLOW_SIMULATED_PAYMENTS;
+  });
+
+  it('P11b: la autoconfirmación de demo es una simulación explícita, imposible en producción', async () => {
+    const saved = { env: process.env.NODE_ENV, flag: process.env.ALLOW_SIMULATED_PAYMENTS };
+    try {
+      // Con el opt-in fuera de producción: se confirma con la tarjeta de prueba y el cobro entra por
+      // reconcileIntent, como cualquier PaymentIntent que Stripe informa como succeeded
+      process.env.ALLOW_SIMULATED_PAYMENTS = 'true';
+      const { api } = await buyer();
+      const simulated = await orderFor(api);
+      const pi = (await createIntent(api, simulated.orderId)).body.data.paymentIntentId;
+      const confirmsBefore = stripe.confirmCalls;
+      const ok = await api.call('POST', '/payments/confirm', { body: { orderId: simulated.orderId, paymentIntentId: pi } });
+      assert.equal(ok.status, 201, JSON.stringify(ok.body));
+      assert.equal(stripe.confirmCalls, confirmsBefore + 1);
+      assert.equal((await orderRow(simulated.orderId)).paymentStatus, 'COMPLETADO');
+
+      // Producción con el mismo opt-in: no hay simulación y el PI sin pagar sigue sin pagar
+      process.env.NODE_ENV = 'production';
+      const real = await orderFor(api);
+      const realPi = (await createIntent(api, real.orderId)).body.data.paymentIntentId;
+      const blocked = await api.call('POST', '/payments/confirm', { body: { orderId: real.orderId, paymentIntentId: realPi } });
+      assert.equal(blocked.status, 400);
+      assert.equal(stripe.confirmCalls, confirmsBefore + 1, 'en producción no se confirma nada en nombre del cliente');
+      assert.equal(stripe.intents.get(realPi)!.status, 'requires_payment_method');
+      assert.notEqual((await orderRow(real.orderId)).paymentStatus, 'COMPLETADO');
+    } finally {
+      process.env.NODE_ENV = saved.env;
+      if (saved.flag === undefined) delete process.env.ALLOW_SIMULATED_PAYMENTS;
+      else process.env.ALLOW_SIMULATED_PAYMENTS = saved.flag;
+    }
   });
 
   it('Unidades menores: decimales según la moneda, sin punto flotante', () => {

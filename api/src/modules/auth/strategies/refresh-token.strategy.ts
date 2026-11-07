@@ -6,6 +6,27 @@ import { ConfigService } from "@nestjs/config";
 import {Request} from 'express';
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { hashToken } from '../../../common/utils/token-hash';
+import type { MobileSessionClaims } from '../../mobile-access/mobile-access.errors';
+import type { AttestationMethod, MobilePlatform } from '../../mobile-access/mobile-access.config';
+
+interface RefreshPayload {
+    sub: string;
+    email: string;
+    tenantId?: string;
+    channel?: 'mobile';
+    att?: AttestationMethod;
+    platform?: MobilePlatform;
+    attestedAt?: number;
+}
+
+export interface RefreshUser {
+    id: string;
+    email: string;
+    role: unknown;
+    channel: 'web' | 'mobile';
+    // Datos de la última prueba de integridad (solo sesiones móviles)
+    mobile: MobileSessionClaims | null;
+}
 
 
 @Injectable()
@@ -25,10 +46,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refres
     }
 
 
-    async validate(req:Request, payload:{sub:string; email:string; tenantId?:string}){
-
-        console.log('RefreshTokenStrategy.validate called');
-        console.log('Payload',{sub: payload.sub, email: payload.email});
+    async validate(req:Request, payload:RefreshPayload): Promise<RefreshUser>{
 
         // Mismo criterio que JwtStrategy: el refresh solo vale en la tienda que lo emitió.
         // Además this.prisma ya apunta al schema de req.tenant, así que el lookup del usuario
@@ -69,6 +87,10 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refres
             throw new UnauthorizedException('Invalid refresh does not match');
         }
 
-        return {id:user.id, email: user.email, role: user.role };
+        const mobile =
+            payload.channel === 'mobile' && payload.att && payload.platform && typeof payload.attestedAt === 'number'
+                ? { method: payload.att, platform: payload.platform, attestedAt: payload.attestedAt }
+                : null;
+        return {id:user.id, email: user.email, role: user.role, channel: mobile ? 'mobile' : 'web', mobile };
     }
 }

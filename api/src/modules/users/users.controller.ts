@@ -12,6 +12,7 @@ import { GetUser } from '../../common/decorators/get-user.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateStaffDto } from './dto/create-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
+import { SyncProfileDto } from './dto/sync-profile.dto';
 import type { AuthUser } from '../../common/decorators/interfaces/request-with-user.interface';
 
 
@@ -122,6 +123,19 @@ async updateProfile(
   @Body() updateUserDto: UpdateUserDto,
 ): Promise<UserResponseDto> {
   return await this.usersService.update(userId, updateUserDto);
+}
+
+// Perfil editado sin conexión en la PWA: escritura condicionada a lo que el dispositivo leyó (ver service)
+@Patch('me/sync')
+@ApiOperation({ summary: 'Apply an offline profile change only if the server values still match' })
+@ApiBody({ type: SyncProfileDto })
+@ApiResponse({ status: 200, description: 'Applied (or already applied with this changeId)', type: UserResponseDto })
+@ApiResponse({ status: 409, description: 'PROFILE_CONFLICT: the profile changed on the server; body.current has it' })
+async syncOfflineProfile(
+  @GetUser('id') userId: string,
+  @Body() dto: SyncProfileDto,
+): Promise<UserResponseDto> {
+  return await this.usersService.syncOfflineProfile(userId, dto);
 }
 
 /*@ApiResponse({ status: 401, description: 'Unauthorized' })

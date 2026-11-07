@@ -14,12 +14,19 @@ export class FakeStripe {
   private readonly idempotent = new Map<string, { body: string; response: Intent }>();
   createCalls = 0;
   refundCalls = 0;
+  // POST /payment_intents/:id/confirm: solo lo usa la autoconfirmación de demo (pm_card_visa)
+  confirmCalls = 0;
   // La operación se aplica y luego se corta la conexión: el cliente no sabe si funcionó
   dropNextCreateResponse = false;
   unavailable = false;
   cancelRejected = false;
   // Simula el índice de búsqueda de Stripe, que aún no ve un PaymentIntent recién creado
   searchLag = false;
+  // Connect: false = la plataforma todavía no activó Connect (accounts.create responde 400)
+  connectEnabled = true;
+  accountCreateCalls = 0;
+  readonly accounts = new Map<string, Intent>();
+  private readonly idempotentAccounts = new Map<string, { status: number; body: Intent }>();
 
   async start(): Promise<string> {
     this.server = createServer((req, res) => void this.handle(req, res));
@@ -65,11 +72,20 @@ export class FakeStripe {
       const data = this.searchLag ? [] : [...this.intents.values()].filter((i) => i.metadata.attemptId === attemptId);
       return send(200, { object: 'search_result', data, has_more: false, url: path });
     }
-    const match = /^\/v1\/payment_intents\/([^/]+)(\/cancel)?$/.exec(path);
+    const match = /^\/v1\/payment_intents\/([^/]+)(\/cancel|\/confirm)?$/.exec(path);
     if (match) {
       const intent = this.intents.get(match[1]);
       if (!intent) return send(404, { error: { type: 'invalid_request_error', code: 'resource_missing', message: 'no such intent' } });
       if (req.method === 'GET') return send(200, intent);
+      if (match[2] === '/confirm') {
+        // Como la tarjeta de prueba de Stripe: confirmar un intento sin pagar lo cobra
+        this.confirmCalls += 1;
+        if (intent.status !== 'requires_payment_method' && intent.status !== 'requires_confirmation') {
+          return send(400, { error: { type: 'invalid_request_error', code: 'payment_intent_unexpected_state', message: `cannot confirm ${intent.status}` } });
+        }
+        intent.status = 'succeeded';
+        return send(200, intent);
+      }
       if (match[2]) {
         if (this.cancelRejected || ['succeeded', 'processing', 'canceled'].includes(intent.status)) {
           return send(400, { error: { type: 'invalid_request_error', code: 'payment_intent_unexpected_state', message: `cannot cancel ${intent.status}` } });
@@ -109,6 +125,27 @@ export class FakeStripe {
         return;
       }
       return send(200, intent);
+    }
+    // Connect: creación de cuentas y links de onboarding. Como Stripe, guarda también la respuesta de
+    // ERROR por Idempotency-Key y la repite con la cabecera Idempotent-Replayed.
+    if (req.method === 'POST' && path === '/v1/accounts') {
+      this.accountCreateCalls += 1;
+      const seen = key ? this.idempotentAccounts.get(key) : undefined;
+      if (seen) {
+        res.writeHead(seen.status, { 'content-type': 'application/json', 'idempotent-replayed': 'true' });
+        res.end(JSON.stringify(seen.body));
+        return;
+      }
+      const outcome = this.connectEnabled
+        ? { status: 200, body: { id: `acct_${randomBytes(8).toString('hex')}`, object: 'account', type: params.type, metadata: params.metadata ?? {}, charges_enabled: false, payouts_enabled: false, details_submitted: false } }
+        : { status: 400, body: { error: { type: 'invalid_request_error', message: "You can only create new accounts if you've signed up for Connect" } } };
+      if (outcome.status === 200) this.accounts.set(outcome.body.id as string, outcome.body);
+      if (key) this.idempotentAccounts.set(key, outcome);
+      return send(outcome.status, outcome.body);
+    }
+    if (req.method === 'POST' && path === '/v1/account_links') {
+      if (!this.accounts.has(params.account)) return send(400, { error: { type: 'invalid_request_error', message: 'No such account' } });
+      return send(200, { object: 'account_link', url: `https://connect.stripe.test/setup/${params.account}`, expires_at: 0 });
     }
     if (req.method === 'POST' && path === '/v1/refunds') {
       this.refundCalls += 1;

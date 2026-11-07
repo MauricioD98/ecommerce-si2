@@ -9,14 +9,29 @@ import {
   ConfirmQrPayload,
 } from '../types';
 
+export interface WalletPaymentOption {
+  provider: string;
+  account: string;
+  instructions: string;
+}
+
+export interface PaymentOptions {
+  // La tienda cobra con su cuenta Stripe Connect habilitada
+  card: boolean;
+  // La app no tiene SDK de Stripe: la tarjeta solo existe como simulación de desarrollo explícita
+  simulatedCard?: boolean;
+  simulatedQr?: boolean;
+  wallet?: WalletPaymentOption | null;
+}
+
 export const paymentsApi = {
   createIntent: async (payload: CreatePaymentIntentPayload): Promise<CreatePaymentIntentResponse> => {
     const response = await apiClient.post<CreatePaymentIntentResponse>('/payments/create-intent', payload);
     return response.data;
   },
 
-  confirmPayment: async (payload: ConfirmPaymentPayload): Promise<{ success: boolean; data: PaymentDetails; message: string }> => {
-    const response = await apiClient.post<{ success: boolean; data: PaymentDetails; message: string }>('/payments/confirm', payload);
+  confirmPayment: async (payload: ConfirmPaymentPayload): Promise<{ success: boolean; data: PaymentDetails; message: string; simulated?: boolean }> => {
+    const response = await apiClient.post<{ success: boolean; data: PaymentDetails; message: string; simulated?: boolean }>('/payments/confirm', payload);
     return response.data;
   },
 
@@ -53,10 +68,10 @@ export const paymentsApi = {
   },
 
   // Medios activos de la tienda. El QR simulado solo existe en entornos de prueba explícitos.
-  getOptions: async (): Promise<{ card: boolean; simulatedQr?: boolean }> => {
-    const response = await apiClient.get<{ data: { card: boolean; simulatedQr?: boolean } }>('/store/payment-options');
+  // wallet llega en null si la billetera está desactivada, incompleta o fuera del plan.
+  getOptions: async (): Promise<PaymentOptions> => {
+    const response = await apiClient.get<{ data: PaymentOptions }>('/store/payment-options');
     return response.data.data;
-
   },
 
   getByOrderId: async (orderId: string): Promise<PaymentDetails | null> => {

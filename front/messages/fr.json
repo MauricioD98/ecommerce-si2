@@ -223,7 +223,17 @@
       "submitting": "Connexion...",
       "submit": "Se connecter",
       "noAccount": "Vous n’avez pas de compte ?",
-      "createAccount": "Créer un compte"
+      "createAccount": "Créer un compte",
+      "storeStepTitle": "À quelle boutique voulez-vous vous connecter ?",
+      "storeStepSubtitle": "Choisissez la boutique où se trouve votre compte. Nous vous demanderons ensuite votre e-mail et votre mot de passe.",
+      "storeLabel": "Boutique",
+      "currentStore": "Boutique actuelle",
+      "changeStore": "Changer de boutique",
+      "noStores": "Impossible de charger les boutiques disponibles. Vérifiez votre connexion et réessayez.",
+      "invalidCredentials": "E-mail ou mot de passe incorrect. Si vous avez échoué plusieurs fois, attendez quelques minutes avant de réessayer.",
+      "platformAdminPrompt": "Vous êtes administrateur NovaSoft ?",
+      "platformAdminLink": "Accéder au panneau de la plateforme",
+      "pendingProfileChanges": "Des modifications de profil enregistrées hors ligne se trouvent sur cet appareil. Elles seront envoyées lorsque le compte qui les a faites se connectera."
     },
     "register": {
       "title": "Créez votre compte",
@@ -339,6 +349,7 @@
       "offlineSaveFailed": "Impossible d’enregistrer la commande sur cet appareil.",
       "gatewayFailed": "Impossible d’initialiser la passerelle de paiement.",
       "cardUnavailable": "Cette boutique n’accepte pas encore les cartes : choisissez un autre moyen de paiement.",
+      "cardCurrencyMismatch": "Le paiement par carte est indisponible : la boutique facturerait dans une autre devise que le Bs. Choisissez un autre moyen de paiement.",
       "bankQr": "QR bancaire",
       "bankQrDescription": "Payez depuis votre appli bancaire et importez le justificatif",
       "usdt": "USDT",
@@ -582,7 +593,34 @@
       "noPreferredBranch": "Aucune succursale préférée",
       "preferredBranchHint": "Nous vous informerons des nouveautés et offres de cette succursale.",
       "saving": "Enregistrement...",
-      "save": "Enregistrer les modifications"
+      "save": "Enregistrer les modifications",
+      "sync": {
+        "offline": "Hors ligne. Vous pouvez modifier votre profil : les modifications sont enregistrées sur cet appareil et seront envoyées au retour de la connexion.",
+        "offlinePending": "Hors ligne. Des modifications en attente sont enregistrées sur cet appareil ; elles seront envoyées au retour de la connexion.",
+        "copyFrom": "Données enregistrées le {date}.",
+        "pending": "Modifications en attente de synchronisation.",
+        "syncing": "Synchronisation de vos modifications…",
+        "synced": "Profil synchronisé avec le serveur.",
+        "needsLogin": "Votre session a expiré. Vos modifications sont toujours enregistrées : reconnectez-vous avec ce compte pour les envoyer.",
+        "signIn": "Se connecter",
+        "error": "Vos modifications n'ont pas pu être synchronisées : {reason}",
+        "retry": "Réessayer",
+        "discard": "Abandonner mes modifications",
+        "conflictTitle": "Votre profil a changé sur un autre appareil",
+        "conflictDescription": "Pendant que vous étiez hors ligne, ces données ont été modifiées ailleurs. Choisissez la version à conserver ; rien n'a été écrasé.",
+        "field": "Champ",
+        "yourChange": "Votre modification",
+        "serverValue": "Valeur actuelle sur le serveur",
+        "keepMine": "Utiliser mes modifications",
+        "keepServer": "Conserver celles du serveur",
+        "emptyValue": "(vide)",
+        "savedLocally": "Enregistré sur cet appareil. Sera envoyé au retour de la connexion.",
+        "offlineFields": "Hors ligne, vous pouvez modifier le prénom, le nom, le téléphone et la boutique préférée. L'e-mail ne peut pas être modifié.",
+        "saveOffline": "Enregistrer sur cet appareil",
+        "requiresConnection": "Changer le mot de passe, activer les notifications et gérer les adresses nécessitent une connexion.",
+        "offlineAccountNote": "Vous consultez la copie de votre compte enregistrée sur cet appareil. Vous pouvez modifier votre profil et consulter vos commandes ; adresses, mot de passe et notifications nécessitent une connexion.",
+        "backHome": "Retour à l'accueil"
+      }
     },
     "security": {
       "title": "Sécurité",
@@ -654,7 +692,9 @@
         "PENDIENTE": "En cours de vérification par la boutique",
         "APROBADO": "Approuvé",
         "RECHAZADO": "Refusé"
-      }
+      },
+      "offlineCopy": "Hors ligne : affichage de la copie enregistrée le {date}. Le statut réel a pu changer.",
+      "offlineNoCopy": "Hors ligne. Ouvrez cette section au moins une fois avec une connexion pour la consulter sans."
     },
     "status": {
       "PENDIENTE": "En attente",

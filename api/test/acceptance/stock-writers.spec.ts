@@ -7,6 +7,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import {
   Api,
   TENANT_A,
+  TENANT_B,
   apiFor,
   bootApp,
   count,
@@ -37,7 +38,14 @@ describe('Todos los escritores de stock', () => {
     return row?.version ?? 0;
   };
 
+  let previousPlan: string;
+
   before(async () => {
+    // POS y devoluciones exigen Growth o superior (@RequirePlanFeature): esta suite los usa, así que su
+    // tienda es Growth. Se fija antes de arrancar la app y la réplica, que cachean el plan de la tienda.
+    const [row] = await queryRows(`SELECT plan FROM public.tenants WHERE id=$1`, [tenant]);
+    previousPlan = row.plan;
+    await queryRows(`UPDATE public.tenants SET plan='growth' WHERE id=$1`, [tenant]);
     app = await bootApp();
     fx = await seedTenant(schema);
     staffId = await createUser(schema, fx, { permissions: STAFF });
@@ -47,6 +55,7 @@ describe('Todos los escritores de stock', () => {
   after(async () => {
     await replica.stop();
     await app.close();
+    await queryRows(`UPDATE public.tenants SET plan=$2 WHERE id=$1`, [tenant, previousPlan]);
   });
 
   it('I01: un ajuste offline basado en stock viejo recibe conflicto y no resucita unidades vendidas', async () => {
@@ -112,6 +121,8 @@ describe('Todos los escritores de stock', () => {
           body: { customerId: buyerId, branchId: fx.branchA, paymentMethod: 'CASH', amountReceived: 1000, items: [{ productId, quantity: 1, size: 'M' }] },
         }),
       ]);
+      // Cada lado gana (201) o pierde por stock (409): un 403 del plan no es una carrera
+      assert.ok([201, 409].includes(web.status) && [201, 409].includes(pos.status), `web ${web.status}, pos ${pos.status} ${JSON.stringify(pos.body)}`);
       const wins = [web.status, pos.status].filter((s) => s === 201).length;
       assert.equal(wins, 1, `web ${web.status} ${JSON.stringify(web.body?.code)}, pos ${pos.status} ${JSON.stringify(pos.body)}`);
       assert.equal((await stockOf(schema, productId, fx.branchA, 'M'))?.stock, 0);
@@ -167,6 +178,25 @@ describe('Todos los escritores de stock', () => {
     // La base rechaza stock o mermas negativos aunque un bug los intentara
     await assert.rejects(queryRows(`UPDATE "${schema}".product_inventories SET stock=-1 WHERE "productId"=$1`, [merma]));
     await assert.rejects(queryRows(`UPDATE "${schema}".product_inventories SET "damagedStock"=-1 WHERE "productId"=$1`, [merma]));
+  });
+
+  it('I04: la regla comercial sigue: una tienda Starter no usa POS ni devoluciones', async () => {
+    const [row] = await queryRows(`SELECT plan FROM public.tenants WHERE id=$1`, [TENANT_B.tenantId]);
+    assert.ok(['free', 'starter'].includes(row.plan), `la tienda B debería ser Starter, es ${row.plan}`);
+    const betaSchema = TENANT_B.schemaName;
+    const betaFx = await seedTenant(betaSchema);
+    const betaStaffId = await createUser(betaSchema, betaFx, { permissions: STAFF });
+    const betaStaff = await apiFor(app, TENANT_B.tenantId, betaStaffId, STAFF);
+    const productId = await createProduct(betaSchema, betaFx, { [betaFx.branchA]: { M: 2 } });
+    const pos = await betaStaff.call('POST', '/pos/checkout', {
+      body: { customerId: betaStaffId, branchId: betaFx.branchA, paymentMethod: 'CASH', amountReceived: 1000, items: [{ productId, quantity: 1, size: 'M' }] },
+    });
+    assert.equal(pos.status, 403, JSON.stringify(pos.body));
+    const returns = await betaStaff.call('POST', '/returns/process', {
+      body: { orderId: randomUUID(), branchId: betaFx.branchA, items: [{ orderItemId: randomUUID(), quantity: 1, reason: 'OTHER', condition: 'SELLABLE' }] },
+    });
+    assert.equal(returns.status, 403, JSON.stringify(returns.body));
+    assert.equal((await stockOf(betaSchema, productId, betaFx.branchA, 'M'))?.stock, 2);
   });
 
   it('M02: variantes distintas actualizan el agregado a la vez sin desfase', async () => {

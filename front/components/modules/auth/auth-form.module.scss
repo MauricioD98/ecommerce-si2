@@ -413,13 +413,22 @@
     color: var(--muted-foreground);
 }
 
-.roleBadge {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: color-mix(in srgb, var(--primary) 12%, transparent);
-    color: var(--foreground);
-    white-space: nowrap;
+
+// Aviso informativo (cambios de perfil pendientes en este dispositivo)
+.notice {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.5rem;
+    color: #1e3a8a;
+    font-size: 0.875rem;
+    line-height: 1.4;
+
+    svg {
+        flex-shrink: 0;
+    }
 }

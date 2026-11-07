@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import apiClient, { getErrorMessage } from '../../api/client';
 import { Input } from '../../components/Input';
@@ -24,10 +25,9 @@ export const TenantSelectorScreen: React.FC<{
   rejected?: boolean;
   onSelect: (tenant: { id: string; name: string; slug: string } | string) => Promise<void>;
 }> = ({ rejected = false, onSelect }) => {
+  const { t } = useTranslation();
   const [slug, setSlug] = useState('');
-  const [error, setError] = useState<string | null>(
-    rejected ? 'La tienda guardada ya no está disponible o su plan actual no incluye la App Móvil.' : null
-  );
+  const [error, setError] = useState<string | null>(rejected ? t('mobileAccess.storeUnavailable') : null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleContinue = async () => {
@@ -40,8 +40,9 @@ export const TenantSelectorScreen: React.FC<{
       const { data } = await apiClient.get<{ data: ResolvedTenant }>(
         `/platform/tenants/resolve/${encodeURIComponent(value)}`
       );
+      // Solo para avisar antes; la API vuelve a decidirlo con el plan vigente en cada sesión móvil
       if (data.data.features && data.data.features.mobileApp === false) {
-        setError('Esta tienda no tiene habilitada la App Móvil (disponible en el Plan Pro).');
+        setError(t('mobileAccess.planNotIncluded'));
         setIsLoading(false);
         return;
       }

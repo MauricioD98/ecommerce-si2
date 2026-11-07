@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,6 +14,11 @@ import { DEFAULT_ROLE } from '../../common/constants/permissions';
 import { MailService } from '../mail/mail.service';
 import { USER_SELECT, UserWithRole, toUserResponse } from '../users/user.mapper';
 import { requireTenant } from '../../tenancy/tenant-context';
+import type { MobileSessionClaims } from '../mobile-access/mobile-access.errors';
+
+// Hash con el mismo costo que las contraseñas reales: si el correo no existe (o la cuenta está
+// bloqueada) se compara igual contra este, para que el tiempo de respuesta no lo delate
+const LOGIN_DUMMY_HASH = bcrypt.hashSync('tenant-login-timing-guard', 12);
 
 @Injectable()
 export class AuthService {
@@ -32,7 +37,8 @@ export class AuthService {
     ) {}
 
 
-    async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+    // mobile: solo lo pasa MobileAuthController después de verificar plan y prueba de integridad
+    async register(registerDto: RegisterDto, mobile?: MobileSessionClaims): Promise<AuthResponseDto> {
         const { email, password, firstName, lastName, phone } = registerDto;
         const normalizedEmail = email.trim().toLowerCase();
 
@@ -64,7 +70,7 @@ export class AuthService {
                 },
                 select: USER_SELECT,
             });
-            const tokens = await this.generateTokens(user);
+            const tokens = await this.generateTokens(user, mobile);
             await this.updateRefreshToken(user.id, tokens.refreshToken);
 
             // Sin await: un fallo del correo nunca debe impedir que el registro termine
@@ -104,8 +110,11 @@ export class AuthService {
     // Los cambios de rol/permisos se reflejan al renovar el token (cada 15 min o al volver a iniciar sesión).
     // tenantId sale del contexto de la request (TenantMiddleware): el usuario se acaba de leer de
     // ese schema, así que el token queda atado a la tienda donde existe ese usuario.
-    private async generateTokens(user: Pick<UserWithRole, 'id' | 'email' | 'branchId' | 'role'>): Promise<{ accessToken: string; refreshToken: string }> {
+    // Canal móvil: channel/att van firmados en ambos tokens. JwtStrategy exige el plan con mobileApp
+    // en cada request y el refresh móvil vuelve a leer el plan; el cliente no puede autodeclararlos.
+    private async generateTokens(user: Pick<UserWithRole, 'id' | 'email' | 'branchId' | 'role'>, mobile?: MobileSessionClaims): Promise<{ accessToken: string; refreshToken: string }> {
       const { tenantId } = requireTenant();
+      const channelClaims = mobile ? { channel: 'mobile' as const, att: mobile.method } : {};
       const accessPayload = {
         sub: user.id,
         email: user.email,
@@ -113,8 +122,15 @@ export class AuthService {
         role: { id: user.role.id, name: user.role.name },
         permissions: user.role.permissions,
         branchId: user.branchId,
+        ...channelClaims,
       };
-      const refreshPayload = { sub: user.id, email: user.email, tenantId, refreshId: randomBytes(16).toString('hex') };
+      const refreshPayload = {
+        sub: user.id,
+        email: user.email,
+        tenantId,
+        refreshId: randomBytes(16).toString('hex'),
+        ...(mobile ? { ...channelClaims, platform: mobile.platform, attestedAt: mobile.attestedAt } : {}),
+      };
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(accessPayload,{expiresIn: '15m'}),
         // El refresh token se firma con su propio secreto: RefreshTokenStrategy lo verifica con JWT_REFRESH_SECRET
@@ -134,7 +150,7 @@ export class AuthService {
         });
     }
 
-    async refreshTokens(userId: string): Promise<AuthResponseDto>{
+    async refreshTokens(userId: string, mobile?: MobileSessionClaims): Promise<AuthResponseDto>{
         // Se vuelve a leer el rol: el nuevo access token trae los permisos vigentes
         const user = await this.prisma.user.findUnique({
             where:{id:userId},
@@ -145,7 +161,7 @@ export class AuthService {
             throw new UnauthorizedException(i18nMessage('errors.USER_NOT_FOUND'));
         }
 
-        const tokens = await this.generateTokens(user);
+        const tokens = await this.generateTokens(user, mobile);
         await this.updateRefreshToken(user.id,tokens.refreshToken);
 
         return {
@@ -263,12 +279,12 @@ export class AuthService {
     }
 
     /** Emite tokens y limpia bloqueos previos para un usuario ya autenticado en el tenant actual. */
-    async issueSessionForUser(user: UserWithRole & { loginAttempts: number; lockedUntil: Date | null }): Promise<AuthResponseDto> {
+    async issueSessionForUser(user: UserWithRole & { loginAttempts: number; lockedUntil: Date | null }, mobile?: MobileSessionClaims): Promise<AuthResponseDto> {
         if (user.loginAttempts > 0 || user.lockedUntil) {
             await this.prisma.user.update({ where: { id: user.id }, data: { loginAttempts: 0, lockedUntil: null } });
         }
 
-        const tokens = await this.generateTokens(user);
+        const tokens = await this.generateTokens(user, mobile);
         await this.updateRefreshToken(user.id, tokens.refreshToken);
 
         return {
@@ -277,7 +293,7 @@ export class AuthService {
         };
     }
 
-    async login (loginDto: LoginDto): Promise<AuthResponseDto>{
+    async login (loginDto: LoginDto, mobile?: MobileSessionClaims): Promise<AuthResponseDto>{
         const {email,password}=loginDto
 
         const user = await this.prisma.user.findFirst({
@@ -285,28 +301,25 @@ export class AuthService {
             select: { ...USER_SELECT, password: true, loginAttempts: true, lockedUntil: true },
         });
 
-        // Cuenta bloqueada: se rechaza sin mirar la contraseña (aunque sea la correcta) hasta que pase el bloqueo
+        // Todo fallo responde igual (mismo status, mismo mensaje y un bcrypt de costo parecido): ni el
+        // mensaje ni el tiempo revelan si el correo existe en esta tienda o si su cuenta está bloqueada
+        const fail = () => new UnauthorizedException(i18nMessage('errors.LOGIN_FAILED'));
+
+        // Cuenta bloqueada: se rechaza sin aceptar la contraseña (aunque sea la correcta) hasta que pase el bloqueo
         if (user?.lockedUntil && user.lockedUntil > new Date()) {
-            const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000);
-            throw new HttpException(
-                i18nMessage('errors.TOO_MANY_ATTEMPTS', { count: minutes }),
-                HttpStatus.TOO_MANY_REQUESTS,
-            );
+            await bcrypt.compare(password, LOGIN_DUMMY_HASH);
+            throw fail();
         }
 
         if(!user || !(await bcrypt.compare(password , user.password))){
             if (user) {
-                const lock = await this.recordFailedLoginAttempt(user);
-                if (lock) {
-                    throw new HttpException(
-                        i18nMessage('errors.ACCOUNT_LOCKED'),
-                        HttpStatus.TOO_MANY_REQUESTS,
-                    );
-                }
+                await this.recordFailedLoginAttempt(user);
+            } else {
+                await bcrypt.compare(password, LOGIN_DUMMY_HASH);
             }
-            throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'))
+            throw fail();
         }
 
-        return this.issueSessionForUser(user);
+        return this.issueSessionForUser(user, mobile);
     }
 }

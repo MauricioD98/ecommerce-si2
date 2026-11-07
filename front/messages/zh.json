@@ -223,7 +223,17 @@
       "submitting": "正在登录...",
       "submit": "登录",
       "noAccount": "还没有账户？",
-      "createAccount": "创建账户"
+      "createAccount": "创建账户",
+      "storeStepTitle": "你要登录哪家店铺？",
+      "storeStepSubtitle": "请选择你拥有账户的店铺，然后我们会请你输入邮箱和密码。",
+      "storeLabel": "店铺",
+      "currentStore": "当前店铺",
+      "changeStore": "更换店铺",
+      "noStores": "无法加载可用店铺。请检查网络连接后重试。",
+      "invalidCredentials": "邮箱或密码错误。如果多次失败，请等待几分钟后再试。",
+      "platformAdminPrompt": "你是 NovaSoft 管理员吗？",
+      "platformAdminLink": "进入平台面板",
+      "pendingProfileChanges": "此设备上有离线保存的个人资料更改。当做出这些更改的同一账户登录后，它们将被发送。"
     },
     "register": {
       "title": "创建你的账户",
@@ -339,6 +349,7 @@
       "offlineSaveFailed": "无法在此设备上保存订单。",
       "gatewayFailed": "无法初始化支付网关。",
       "cardUnavailable": "本店暂不支持银行卡支付：请选择其他支付方式。",
+      "cardCurrencyMismatch": "暂不支持银行卡支付：本店将以 Bs 以外的货币扣款。请选择其他支付方式。",
       "bankQr": "银行二维码",
       "bankQrDescription": "用银行 App 付款并上传凭证",
       "usdt": "USDT",
@@ -582,7 +593,34 @@
       "noPreferredBranch": "无常用分店",
       "preferredBranchHint": "我们会通知你该分店的新品和优惠。",
       "saving": "正在保存...",
-      "save": "保存更改"
+      "save": "保存更改",
+      "sync": {
+        "offline": "当前离线。您可以编辑个人资料：更改会保存在此设备上，并在恢复连接后发送。",
+        "offlinePending": "当前离线。您有待同步的更改保存在此设备上，将在恢复连接后发送。",
+        "copyFrom": "数据保存于 {date}。",
+        "pending": "有待同步的更改。",
+        "syncing": "正在同步您的更改…",
+        "synced": "个人资料已与服务器同步。",
+        "needsLogin": "您的会话已过期。您的更改仍已保存：请使用此账户重新登录以发送更改。",
+        "signIn": "登录",
+        "error": "无法同步您的更改：{reason}",
+        "retry": "重试",
+        "discard": "放弃我的更改",
+        "conflictTitle": "您的个人资料已在另一台设备上更改",
+        "conflictDescription": "您离线期间，这些数据已在其他地方被修改。请选择要保留的版本；没有任何内容被覆盖。",
+        "field": "字段",
+        "yourChange": "您的更改",
+        "serverValue": "服务器上的当前值",
+        "keepMine": "使用我的更改",
+        "keepServer": "保留服务器上的",
+        "emptyValue": "（空）",
+        "savedLocally": "已保存在此设备上。将在恢复连接后发送。",
+        "offlineFields": "离线时可以编辑名字、姓氏、电话和常用门店。邮箱无法更改。",
+        "saveOffline": "保存到此设备",
+        "requiresConnection": "修改密码、开启通知和管理地址需要网络连接。",
+        "offlineAccountNote": "您正在查看保存在此设备上的账户副本。您可以编辑个人资料和查看订单；地址、密码和通知需要网络连接。",
+        "backHome": "返回首页"
+      }
     },
     "security": {
       "title": "安全",
@@ -654,7 +692,9 @@
         "PENDIENTE": "店铺审核中",
         "APROBADO": "已通过",
         "RECHAZADO": "已拒绝"
-      }
+      },
+      "offlineCopy": "当前离线：正在显示 {date} 保存的副本。实际状态可能已有变化。",
+      "offlineNoCopy": "当前离线。请至少联网打开一次此页面，之后才能离线查看。"
     },
     "status": {
       "PENDIENTE": "待处理",

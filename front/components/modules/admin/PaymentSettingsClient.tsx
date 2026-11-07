@@ -438,7 +438,7 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
     const { features } = useStorePlan();
     const { isSuperAdmin } = useAdminRole();
     const [enabled, setEnabled] = useState(settings.wallet?.enabled ?? false);
-    const [provider, setProvider] = useState(settings.wallet?.provider ?? 'Airtm / Takenos / Wallbit');
+    const [provider, setProvider] = useState(settings.wallet?.provider ?? '');
     const [account, setAccount] = useState(settings.wallet?.account ?? '');
     const [instructions, setInstructions] = useState(settings.wallet?.instructions ?? '');
     const [busy, setBusy] = useState(false);
@@ -446,7 +446,7 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
 
     useEffect(() => {
         setEnabled(settings.wallet?.enabled ?? false);
-        setProvider(settings.wallet?.provider ?? 'Airtm / Takenos / Wallbit');
+        setProvider(settings.wallet?.provider ?? '');
         setAccount(settings.wallet?.account ?? '');
         setInstructions(settings.wallet?.instructions ?? '');
     }, [settings.wallet]);
@@ -494,7 +494,8 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
         );
     }
 
-    const complete = Boolean(account.trim().length > 0);
+    // Igual que la API: sin proveedor y cuenta de cobro reales no se puede activar
+    const complete = Boolean(provider.trim() && account.trim());
 
     const save = async () => {
         setBusy(true);
@@ -567,7 +568,7 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
                 <input type="checkbox" checked={enabled} disabled={!complete} onChange={(e) => setEnabled(e.target.checked)} />
                 Habilitar pagos con Billeteras Digitales
             </label>
-            {!complete && <small className={styles.cellSub}>Ingresa la cuenta o usuario de cobro para poder habilitar este medio.</small>}
+            {!complete && <small className={styles.cellSub}>Ingresa la billetera aceptada y la cuenta o usuario de cobro para poder habilitar este medio.</small>}
 
             <div>
                 <button type="button" className={styles.button} onClick={save} disabled={busy || (!complete && enabled)}>

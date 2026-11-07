@@ -9,12 +9,11 @@ import { PaymentsService } from './payments.service';
 import { PaymentSettlementService } from './payment-settlement.service';
 import { CheckoutCode, CheckoutException } from '../../common/checkout/checkout-errors';
 import { lockOrder, withTxRetry } from '../../common/checkout/tx.util';
-import { UploadedImage, detectImageType, isValidTxId } from './payment-settings.service';
-
-const MANUAL_METHODS: PaymentMethod[] = [PaymentMethod.BANK_QR, PaymentMethod.USDT, PaymentMethod.WALLET];
+import { MANUAL_PAYMENT_METHODS } from '../../common/checkout/checkout-policy';
+import { UploadedImage, detectImageType, isValidTxId, isWalletReady } from './payment-settings.service';
 
 /**
- * Pagos manuales (QR bancario y USDT): el cliente informa el pago y la tienda lo verifica desde
+ * Pagos manuales (QR bancario, USDT y billetera): el cliente informa el pago y la tienda lo verifica desde
  * Pedidos. Hasta que se aprueba, el pedido queda PENDIENTE con su stock reservado; si se rechaza,
  * se cancela y el stock vuelve (OrdersService.cancel).
  */
@@ -35,7 +34,7 @@ export class PaymentProofsService {
     });
     if (!order) throw new NotFoundException(`Order ${orderId} not found`);
     if (
-      !MANUAL_METHODS.includes(method) ||
+      !MANUAL_PAYMENT_METHODS.includes(method) ||
       order.status !== OrderStatus.PENDIENTE ||
       order.paymentStatus !== PaymentStatus.PENDIENTE ||
       (order.paymentProof && order.paymentProof.status !== PaymentProofStatus.PENDIENTE)
@@ -49,14 +48,14 @@ export class PaymentProofsService {
 
     const settings = await this.prisma.paymentSettings.findUnique({
       where: { id: 'default' },
-      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletAccount: true },
+      select: { qrEnabled: true, qrImageType: true, usdtEnabled: true, usdtNetwork: true, usdtWalletAddress: true, walletEnabled: true, walletProvider: true, walletAccount: true },
     });
     const enabled =
       method === PaymentMethod.BANK_QR
         ? Boolean(settings?.qrEnabled && settings.qrImageType)
         : method === PaymentMethod.USDT
         ? Boolean(settings?.usdtEnabled && settings.usdtNetwork && settings.usdtWalletAddress)
-        : Boolean(settings?.walletEnabled && settings.walletAccount);
+        : isWalletReady(settings);
     if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
 
     if (method === PaymentMethod.BANK_QR && !image) {

@@ -34,7 +34,8 @@ import { SetTenantStatusDto } from './dto/set-tenant-status.dto';
 import { PLATFORM_KEY_HEADER, PlatformAdminGuard } from './guards/platform-admin.guard';
 import { InternalKeyGuard } from './guards/internal-key.guard';
 import { SubscriptionsService } from './subscriptions.service';
-import { PLANS, type PlanKey, getPlanFeatures } from './plans';
+import { PLANS, type PlanKey, getPlanFeatures, minimumPlanName } from './plans';
+import { i18nMessage } from '../../i18n/i18n-message';
 
 // Suscripciones que hoy generan ingreso: past_due sigue contando hasta que Stripe la dé por perdida
 const PAYING_STATUSES = ['active', 'past_due'];
@@ -114,7 +115,11 @@ export class PlatformController {
     const features = getPlanFeatures(tenant.plan);
     if (clientPlatform?.trim().toLowerCase() === 'mobile' && !features.mobileApp) {
       throw new ForbiddenException(
-        `La tienda "${tenant.name}" no cuenta con App Móvil habilitada en su plan actual (${features.planName}). Disponible en el Plan Pro.`,
+        i18nMessage('errors.PLAN_STORE_MOBILE_APP', {
+          store: tenant.name,
+          currentPlan: features.planName,
+          plan: minimumPlanName((plan) => plan.mobileApp),
+        }),
       );
     }
 
@@ -170,7 +175,10 @@ export class PlatformController {
       const features = getPlanFeatures(target.plan);
       if (!features.customDomain) {
         throw new ForbiddenException(
-          `El plan actual de la tienda (${features.planName}) no incluye dominio propio. Requiere plan Growth o Pro.`,
+          i18nMessage('errors.PLAN_STORE_CUSTOM_DOMAIN', {
+            currentPlan: features.planName,
+            plan: minimumPlanName((plan) => plan.customDomain),
+          }),
         );
       }
     }

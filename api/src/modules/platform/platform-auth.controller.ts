@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { PlatformLoginDto } from './dto/platform-login.dto';
-import { TenantDiscoveryLoginDto } from './dto/tenant-discovery-login.dto';
+import { TenantLoginDto } from './dto/tenant-login.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import { PlatformAuthService } from './platform-auth.service';
 
-// Login de los administradores del SaaS (/plataforma) y descubrimiento multi-tienda de usuarios.
-// Va bajo /platform, excluido de TenantMiddleware.
+// Login de los administradores del SaaS (/plataforma, JWT de plataforma) y login de usuarios en la
+// tienda que eligieron antes de autenticar (JWT de tienda). Va bajo /platform, excluido de TenantMiddleware.
 @ApiTags('platform')
 @Controller('platform/auth')
 export class PlatformAuthController {
@@ -29,18 +29,14 @@ export class PlatformAuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Login de tienda con detección automática del tenant por credenciales' })
-  async tenantLogin(@Body() dto: TenantDiscoveryLoginDto) {
+  @ApiOperation({
+    summary: 'Login en la tienda elegida (tenantId obligatorio)',
+    description:
+      'Consulta las credenciales solo en esa tienda. Cualquier fallo (tienda inválida o suspendida, correo inexistente, contraseña incorrecta, cuenta bloqueada) responde 401 con el mismo mensaje.',
+  })
+  async tenantLogin(@Body() dto: TenantLoginDto) {
     const data = await this.auth.tenantLogin(dto);
-    return {
-      success: true,
-      data,
-      message: data.isPlatformAdmin
-        ? 'Sesión de plataforma iniciada'
-        : data.requiresTenantSelection
-          ? 'Selecciona una tienda para continuar'
-          : 'Sesión iniciada',
-    };
+    return { success: true, data, message: 'Sesión iniciada' };
   }
 
   @Get('me')

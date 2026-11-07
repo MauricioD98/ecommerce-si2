@@ -223,7 +223,17 @@
       "submitting": "Iniciando sesión...",
       "submit": "Iniciar sesión",
       "noAccount": "¿No tienes una cuenta?",
-      "createAccount": "Crear cuenta"
+      "createAccount": "Crear cuenta",
+      "storeStepTitle": "¿A qué tienda quieres ingresar?",
+      "storeStepSubtitle": "Elige la tienda donde tienes tu cuenta. Después te pediremos tu correo y contraseña.",
+      "storeLabel": "Tienda",
+      "currentStore": "Tienda actual",
+      "changeStore": "Cambiar tienda",
+      "noStores": "No pudimos cargar las tiendas disponibles. Revisa tu conexión e inténtalo de nuevo.",
+      "invalidCredentials": "Correo o contraseña incorrectos. Si fallaste varias veces, espera unos minutos antes de volver a intentarlo.",
+      "platformAdminPrompt": "¿Eres administrador de NovaSoft?",
+      "platformAdminLink": "Ingresar al panel de plataforma",
+      "pendingProfileChanges": "Hay cambios de perfil guardados sin conexión en este dispositivo. Se enviarán cuando inicie sesión la misma cuenta que los hizo."
     },
     "register": {
       "title": "Crea tu cuenta",
@@ -339,6 +349,7 @@
       "offlineSaveFailed": "No se pudo guardar el pedido en este dispositivo.",
       "gatewayFailed": "No se pudo inicializar la pasarela de pago.",
       "cardUnavailable": "Esta tienda todavía no acepta pagos con tarjeta: elige otro medio de pago.",
+      "cardCurrencyMismatch": "La tarjeta no está disponible: la tienda cobraría en una moneda distinta de Bs. Elige otro medio de pago.",
       "bankQr": "QR bancario",
       "bankQrDescription": "Paga desde la app de tu banco y sube el comprobante",
       "usdt": "USDT",
@@ -591,7 +602,34 @@
       "noPreferredBranch": "Sin sucursal favorita",
       "preferredBranchHint": "Te avisaremos de las novedades y ofertas de esta sucursal.",
       "saving": "Guardando...",
-      "save": "Guardar cambios"
+      "save": "Guardar cambios",
+      "sync": {
+        "offline": "Sin conexión. Puedes editar tu perfil: los cambios se guardan en este dispositivo y se enviarán al volver la conexión.",
+        "offlinePending": "Sin conexión. Tienes cambios pendientes guardados en este dispositivo; se enviarán al volver la conexión.",
+        "copyFrom": "Datos guardados el {date}.",
+        "pending": "Cambios pendientes de sincronizar.",
+        "syncing": "Sincronizando tus cambios…",
+        "synced": "Perfil sincronizado con el servidor.",
+        "needsLogin": "Tu sesión venció. Tus cambios siguen guardados: inicia sesión de nuevo con esta cuenta para enviarlos.",
+        "signIn": "Iniciar sesión",
+        "error": "No se pudieron sincronizar tus cambios: {reason}",
+        "retry": "Reintentar",
+        "discard": "Descartar mis cambios",
+        "conflictTitle": "Tu perfil cambió en otro dispositivo",
+        "conflictDescription": "Mientras estabas sin conexión, estos datos se modificaron en otro lugar. Elige qué versión conservar; nada se sobrescribió.",
+        "field": "Campo",
+        "yourChange": "Tu cambio",
+        "serverValue": "Valor actual en el servidor",
+        "keepMine": "Usar mis cambios",
+        "keepServer": "Conservar los del servidor",
+        "emptyValue": "(vacío)",
+        "savedLocally": "Guardado en este dispositivo. Se enviará cuando vuelva la conexión.",
+        "offlineFields": "Sin conexión puedes editar nombre, apellido, teléfono y sucursal favorita. El correo no se puede cambiar.",
+        "saveOffline": "Guardar en este dispositivo",
+        "requiresConnection": "Cambiar la contraseña, activar notificaciones y administrar direcciones requieren conexión.",
+        "offlineAccountNote": "Estás viendo la copia de tu cuenta guardada en este dispositivo. Puedes editar tu perfil y consultar tus pedidos; direcciones, contraseña y notificaciones requieren conexión.",
+        "backHome": "Volver al inicio"
+      }
     },
     "security": {
       "title": "Seguridad",
@@ -663,7 +701,9 @@
         "PENDIENTE": "En revisión por la tienda",
         "APROBADO": "Aprobado",
         "RECHAZADO": "Rechazado"
-      }
+      },
+      "offlineCopy": "Sin conexión: mostrando la copia guardada el {date}. El estado real puede haber cambiado.",
+      "offlineNoCopy": "Sin conexión. Abre este apartado con conexión al menos una vez para poder verlo sin ella."
     },
     "status": {
       "PENDIENTE": "Pendiente",

@@ -4,6 +4,7 @@ import { getServerStoreName } from "@/utils/storeName.server";
 import React from 'react';
 import { WifiOff } from 'lucide-react';
 import styles from './offline.module.scss';
+import OfflineAccountGate from '@/components/modules/account/OfflineAccountGate';
 
 export const revalidate = false;
 
@@ -14,7 +15,9 @@ export default async function OfflinePage() {
     const t = await getTranslations('ErrorPage');
     const store = await getServerStoreName();
 
+    // Si lo que no cargó fue "Mi cuenta", el gate puede mostrar el perfil guardado en IndexedDB (nunca desde caché)
     return (
+        <OfflineAccountGate>
         <main className={styles.page}>
             <div className={styles.card}>
                 <WifiOff size={40} strokeWidth={1.75} />
@@ -28,6 +31,7 @@ export default async function OfflinePage() {
                 <a href="/">{t('backHome')}</a>
             </div>
         </main>
+        </OfflineAccountGate>
     );
 }
 

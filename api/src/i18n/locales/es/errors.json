@@ -14,6 +14,7 @@
   "REGISTER_FAILED": "Ocurrió un error durante el registro",
   "USER_NOT_FOUND": "Usuario no encontrado",
   "INVALID_CREDENTIALS": "Email o contraseña inválidos",
+  "LOGIN_FAILED": "Correo o contraseña incorrectos. Si fallaste varias veces, espera unos minutos antes de volver a intentarlo",
   "TOO_MANY_ATTEMPTS": {
     "one": "Demasiados intentos fallidos. Inténtalo de nuevo en {count} minuto",
     "other": "Demasiados intentos fallidos. Inténtalo de nuevo en {count} minutos"
@@ -66,5 +67,42 @@
   "PAYMENT_MISMATCH": "El pago no coincide con este pedido.",
   "PAYMENT_SIMULATION_DISABLED": "Este medio de pago no está disponible.",
   "INVENTORY_VERSION_CONFLICT": "El stock cambió desde que lo leíste. Revisa el valor actual antes de ajustar.",
-  "PROVIDER_UNAVAILABLE": "El proveedor de pagos no responde. Intenta de nuevo en un momento."
+  "PROVIDER_UNAVAILABLE": "El proveedor de pagos no responde. Intenta de nuevo en un momento.",
+  "MOBILE_APP_NOT_IN_PLAN": "El plan actual de esta tienda no incluye la app móvil (disponible en el plan Pro). Puedes seguir comprando desde la tienda web, también en el navegador del teléfono.",
+  "MOBILE_ATTESTATION_REQUIRED": "Por seguridad, la app necesita verificar este dispositivo de nuevo.",
+  "MOBILE_ATTESTATION_INVALID": "No pudimos verificar que esta sea la app oficial en un dispositivo seguro.",
+  "MOBILE_ATTESTATION_UNAVAILABLE": "La verificación del dispositivo no está disponible en este momento. Inténtalo más tarde.",
+  "MOBILE_CHANNEL_MISMATCH": "Esta sesión no corresponde a este canal. Vuelve a iniciar sesión.",
+  "PLAN_FEATURE": {
+    "pos": "El Punto de Venta (POS) está disponible desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "returns": "La gestión de devoluciones y mermas está disponible desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "multiBranchInventory": "La gestión de inventario multi-sucursal y descuentos globales está disponible desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "customDomain": "El dominio propio está disponible desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "aiReports": "Los reportes con IA están disponibles desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "virtualTryOn": "El Probador Virtual está disponible desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "campaigns": "Las campañas de email y notificaciones push están disponibles desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "qrPayments": "Los pagos por QR están disponibles en todos los planes.",
+    "digitalWallet": "Los pagos con billetera digital (Airtm, Takenos, Wallbit) están disponibles desde el plan {plan}. Actualiza tu plan en Suscripción.",
+    "mobileApp": "Esta tienda no tiene habilitada la App Móvil para clientes en su plan actual (disponible desde el plan {plan})."
+  },
+  "PLAN_BRANCH_LIMIT": {
+    "one": "Tu plan {plan} permite crear hasta {count} sucursal. Actualiza tu plan en Suscripción para agregar más sucursales.",
+    "other": "Tu plan {plan} permite crear hasta {count} sucursales. Actualiza tu plan en Suscripción para agregar más sucursales."
+  },
+  "PLAN_ACTIVE_BRANCH_LIMIT": {
+    "one": "Tu plan {plan} permite mantener hasta {count} sucursal activa. Actualiza tu plan en Suscripción.",
+    "other": "Tu plan {plan} permite mantener hasta {count} sucursales activas. Actualiza tu plan en Suscripción."
+  },
+  "PLAN_PRODUCT_LIMIT": {
+    "one": "Tu plan {plan} permite hasta {count} producto activo. Actualiza al plan {upgradePlan} o superior para tener productos ilimitados.",
+    "other": "Tu plan {plan} permite hasta {count} productos activos. Actualiza al plan {upgradePlan} o superior para tener productos ilimitados."
+  },
+  "PLAN_STORE_MOBILE_APP": "La tienda \"{store}\" no tiene habilitada la App Móvil en su plan actual ({currentPlan}). Disponible desde el plan {plan}.",
+  "PLAN_STORE_CUSTOM_DOMAIN": "El plan actual de la tienda ({currentPlan}) no incluye dominio propio. Requiere el plan {plan} o superior.",
+  "PLAN_SIGNUP_CUSTOM_DOMAIN": "El dominio propio está disponible desde el plan {plan}.",
+  "PROFILE_CONFLICT": "Tu perfil cambió en otro dispositivo mientras estabas sin conexión. Revisa los cambios antes de guardarlos.",
+  "PROFILE_SYNC_EMPTY": "No hay cambios de perfil para sincronizar.",
+  "PROFILE_SYNC_EXPECTED_MISSING": "Falta el valor anterior del campo {field}: no se puede sincronizar sin comprobar que no cambió.",
+  "PROFILE_SYNC_CHANGE_REUSED": "Este cambio pertenece a otra cuenta.",
+  "PROFILE_FIRST_NAME_REQUIRED": "El nombre es obligatorio."
 }

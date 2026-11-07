@@ -28,10 +28,11 @@
     "logout": "Cerrar Sesión",
     "logoutConfirm": "¿Estás seguro de que deseas salir de tu cuenta?",
     "apiModalTitle": "Configurar Servidor API",
-    "apiModalDesc": "Conéctate a la API en la nube (Azure) o ajusta la URL para desarrollo local.",
+    "apiModalDesc": "Conéctate al servidor configurado para esta versión o ajusta la URL para desarrollo local.",
     "apiUrlLabel": "URL Base de la API",
-    "cloudServer": "Servidor en la Nube (Azure Producción)",
+    "cloudServer": "Servidor configurado (producción)",
     "localServer": "Servidor Local (PC): {{address}}",
+    "urlInvalid": "URL no válida",
     "urlSaved": "URL Guardada",
     "urlSavedBody": "Conectando con: {{url}}",
     "urlRestored": "URL Restaurada",
@@ -45,5 +46,13 @@
     "storageFailed": "No pudimos guardar tu compra en este dispositivo, así que no la enviamos. Libera espacio e inténtalo de nuevo.",
     "pendingTitle": "Pago en proceso",
     "pending": "Tu pago todavía no está confirmado. Actualizaremos tu pedido cuando el banco responda. No hace falta que pagues de nuevo."
+  },
+  "mobileAccess": {
+    "noStore": "Elige una tienda para continuar.",
+    "notConfigured": "Esta versión de la app no está configurada para verificar el dispositivo.",
+    "serverNotConfigured": "La verificación de la app móvil todavía no está disponible. Puedes comprar desde la tienda web.",
+    "deviceUnsupported": "No pudimos verificar este dispositivo. La app requiere un teléfono compatible con la verificación de Google Play o Apple; puedes seguir comprando desde la tienda web en el navegador.",
+    "planNotIncluded": "Esta tienda no tiene la app móvil en su plan actual (disponible en el plan Pro). Puedes comprar desde la tienda web, también en el navegador del teléfono.",
+    "storeUnavailable": "La tienda guardada ya no está disponible o su plan actual no incluye la app móvil."
   }
 }

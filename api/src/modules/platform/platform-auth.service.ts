@@ -1,14 +1,12 @@
-import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { ControlPrismaService } from '../../tenancy/control-prisma.service';
-import { TenantPrismaService } from '../../tenancy/tenant-prisma.service';
 import { runInTenant } from '../../tenancy/tenant-context';
 import { AuthService } from '../auth/auth.service';
 import { AuthResponseDto } from '../auth/dto/auth-response.dto';
-import { USER_SELECT } from '../users/user.mapper';
-import { TenantDiscoveryLoginDto } from './dto/tenant-discovery-login.dto';
+import { TenantLoginDto } from './dto/tenant-login.dto';
 
 // Mismo criterio que el login de las tiendas (AuthService): tras MAX_ATTEMPTS fallos seguidos la
 // cuenta queda bloqueada LOCK_MS (el mensaje ACCOUNT_LOCKED dice 5 minutos)
@@ -21,7 +19,7 @@ const TOKEN_TTL_SECONDS = 8 * 60 * 60;
 // tienda no pasa PlatformAdminGuard, y uno de plataforma no trae tenantId/rol para JwtStrategy
 export const PLATFORM_TOKEN_AUDIENCE = 'stella-platform';
 // Hash de una contraseña cualquiera: si el email no existe se compara igual contra este, para que el
-// tiempo de respuesta no revele qué emails son administradores
+// tiempo de respuesta no revele qué emails son administradores (ni, en tenantLogin, si la tienda existe)
 const DUMMY_HASH = bcrypt.hashSync('platform-admin-timing-guard', 10);
 
 export interface PlatformAdminProfile {
@@ -37,30 +35,10 @@ export interface TenantPublicSummary {
   plan: string;
 }
 
-export interface TenantMatchOption extends TenantPublicSummary {
-  role: string;
+export interface TenantLoginResult {
+  tenant: TenantPublicSummary;
+  auth: AuthResponseDto;
 }
-
-export type TenantDiscoveryLoginResult =
-  | {
-      isPlatformAdmin?: false;
-      requiresTenantSelection: false;
-      tenant: TenantPublicSummary;
-      auth: AuthResponseDto;
-    }
-  | {
-      isPlatformAdmin?: false;
-      requiresTenantSelection: true;
-      tenants: TenantMatchOption[];
-    }
-  | {
-      isPlatformAdmin: true;
-      requiresTenantSelection: false;
-      accessToken: string;
-      expiresIn: number;
-      admin: PlatformAdminProfile;
-      redirectUrl: string;
-    };
 
 interface PlatformTokenPayload {
   sub: string;
@@ -81,7 +59,6 @@ export class PlatformAuthService {
   constructor(
     private readonly control: ControlPrismaService,
     private readonly jwt: JwtService,
-    private readonly tenants: TenantPrismaService,
     private readonly tenantAuth: AuthService,
   ) {
     if (!platformJwtSecret()) {
@@ -134,205 +111,30 @@ export class PlatformAuthService {
   }
 
   /**
-   * Login inteligente multi-tienda para dueños, empleados y clientes:
-   * - Si `tenantId` viene explícito, autentica directamente en esa tienda.
-   * - Si se omite `tenantId`, busca el email en todas las tiendas activas:
-   *    - 1 coincidencia de (email + contraseña) → inicia sesión automáticamente en esa tienda.
-   *    - 2+ coincidencias (p. ej. mismo cliente registrado con igual clave en varias tiendas) →
-   *      devuelve `requiresTenantSelection: true` con las tiendas coincidentes para que el usuario elija.
+   * Login de una tienda elegida ANTES de autenticar (dominio propio, tienda activa del navegador o
+   * selector). Las credenciales se consultan solo en el schema de esa tienda: nunca se recorren las
+   * demás ni se informa en cuáles existe un correo. Tienda inexistente o no ACTIVE, correo inexistente,
+   * contraseña incorrecta y cuenta bloqueada responden el mismo 401 genérico (LOGIN_FAILED).
+   * Los administradores de NovaSoft no entran por aquí: usan POST /platform/auth/login (JWT de plataforma).
    */
-  async tenantLogin(dto: TenantDiscoveryLoginDto): Promise<TenantDiscoveryLoginResult> {
-    const cleanEmail = dto.email.trim();
-    const normalizedEmail = normalizeAdminEmail(cleanEmail);
-
-    // Si las credenciales corresponden a un administrador de plataforma (NovaSoft),
-    // inicia sesión directamente en el panel de plataforma
-    const platformAdmin = await this.control.platformAdmin.findUnique({
-      where: { email: normalizedEmail },
-    });
-
-    if (platformAdmin && platformAdmin.isActive) {
-      if (platformAdmin.lockedUntil && platformAdmin.lockedUntil > new Date()) {
-        const minutes = Math.ceil((platformAdmin.lockedUntil.getTime() - Date.now()) / 60_000);
-        throw new HttpException(
-          i18nMessage('errors.TOO_MANY_ATTEMPTS', { count: minutes }),
-          HttpStatus.TOO_MANY_REQUESTS,
-        );
-      }
-
-      const validPlatformPass = await bcrypt.compare(dto.password, platformAdmin.passwordHash);
-      if (validPlatformPass) {
-        if (platformAdmin.loginAttempts > 0 || platformAdmin.lockedUntil) {
-          await this.control.platformAdmin.update({
-            where: { id: platformAdmin.id },
-            data: { loginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
-          });
-        } else {
-          await this.control.platformAdmin.update({
-            where: { id: platformAdmin.id },
-            data: { lastLoginAt: new Date() },
-          });
-        }
-
-        const secret = platformJwtSecret();
-        if (!secret) throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'));
-
-        const payload: PlatformTokenPayload = { sub: platformAdmin.id, email: platformAdmin.email };
-        const accessToken = await this.jwt.signAsync(payload, {
-          secret,
-          audience: PLATFORM_TOKEN_AUDIENCE,
-          expiresIn: TOKEN_TTL_SECONDS,
-        });
-
-        return {
-          isPlatformAdmin: true,
-          requiresTenantSelection: false,
-          accessToken,
-          expiresIn: TOKEN_TTL_SECONDS,
-          admin: { id: platformAdmin.id, email: platformAdmin.email, name: platformAdmin.name },
-          redirectUrl: '/plataforma',
-        };
-      }
-    }
-
-    if (dto.tenantId) {
-      const tenant = await this.control.tenant.findFirst({
-        where: { id: dto.tenantId, status: 'ACTIVE' },
-        select: { id: true, slug: true, name: true, schemaName: true, plan: true },
-      });
-      if (!tenant) {
-        throw new NotFoundException('La tienda seleccionada no está disponible');
-      }
-      const auth = await runInTenant(
-        { tenantId: tenant.id, schemaName: tenant.schemaName, plan: tenant.plan },
-        () => this.tenantAuth.login({ email: cleanEmail, password: dto.password }),
-      );
-      return {
-        requiresTenantSelection: false,
-        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, plan: tenant.plan },
-        auth,
-      };
-    }
-
-    const activeTenants = await this.control.tenant.findMany({
-      where: { status: 'ACTIVE' },
-      orderBy: { createdAt: 'asc' },
+  async tenantLogin(dto: TenantLoginDto): Promise<TenantLoginResult> {
+    const tenant = await this.control.tenant.findFirst({
+      where: { id: dto.tenantId, status: 'ACTIVE' },
       select: { id: true, slug: true, name: true, schemaName: true, plan: true },
     });
-
-    const lookups = await Promise.all(
-      activeTenants.map(async (tenant) => {
-        try {
-          const user = await this.tenants.forSchema(tenant.schemaName).user.findFirst({
-            where: {
-              email: { equals: cleanEmail, mode: 'insensitive' },
-              NOT: { email: { endsWith: '@pos.stellafemme.internal' } },
-            },
-            select: { ...USER_SELECT, password: true, loginAttempts: true, lockedUntil: true },
-          });
-          return user ? { tenant, user } : null;
-        } catch (err) {
-          this.logger.error(
-            `No se pudo consultar usuarios en ${tenant.schemaName} (${tenant.slug}): ${(err as Error).message}`,
-          );
-          return null;
-        }
-      }),
-    );
-
-    const candidates = lookups.filter((item): item is NonNullable<typeof item> => item !== null);
-    if (candidates.length === 0) {
-      if (platformAdmin && platformAdmin.isActive) {
-        const attempts = (platformAdmin.lockedUntil ? 0 : platformAdmin.loginAttempts) + 1;
-        const locked = attempts >= MAX_ATTEMPTS;
-        await this.control.platformAdmin.update({
-          where: { id: platformAdmin.id },
-          data: locked
-            ? { loginAttempts: 0, lockedUntil: new Date(Date.now() + LOCK_MS) }
-            : { loginAttempts: attempts, lockedUntil: null },
-        });
-        if (locked) {
-          this.logger.warn(`Administrador de plataforma bloqueado por intentos fallidos: ${platformAdmin.email}`);
-          throw new HttpException(i18nMessage('errors.ACCOUNT_LOCKED'), HttpStatus.TOO_MANY_REQUESTS);
-        }
-      }
+    if (!tenant) {
+      // Mismo costo que una contraseña incorrecta: el tiempo no distingue una tienda inválida
       await bcrypt.compare(dto.password, DUMMY_HASH);
-      throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'));
+      throw new UnauthorizedException(i18nMessage('errors.LOGIN_FAILED'));
     }
 
-    const now = new Date();
-    const lockedCandidates = candidates.filter((c) => c.user.lockedUntil && c.user.lockedUntil > now);
-    const unlockedCandidates = candidates.filter((c) => !c.user.lockedUntil || c.user.lockedUntil <= now);
-
-    if (unlockedCandidates.length === 0) {
-      const maxRemainingMs = Math.max(...lockedCandidates.map((c) => (c.user.lockedUntil?.getTime() ?? now.getTime()) - now.getTime()));
-      const minutes = Math.max(1, Math.ceil(maxRemainingMs / 60_000));
-      throw new HttpException(
-        i18nMessage('errors.TOO_MANY_ATTEMPTS', { count: minutes }),
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-
-    const checks = await Promise.all(
-      unlockedCandidates.map(async (c) => ({
-        ...c,
-        valid: await bcrypt.compare(dto.password, c.user.password),
-      })),
+    const auth = await runInTenant(
+      { tenantId: tenant.id, schemaName: tenant.schemaName, plan: tenant.plan },
+      () => this.tenantAuth.login({ email: dto.email, password: dto.password }),
     );
-    const matched = checks.filter((c) => c.valid);
-
-    if (matched.length === 0) {
-      // Solo se incrementan intentos fallidos si NINGUNA tienda coincidió con la contraseña: así un
-      // cliente con claves distintas en dos tiendas no bloquea la Tienda B al entrar a la Tienda A.
-      const lockResults = await Promise.all(
-        unlockedCandidates.map((c) =>
-          runInTenant(
-            { tenantId: c.tenant.id, schemaName: c.tenant.schemaName, plan: c.tenant.plan },
-            () => this.tenantAuth.recordFailedLoginAttempt(c.user),
-          ),
-        ),
-      );
-      if (lockResults.some(Boolean)) {
-        throw new HttpException(i18nMessage('errors.ACCOUNT_LOCKED'), HttpStatus.TOO_MANY_REQUESTS);
-      }
-      throw new UnauthorizedException(i18nMessage('errors.INVALID_CREDENTIALS'));
-    }
-
-    if (matched.length === 1) {
-      const winner = matched[0];
-      const auth = await runInTenant(
-        { tenantId: winner.tenant.id, schemaName: winner.tenant.schemaName, plan: winner.tenant.plan },
-        () => this.tenantAuth.issueSessionForUser(winner.user),
-      );
-      return {
-        requiresTenantSelection: false,
-        tenant: {
-          id: winner.tenant.id,
-          slug: winner.tenant.slug,
-          name: winner.tenant.name,
-          plan: winner.tenant.plan,
-        },
-        auth,
-      };
-    }
-
-    const sorted = [...matched].sort((a, b) => {
-      if (dto.preferredTenantId) {
-        if (a.tenant.id === dto.preferredTenantId) return -1;
-        if (b.tenant.id === dto.preferredTenantId) return 1;
-      }
-      return 0;
-    });
-
     return {
-      requiresTenantSelection: true,
-      tenants: sorted.map((m) => ({
-        id: m.tenant.id,
-        slug: m.tenant.slug,
-        name: m.tenant.name,
-        plan: m.tenant.plan,
-        role: m.user.role.name,
-      })),
+      tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, plan: tenant.plan },
+      auth,
     };
   }
 

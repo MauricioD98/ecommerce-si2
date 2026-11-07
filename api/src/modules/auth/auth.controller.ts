@@ -10,6 +10,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import type { RefreshUser } from './strategies/refresh-token.strategy';
+import { mobileChannelMismatch } from '../mobile-access/mobile-access.errors';
 
 @Controller('auth')
 
@@ -63,8 +65,11 @@ export class AuthController {
         status:429,
         description: 'Too Many Request. Rate limit exceeded',
     })
-    async refresh( @GetUser('id') userId: string): Promise<AuthResponseDto> {
-        return await this.authService.refreshTokens(userId);
+    async refresh( @GetUser() user: RefreshUser): Promise<AuthResponseDto> {
+        // Una sesión móvil se renueva solo por /auth/mobile/refresh (vuelve a mirar el plan y la
+        // integridad); acá terminaría convertida en sesión web sin esos chequeos
+        if (user.channel === 'mobile') throw mobileChannelMismatch();
+        return await this.authService.refreshTokens(user.id);
     }
 
     @Post('logout')

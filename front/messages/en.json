@@ -223,7 +223,17 @@
       "submitting": "Logging in...",
       "submit": "Log in",
       "noAccount": "Don’t have an account?",
-      "createAccount": "Create account"
+      "createAccount": "Create account",
+      "storeStepTitle": "Which store do you want to sign in to?",
+      "storeStepSubtitle": "Choose the store where you have your account. We'll ask for your email and password next.",
+      "storeLabel": "Store",
+      "currentStore": "Current store",
+      "changeStore": "Change store",
+      "noStores": "We couldn't load the available stores. Check your connection and try again.",
+      "invalidCredentials": "Incorrect email or password. If you failed several times, wait a few minutes before trying again.",
+      "platformAdminPrompt": "Are you a NovaSoft administrator?",
+      "platformAdminLink": "Go to the platform panel",
+      "pendingProfileChanges": "There are profile changes saved offline on this device. They will be sent when the same account that made them signs in."
     },
     "register": {
       "title": "Create your account",
@@ -339,6 +349,7 @@
       "offlineSaveFailed": "Couldn’t save the order on this device.",
       "gatewayFailed": "Couldn’t initialize the payment gateway.",
       "cardUnavailable": "This store doesn’t accept card payments yet: choose another payment method.",
+      "cardCurrencyMismatch": "Card payments are unavailable: the store would charge in a currency other than Bs. Choose another payment method.",
       "bankQr": "Bank QR",
       "bankQrDescription": "Pay from your banking app and upload the receipt",
       "usdt": "USDT",
@@ -591,7 +602,34 @@
       "noPreferredBranch": "No favorite branch",
       "preferredBranchHint": "We’ll let you know about this branch’s news and offers.",
       "saving": "Saving...",
-      "save": "Save changes"
+      "save": "Save changes",
+      "sync": {
+        "offline": "You're offline. You can edit your profile: changes are saved on this device and sent when the connection is back.",
+        "offlinePending": "You're offline. You have pending changes saved on this device; they will be sent when the connection is back.",
+        "copyFrom": "Data saved on {date}.",
+        "pending": "Changes waiting to sync.",
+        "syncing": "Syncing your changes…",
+        "synced": "Profile synced with the server.",
+        "needsLogin": "Your session expired. Your changes are still saved: sign in again with this account to send them.",
+        "signIn": "Sign in",
+        "error": "Your changes could not be synced: {reason}",
+        "retry": "Retry",
+        "discard": "Discard my changes",
+        "conflictTitle": "Your profile changed on another device",
+        "conflictDescription": "While you were offline, this data was changed somewhere else. Choose which version to keep; nothing was overwritten.",
+        "field": "Field",
+        "yourChange": "Your change",
+        "serverValue": "Current value on the server",
+        "keepMine": "Use my changes",
+        "keepServer": "Keep the server's",
+        "emptyValue": "(empty)",
+        "savedLocally": "Saved on this device. It will be sent when the connection is back.",
+        "offlineFields": "Offline you can edit first name, last name, phone and favorite branch. The email cannot be changed.",
+        "saveOffline": "Save on this device",
+        "requiresConnection": "Changing your password, enabling notifications and managing addresses require a connection.",
+        "offlineAccountNote": "You're viewing the copy of your account saved on this device. You can edit your profile and check your orders; addresses, password and notifications require a connection.",
+        "backHome": "Back to home"
+      }
     },
     "security": {
       "title": "Security",
@@ -663,7 +701,9 @@
         "PENDIENTE": "Being reviewed by the store",
         "APROBADO": "Approved",
         "RECHAZADO": "Rejected"
-      }
+      },
+      "offlineCopy": "Offline: showing the copy saved on {date}. The actual status may have changed.",
+      "offlineNoCopy": "Offline. Open this section with a connection at least once to see it without one."
     },
     "status": {
       "PENDIENTE": "Pending",
