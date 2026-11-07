@@ -54,5 +54,47 @@
     "deviceUnsupported": "无法验证此设备。该应用需要支持 Google Play 或 Apple 验证的手机；您可以继续在浏览器中的网页商店购物。",
     "planNotIncluded": "该店铺当前套餐不包含移动应用（Pro 套餐提供）。您可以在网页商店购物，包括使用手机浏览器。",
     "storeUnavailable": "已保存的店铺不再可用，或其当前套餐不包含移动应用。"
+  },
+  "offline": {
+    "noConnection": "无网络连接",
+    "serverUnreachable": "无法连接服务器",
+    "showingCopy": "显示 {{date}} 保存的数据；价格和库存可能已变化",
+    "requiresConnectionTitle": "需要网络连接",
+    "requiresConnection": "此操作需要网络连接。",
+    "purchaseRequiresConnection": "购买需要网络连接：价格和库存需由商店实时确认。您的购物车仍已保存。",
+    "fields": {
+      "firstName": "名字",
+      "lastName": "姓氏"
+    },
+    "profile": {
+      "offlineHint": "您可以修改名字和姓氏：它们会保存在这台手机上，并在恢复连接后发送。邮箱和密码需要网络连接。",
+      "status": {
+        "pending": "等待同步",
+        "syncing": "正在同步…",
+        "synced": "已同步",
+        "conflict": "与其他设备冲突",
+        "error": "无法保存",
+        "needs-login": "请重新登录"
+      },
+      "willSyncOnline": "将在恢复连接后发送",
+      "willSyncSoon": "将在几秒内发送",
+      "syncNow": "立即同步",
+      "needsLogin": "您的修改仍保存在这台手机上。用同一账号重新登录后将会发送。",
+      "retry": "重试",
+      "discard": "放弃我的修改",
+      "conflictDescription": "您离线期间，此数据已在其他设备上被修改。请选择保留哪个值；未经您的决定不会覆盖任何内容。",
+      "field": "字段",
+      "yourChange": "您的修改",
+      "serverValue": "服务器上",
+      "keepMine": "使用我的修改",
+      "keepServer": "保留服务器的值",
+      "resolveFirst": "请先解决上方显示的冲突。",
+      "savedTitle": "已保存在这台手机上",
+      "savedOffline": "无网络连接：恢复连接后会自动发送您的修改。",
+      "savedOnline": "正在将您的修改发送到服务器。",
+      "emailRequiresConnection": "只有在联网且没有待同步修改时才能更改邮箱。",
+      "firstNameRequired": "名字不能为空。",
+      "logoutPending": "您有尚未发送的资料修改。它们会保留在这台手机上，并在您用此账号重新登录后发送。"
+    }
   }
 }

@@ -54,5 +54,47 @@
     "deviceUnsupported": "No pudimos verificar este dispositivo. La app requiere un teléfono compatible con la verificación de Google Play o Apple; puedes seguir comprando desde la tienda web en el navegador.",
     "planNotIncluded": "Esta tienda no tiene la app móvil en su plan actual (disponible en el plan Pro). Puedes comprar desde la tienda web, también en el navegador del teléfono.",
     "storeUnavailable": "La tienda guardada ya no está disponible o su plan actual no incluye la app móvil."
+  },
+  "offline": {
+    "noConnection": "Sin conexión",
+    "serverUnreachable": "No se pudo conectar con el servidor",
+    "showingCopy": "datos guardados del {{date}}; precios y stock pueden haber cambiado",
+    "requiresConnectionTitle": "Requiere conexión",
+    "requiresConnection": "Esta acción requiere conexión a Internet.",
+    "purchaseRequiresConnection": "Para comprar necesitas conexión: el precio y el stock se confirman con la tienda en el momento. Tu carrito sigue guardado.",
+    "fields": {
+      "firstName": "Nombre",
+      "lastName": "Apellido"
+    },
+    "profile": {
+      "offlineHint": "Puedes cambiar tu nombre y apellido: se guardan en este teléfono y se envían cuando vuelva la conexión. El correo y la contraseña requieren conexión.",
+      "status": {
+        "pending": "Pendiente de sincronizar",
+        "syncing": "Sincronizando…",
+        "synced": "Sincronizado",
+        "conflict": "Conflicto con otro dispositivo",
+        "error": "No se pudo guardar",
+        "needs-login": "Inicia sesión de nuevo"
+      },
+      "willSyncOnline": "se enviará cuando vuelva la conexión",
+      "willSyncSoon": "se enviará en unos segundos",
+      "syncNow": "Sincronizar ahora",
+      "needsLogin": "Tu cambio sigue guardado en este teléfono. Se enviará cuando vuelvas a iniciar sesión con esta misma cuenta.",
+      "retry": "Reintentar",
+      "discard": "Descartar mi cambio",
+      "conflictDescription": "Mientras estabas sin conexión, este dato cambió desde otro dispositivo. Elige qué valor conservar; no se sobrescribe nada sin tu decisión.",
+      "field": "Campo",
+      "yourChange": "Tu cambio",
+      "serverValue": "En el servidor",
+      "keepMine": "Usar mis cambios",
+      "keepServer": "Conservar los del servidor",
+      "resolveFirst": "Primero resuelve el conflicto que aparece arriba.",
+      "savedTitle": "Guardado en este teléfono",
+      "savedOffline": "Sin conexión: tu cambio se enviará automáticamente cuando vuelva la conexión.",
+      "savedOnline": "Estamos enviando tu cambio al servidor.",
+      "emailRequiresConnection": "El correo solo se puede cambiar con conexión y sin cambios pendientes.",
+      "firstNameRequired": "El nombre no puede estar vacío.",
+      "logoutPending": "Tienes cambios de perfil sin enviar. Se conservarán en este teléfono y se enviarán cuando vuelvas a iniciar sesión con esta cuenta."
+    }
   }
 }

@@ -54,5 +54,47 @@
     "deviceUnsupported": "Nous n'avons pas pu vérifier cet appareil. L'application nécessite un téléphone compatible avec la vérification Google Play ou Apple ; vous pouvez continuer vos achats sur la boutique web dans votre navigateur.",
     "planNotIncluded": "L'offre actuelle de cette boutique n'inclut pas l'application mobile (disponible avec l'offre Pro). Vous pouvez acheter sur la boutique web, y compris depuis le navigateur de votre téléphone.",
     "storeUnavailable": "La boutique enregistrée n'est plus disponible ou son offre actuelle n'inclut pas l'application mobile."
+  },
+  "offline": {
+    "noConnection": "Pas de connexion",
+    "serverUnreachable": "Impossible de joindre le serveur",
+    "showingCopy": "données enregistrées le {{date}} ; les prix et le stock ont pu changer",
+    "requiresConnectionTitle": "Connexion requise",
+    "requiresConnection": "Cette action nécessite une connexion Internet.",
+    "purchaseRequiresConnection": "Une connexion est nécessaire pour acheter : le prix et le stock sont confirmés par la boutique à ce moment-là. Votre panier reste enregistré.",
+    "fields": {
+      "firstName": "Prénom",
+      "lastName": "Nom"
+    },
+    "profile": {
+      "offlineHint": "Vous pouvez modifier votre prénom et votre nom : ils sont enregistrés sur ce téléphone et envoyés au retour de la connexion. L’e-mail et le mot de passe nécessitent une connexion.",
+      "status": {
+        "pending": "En attente de synchronisation",
+        "syncing": "Synchronisation…",
+        "synced": "Synchronisé",
+        "conflict": "Conflit avec un autre appareil",
+        "error": "Impossible d’enregistrer",
+        "needs-login": "Reconnectez-vous"
+      },
+      "willSyncOnline": "elle sera envoyée au retour de la connexion",
+      "willSyncSoon": "elle sera envoyée dans quelques secondes",
+      "syncNow": "Synchroniser maintenant",
+      "needsLogin": "Votre modification reste enregistrée sur ce téléphone. Elle sera envoyée lorsque vous vous reconnecterez avec ce même compte.",
+      "retry": "Réessayer",
+      "discard": "Annuler ma modification",
+      "conflictDescription": "Pendant que vous étiez hors ligne, cette donnée a changé depuis un autre appareil. Choisissez la valeur à conserver ; rien n’est écrasé sans votre décision.",
+      "field": "Champ",
+      "yourChange": "Votre modification",
+      "serverValue": "Sur le serveur",
+      "keepMine": "Utiliser mes modifications",
+      "keepServer": "Garder celles du serveur",
+      "resolveFirst": "Résolvez d’abord le conflit affiché ci-dessus.",
+      "savedTitle": "Enregistré sur ce téléphone",
+      "savedOffline": "Pas de connexion : votre modification sera envoyée automatiquement au retour de la connexion.",
+      "savedOnline": "Nous envoyons votre modification au serveur.",
+      "emailRequiresConnection": "L’e-mail ne peut être modifié qu’en ligne et sans modifications en attente.",
+      "firstNameRequired": "Le prénom ne peut pas être vide.",
+      "logoutPending": "Certaines modifications du profil n’ont pas été envoyées. Elles resteront sur ce téléphone et seront envoyées lorsque vous vous reconnecterez avec ce compte."
+    }
   }
 }

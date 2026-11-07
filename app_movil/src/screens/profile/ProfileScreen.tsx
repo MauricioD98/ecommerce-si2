@@ -19,6 +19,8 @@ import { useTenant } from '../../context/TenantContext';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { LanguageSelector } from '../../components/LanguageSelector';
+import { ProfileSyncStatus } from '../../components/ProfileSyncStatus';
+import { useProfileSync } from '../../offline/profileSync';
 import { Colors, Shadows } from '../../theme/colors';
 import { getErrorMessage } from '../../api/client';
 import {
@@ -36,6 +38,10 @@ export const ProfileScreen: React.FC = () => {
   const { user, logout, refreshUser } = useAuth();
   const { clearTenant, tenantName } = useTenant();
   const { t } = useTranslation();
+  // Perfil mostrado = servidor + cambios hechos sin conexión que todavía no confirmó
+  const sync = useProfileSync(user);
+  const shown = sync.displayUser;
+  const unsynced = !!sync.change && sync.change.status !== 'synced';
 
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [apiUrlInput, setApiUrlInput] = useState<string>('');
@@ -51,7 +57,10 @@ export const ProfileScreen: React.FC = () => {
   const handleLogout = () => {
     Alert.alert(
       t('profile.logout'),
-      t('profile.logoutConfirm'),
+      // Los cambios sin enviar se conservan en el teléfono, pero solo se envían con esta misma cuenta
+      unsynced ? `${t('profile.logoutConfirm')}
+
+${t('offline.profile.logoutPending')}` : t('profile.logoutConfirm'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -105,13 +114,13 @@ export const ProfileScreen: React.FC = () => {
   };
 
   const initials =
-    ((user?.firstName?.[0] || '') + (user?.lastName?.[0] || '')) ||
+    ((shown?.firstName?.[0] || '') + (shown?.lastName?.[0] || '')) ||
     user?.email?.[0]?.toUpperCase() ||
     'U';
 
   const fullName =
-    user?.firstName || user?.lastName
-      ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+    shown?.firstName || shown?.lastName
+      ? `${shown.firstName || ''} ${shown.lastName || ''}`.trim()
       : t('profile.defaultUser');
 
   return (
@@ -149,6 +158,8 @@ export const ProfileScreen: React.FC = () => {
             );
           })()}
         </View>
+
+        <ProfileSyncStatus sync={sync} />
 
         {/* Menu Items */}
         <View style={styles.menuCard}>
@@ -188,7 +199,12 @@ export const ProfileScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.menuItem}
-            onPress={() => navigation.navigate('ChangePassword')}
+            onPress={() =>
+              // Cambiar la contraseña exige la actual y la verifica el servidor: nunca sin conexión
+              sync.isOnline
+                ? navigation.navigate('ChangePassword')
+                : Alert.alert(t('offline.requiresConnectionTitle'), t('offline.requiresConnection'))
+            }
             activeOpacity={0.7}
           >
             <View style={[styles.menuIconBox, { backgroundColor: '#FEF3C7' }]}>

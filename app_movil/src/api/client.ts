@@ -4,6 +4,9 @@ import { getCurrentApiBaseUrl, getApiBaseUrl, API_URL_CONFIG_ERROR } from '../co
 import { TENANT_HEADER, TENANT_REQUIRED, getTenantId, notifyTenantRequired } from '../config/tenant';
 import { getCurrentLanguage } from '../i18n';
 import { withMobileAttestation } from '../security/mobileAttestation';
+import i18n from 'i18next';
+import { offlineCopyFor, rememberRead } from '../offline/readCache';
+import { isOnlineNow } from '../offline/network';
 
 export const ACCESS_TOKEN_KEY = '@access_token';
 export const REFRESH_TOKEN_KEY = '@refresh_token';
@@ -113,9 +116,21 @@ export const setOnAuthFailureCallback = (callback: (() => void) | null) => {
 
 // Response interceptor for auto-refresh
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Copia para abrir catálogo, carrito y pedidos sin conexión (ver offline/readCache.ts)
+    if ((response.config.method || 'get').toLowerCase() === 'get') void rememberRead(response);
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Sin respuesta del servidor (sin red): un GET guardado se responde con la copia local. Nunca una
+    // escritura: agregar al carrito, comprar o pagar siempre necesitan la confirmación de la API.
+    if (__DEV__ && !error.response) console.log('[offline] petición sin respuesta', error.code, originalRequest?.method, originalRequest?.url);
+    if (!error.response && originalRequest && error.code !== 'ERR_API_URL_MISSING' && error.code !== 'ERR_CANCELED') {
+      const copy = await offlineCopyFor(originalRequest);
+      if (copy) return copy;
+    }
 
     // 401 por falta de tienda ≠ sesión vencida: ni refresh, ni cola, ni auto-logout (los tokens
     // siguen guardados por si la tienda vuelve a estar disponible). Se pide elegir tienda.
@@ -257,6 +272,7 @@ export const getErrorMessage = (error: unknown): string => {
       return 'Tiempo de espera agotado. Verifica tu conexión.';
     }
     if (error.message === 'Network Error') {
+      if (!isOnlineNow()) return i18n.t('offline.requiresConnection');
       return 'No se pudo conectar con el servidor. Verifica que la API esté corriendo y la URL sea correcta.';
     }
     if (error.message?.toLowerCase().includes('refresh token') || error.message === 'No refresh token') {

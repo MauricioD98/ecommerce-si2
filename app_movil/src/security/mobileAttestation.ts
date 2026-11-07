@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import axios from 'axios';
-import * as AppIntegrity from '@expo/app-integrity';
+import type * as AppIntegrityModule from '@expo/app-integrity';
 import { appStorage } from '../utils/storage';
 import { getApiBaseUrl } from '../config/env';
 import { TENANT_HEADER, getTenantId } from '../config/tenant';
@@ -45,6 +45,21 @@ const unavailable = (key: string) => new MobileAttestationUnavailableError(i18n.
 
 // Atajo de desarrollo: solo en __DEV__ y solo si la API también lo permite (NODE_ENV no productivo +
 // MOBILE_ATTESTATION_DEV_BYPASS=true). Un build de release nunca lo usa.
+// El módulo nativo se carga recién al pedir una prueba real. Expo Go no lo incluye: si se importara al
+// arrancar, la app ni abriría ahí (aunque en desarrollo se use el atajo y nunca se llame). En un build de
+// desarrollo o de release el módulo existe y el comportamiento es el mismo; la API verifica cada prueba igual.
+let appIntegrityModule: typeof AppIntegrityModule | null = null;
+function appIntegrity(): typeof AppIntegrityModule {
+  if (appIntegrityModule) return appIntegrityModule;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    appIntegrityModule = require('@expo/app-integrity') as typeof AppIntegrityModule;
+    return appIntegrityModule;
+  } catch {
+    throw unavailable('deviceUnsupported');
+  }
+}
+
 const devBypassRequested = () => __DEV__ && process.env.EXPO_PUBLIC_MOBILE_ATTESTATION_DEV_BYPASS === 'true';
 
 // axios sin interceptores (como el refresh de client.ts): evita el ciclo client → attestation → client
@@ -65,7 +80,7 @@ async function androidIntegrityToken(requestHash: string): Promise<string> {
   const cloudProjectNumber = process.env.EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER?.trim();
   if (!cloudProjectNumber) throw unavailable('notConfigured');
   const prepare = () => {
-    androidProvider = AppIntegrity.prepareIntegrityTokenProviderAsync(cloudProjectNumber).catch((error) => {
+    androidProvider = appIntegrity().prepareIntegrityTokenProviderAsync(cloudProjectNumber).catch((error) => {
       androidProvider = null;
       throw error;
     });
@@ -73,33 +88,33 @@ async function androidIntegrityToken(requestHash: string): Promise<string> {
   };
   try {
     await (androidProvider ?? prepare());
-    return await AppIntegrity.requestIntegrityCheckAsync(requestHash);
+    return await appIntegrity().requestIntegrityCheckAsync(requestHash);
   } catch (error) {
     // El proveedor vence si se guarda mucho tiempo: se prepara de nuevo una vez
     if ((error as { code?: string })?.code === 'ERR_APP_INTEGRITY_PROVIDER_INVALID') {
       await prepare();
-      return AppIntegrity.requestIntegrityCheckAsync(requestHash);
+      return appIntegrity().requestIntegrityCheckAsync(requestHash);
     }
     throw unavailable('deviceUnsupported');
   }
 }
 
 async function iosProof(challenge: ChallengeResponse): Promise<MobileAttestation> {
-  if (!AppIntegrity.isSupported) throw unavailable('deviceUnsupported');
+  if (!appIntegrity().isSupported) throw unavailable('deviceUnsupported');
   let keyId = await appStorage.getItem(APP_ATTEST_KEY_ID);
   if (!keyId) {
-    keyId = await AppIntegrity.generateKeyAsync();
+    keyId = await appIntegrity().generateKeyAsync();
     await appStorage.setItem(APP_ATTEST_KEY_ID, keyId);
     await appStorage.removeItem(APP_ATTEST_KEY_ATTESTED);
   }
 
   if (await appStorage.getItem(APP_ATTEST_KEY_ATTESTED)) {
-    const assertion = await AppIntegrity.generateAssertionAsync(keyId, challenge.clientData);
+    const assertion = await appIntegrity().generateAssertionAsync(keyId, challenge.clientData);
     return { challengeId: challenge.challengeId, platform: 'ios', keyId, assertion };
   }
 
   try {
-    const attestation = await AppIntegrity.attestKeyAsync(keyId, challenge.clientData);
+    const attestation = await appIntegrity().attestKeyAsync(keyId, challenge.clientData);
     // Se marca al enviarla: si el servidor la rechaza, la próxima aserción vuelve con
     // APP_ATTEST_KEY_UNKNOWN y withMobileAttestation regenera la clave.
     await appStorage.setItem(APP_ATTEST_KEY_ATTESTED, '1');

@@ -25,6 +25,7 @@ import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Colors, Shadows } from '../../theme/colors';
 import { getErrorMessage } from '../../api/client';
+import { checkOnline } from '../../offline/network';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
@@ -115,6 +116,13 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
+    // Sin conexión no se inicia una compra: precio y stock guardados pueden estar desactualizados y solo la
+    // API los confirma. Tampoco se deja guardada para enviarla sola después.
+    if (!(await checkOnline())) {
+      Alert.alert(t('offline.requiresConnectionTitle'), t('offline.purchaseRequiresConnection'));
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       const itemsPayload = cartItems.map((item) => ({
@@ -125,7 +133,7 @@ export const CheckoutScreen: React.FC<Props> = ({ navigation }) => {
       }));
 
       // Revisión leída del servidor: si el carrito cambió en otro dispositivo, el servidor responde conflicto
-      const freshCart = await cartApi.getCart();
+      const freshCart = await cartApi.getCart({ fresh: true });
 
       // Se guarda ANTES de enviar: sin esto la compra no sería recuperable tras un cierre forzado
       let attempt: CheckoutAttempt;

@@ -2,8 +2,9 @@ import apiClient from './client';
 import { Cart, AddCartItemPayload, UpdateCartItemPayload } from '../types';
 
 export const cartApi = {
-  getCart: async (): Promise<Cart> => {
-    const response = await apiClient.get<Cart>('/cart');
+  // fresh: la lectura decide una compra (versión del carrito, total): nunca se responde con la copia guardada
+  getCart: async (options?: { fresh?: boolean }): Promise<Cart> => {
+    const response = await apiClient.get<Cart>('/cart', options?.fresh ? ({ offlineCopy: false } as object) : undefined);
     return response.data;
   },
 

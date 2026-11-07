@@ -54,5 +54,47 @@
     "deviceUnsupported": "We could not verify this device. The app requires a phone that supports Google Play or Apple verification; you can keep shopping on the web store in your browser.",
     "planNotIncluded": "This store's current plan does not include the mobile app (available on the Pro plan). You can shop on the web store, including from your phone's browser.",
     "storeUnavailable": "The saved store is no longer available or its current plan does not include the mobile app."
+  },
+  "offline": {
+    "noConnection": "No connection",
+    "serverUnreachable": "Could not reach the server",
+    "showingCopy": "data saved on {{date}}; prices and stock may have changed",
+    "requiresConnectionTitle": "Connection required",
+    "requiresConnection": "This action requires an Internet connection.",
+    "purchaseRequiresConnection": "You need a connection to buy: price and stock are confirmed with the store at that moment. Your cart is still saved.",
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name"
+    },
+    "profile": {
+      "offlineHint": "You can change your first and last name: they are saved on this phone and sent when the connection returns. Email and password require a connection.",
+      "status": {
+        "pending": "Pending sync",
+        "syncing": "Syncing…",
+        "synced": "Synced",
+        "conflict": "Conflict with another device",
+        "error": "Could not be saved",
+        "needs-login": "Sign in again"
+      },
+      "willSyncOnline": "it will be sent when the connection returns",
+      "willSyncSoon": "it will be sent in a few seconds",
+      "syncNow": "Sync now",
+      "needsLogin": "Your change is still saved on this phone. It will be sent when you sign in again with this same account.",
+      "retry": "Retry",
+      "discard": "Discard my change",
+      "conflictDescription": "While you were offline, this data changed from another device. Choose which value to keep; nothing is overwritten without your decision.",
+      "field": "Field",
+      "yourChange": "Your change",
+      "serverValue": "On the server",
+      "keepMine": "Use my changes",
+      "keepServer": "Keep the server values",
+      "resolveFirst": "Resolve the conflict shown above first.",
+      "savedTitle": "Saved on this phone",
+      "savedOffline": "No connection: your change will be sent automatically when the connection returns.",
+      "savedOnline": "We are sending your change to the server.",
+      "emailRequiresConnection": "Email can only be changed online and with no pending changes.",
+      "firstNameRequired": "First name cannot be empty.",
+      "logoutPending": "You have profile changes that were not sent. They will stay on this phone and be sent when you sign in again with this account."
+    }
   }
 }
