@@ -287,7 +287,7 @@
     "steps": {
       "delivery": "Entrega",
       "payment": "Pago",
-      "completed": "Completado"
+      "completed": "Confirmación"
     },
     "delivery": {
       "title": "Método de entrega",
@@ -357,7 +357,7 @@
       "cardUnavailable": "Esta tienda todavía no acepta pagos con tarjeta: elige otro medio de pago.",
       "cardCurrencyMismatch": "La tarjeta no está disponible: la tienda cobraría en una moneda distinta de Bs. Elige otro medio de pago.",
       "bankQr": "QR bancario",
-      "bankQrDescription": "Paga desde la app de tu banco y sube el comprobante",
+      "bankQrDescription": "Paga desde la app de tu banco y avísanos que transferiste",
       "usdt": "USDT",
       "usdtDescription": "Transferencia en la red {network}",
       "verifying": "Estamos verificando tu compra. No hace falta que la repitas.",
@@ -442,7 +442,7 @@
     },
     "manual": {
       "qrTitle": "Escanea el QR con la app de tu banco",
-      "qrSubtitle": "Paga el monto exacto y luego sube la captura del comprobante.",
+      "qrSubtitle": "Paga el monto exacto con la app de tu banco y luego avísanos que realizaste la transferencia.",
       "usdtTitle": "Envía USDT a la wallet de la tienda",
       "usdtSubtitle": "Cuando la transferencia se confirme, pega el TxID (hash) de la transacción.",
       "qrAlt": "QR bancario de la tienda",
@@ -476,7 +476,7 @@
       "submitFailed": "No se pudo enviar el comprobante.",
       "orderFailed": "No se pudo crear el pedido.",
       "reviewNote": "Tu pedido queda reservado mientras la tienda verifica el pago.",
-      "submittedTitle": "¡Recibimos tu comprobante!",
+      "submittedTitle": "¡Recibimos tu aviso de pago!",
       "submittedText": "La tienda verificará el pago y confirmará tu pedido. Puedes seguir su estado en Mis pedidos.",
       "viewOrder": "Ver mi pedido",
       "walletTitle": "Transfiere desde tu billetera digital",
@@ -485,7 +485,36 @@
       "walletAccount": "Cuenta de destino",
       "walletTxId": "ID o Referencia de la transferencia",
       "walletTxIdPlaceholder": "Ej. AIRTM-849201, TK-123456, WB-987654",
-      "walletTxIdHint": "Ingresa el código o número de referencia de la transferencia."
+      "walletTxIdHint": "Ingresa el código o número de referencia de la transferencia.",
+      "transferDone": "Ya realicé la transferencia",
+      "referenceLabel": "Referencia de la transferencia (opcional)",
+      "referencePlaceholder": "Ej. número de operación de tu banco",
+      "referenceHint": "Ayuda a la tienda a encontrar tu pago más rápido.",
+      "attachOptional": "Adjuntar comprobante (opcional)"
+    },
+    "confirmation": {
+      "title": "Pedido enviado — pago pendiente de verificación",
+      "text": "Recibimos tu pedido y tu aviso de pago. La tienda verificará la transferencia y confirmará el pago; mientras tanto tus productos quedan reservados.",
+      "paidTitle": "Pago confirmado",
+      "paidText": "La tienda verificó tu pago y tu pedido ya está en preparación.",
+      "rejectedTitle": "El pago no fue aprobado",
+      "rejectedText": "La tienda no pudo verificar tu pago y el pedido se canceló. Revisa el detalle en Mis pedidos.",
+      "orderNumber": "Pedido <strong>{order}</strong>",
+      "loading": "Cargando el detalle del pedido...",
+      "loadFailed": "Tu pedido quedó registrado, pero no pudimos cargar su detalle. Puedes reintentar o verlo en Mis pedidos.",
+      "retry": "Reintentar",
+      "summaryTitle": "Resumen del pedido",
+      "size": "Talla {size}",
+      "quantity": "Cantidad: {count}",
+      "discount": "Descuento",
+      "shipping": "Envío",
+      "total": "Total",
+      "paymentStatus": "Estado del pago",
+      "statusPending": "Pendiente de verificación",
+      "statusPaid": "Pagado",
+      "statusRejected": "Rechazado",
+      "viewOrder": "Ver mi pedido",
+      "backToStore": "Volver a la tienda"
     },
     "drafts": {
       "title": "Borradores guardados sin conexión",
@@ -1126,7 +1155,8 @@
       "usdtHint": "Busca el TxID en el explorador de la red y comprueba el monto y la wallet de destino antes de aprobarlo.",
       "approve": "Aprobar pago",
       "reject": "Rechazar",
-      "confirmReject": "¿Rechazar el pago? El pedido se cancelará y el stock volverá a estar disponible."
+      "confirmReject": "¿Rechazar el pago? El pedido se cancelará y el stock volverá a estar disponible.",
+      "noAttachment": "El cliente avisó la transferencia sin adjuntar comprobante ni referencia. Verifica el ingreso en tu banco antes de aprobar."
     }
   },
   "AdminProducts": {

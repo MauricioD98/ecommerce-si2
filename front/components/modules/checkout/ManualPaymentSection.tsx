@@ -35,6 +35,8 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
     const [submittedOrderId, setSubmittedOrderId] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const fileInput = useRef<HTMLInputElement>(null);
+    // Candado síncrono: dos clics seguidos no llegan a ver isSubmitting actualizado
+    const submittingRef = useRef(false);
 
     // QR bancario de la tienda (la API lo sirve con x-tenant-id, por eso va como blob)
     useEffect(() => {
@@ -76,10 +78,13 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
         }
     };
 
-    const canSubmit = method === 'BANK_QR' ? Boolean(file) : txId.trim().length > 0;
+    // QR bancario: basta con avisar la transferencia; referencia e imagen son opcionales y la tienda verifica
+    // el ingreso en su banco antes de aprobar. USDT y billetera necesitan su referencia.
+    const canSubmit = method === 'BANK_QR' ? true : txId.trim().length > 0;
 
     const submit = async () => {
-        if (!canSubmit || isSubmitting) return;
+        if (!canSubmit || isSubmitting || submittingRef.current) return;
+        submittingRef.current = true;
         setIsSubmitting(true);
         setError(null);
         try {
@@ -88,13 +93,14 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
             await paymentSettingsService.submitProof(
                 orderId,
                 method,
-                method === 'BANK_QR' ? { file } : { txId, file: file || undefined },
+                { txId, file: file || undefined },
             );
             setSubmittedOrderId(orderId);
             onSubmitted?.(orderId);
         } catch (err) {
             setError(err instanceof Error && !('isAxiosError' in err) ? err.message : getApiErrorMessage(err, t('submitFailed')));
         } finally {
+            submittingRef.current = false;
             setIsSubmitting(false);
         }
     };
@@ -213,6 +219,19 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
             <div className={styles.proofForm}>
                 {method === 'BANK_QR' && (
                     <>
+                        <label className={styles.txField}>
+                            <span className={styles.label}>{t('referenceLabel')}</span>
+                            <input
+                                className={styles.txInput}
+                                value={txId}
+                                maxLength={100}
+                                spellCheck={false}
+                                autoComplete="off"
+                                placeholder={t('referencePlaceholder')}
+                                onChange={(e) => setTxId(e.target.value)}
+                            />
+                            <span className={styles.hint}>{t('referenceHint')}</span>
+                        </label>
                         <input
                             ref={fileInput}
                             type="file"
@@ -222,7 +241,7 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
                         />
                         <button type="button" className={styles.uploadButton} onClick={() => fileInput.current?.click()}>
                             <Upload size={16} />
-                            {file ? t('changeReceipt') : t('uploadReceipt')}
+                            {file ? t('changeReceipt') : t('attachOptional')}
                         </button>
                         <p className={styles.hint}>{file ? file.name : t('receiptHint')}</p>
                     </>
@@ -281,7 +300,7 @@ export default function ManualPaymentSection({ method, options, amount, ensureOr
                 {error && <div className={qrStyles.errorBox}>{error}</div>}
 
                 <button type="button" className={qrStyles.simulateBtn} onClick={submit} disabled={!canSubmit || isSubmitting}>
-                    {isSubmitting ? t('submitting') : t('submit')}
+                    {isSubmitting ? t('submitting') : method === 'BANK_QR' ? t('transferDone') : t('submit')}
                 </button>
                 <p className={styles.hint}>{t('reviewNote')}</p>
             </div>

@@ -287,7 +287,7 @@
     "steps": {
       "delivery": "配送",
       "payment": "付款",
-      "completed": "完成"
+      "completed": "确认"
     },
     "delivery": {
       "title": "配送方式",
@@ -357,7 +357,7 @@
       "cardUnavailable": "本店暂不支持银行卡支付：请选择其他支付方式。",
       "cardCurrencyMismatch": "暂不支持银行卡支付：本店将以 Bs 以外的货币扣款。请选择其他支付方式。",
       "bankQr": "银行二维码",
-      "bankQrDescription": "用银行 App 付款并上传凭证",
+      "bankQrDescription": "用银行 App 付款后通知我们已转账",
       "usdt": "USDT",
       "usdtDescription": "通过 {network} 网络转账",
       "verifying": "我们正在核实您的购买，无需重复操作。",
@@ -440,7 +440,7 @@
     },
     "manual": {
       "qrTitle": "用银行 App 扫描二维码",
-      "qrSubtitle": "支付准确金额，然后上传付款凭证截图。",
+      "qrSubtitle": "请用银行 App 支付准确金额，然后告诉我们您已完成转账。",
       "usdtTitle": "向店铺钱包转账 USDT",
       "usdtSubtitle": "转账确认后，粘贴交易的 TxID（哈希）。",
       "qrAlt": "店铺银行二维码",
@@ -474,9 +474,38 @@
       "submitFailed": "无法提交凭证。",
       "orderFailed": "无法创建订单。",
       "reviewNote": "店铺核实付款期间，您的订单将保持预留。",
-      "submittedTitle": "已收到您的凭证！",
-      "submittedText": "店铺将核实付款并确认您的订单。您可以在“我的订单”中查看进度。",
-      "viewOrder": "查看我的订单"
+      "submittedTitle": "我们已收到您的付款通知！",
+      "submittedText": "商店将核实付款并确认您的订单。您可以在\"我的订单\"中查看状态。",
+      "viewOrder": "查看我的订单",
+      "transferDone": "我已完成转账",
+      "referenceLabel": "转账参考号（可选）",
+      "referencePlaceholder": "例如：银行交易编号",
+      "referenceHint": "有助于商店更快找到您的付款。",
+      "attachOptional": "上传付款凭证（可选）"
+    },
+    "confirmation": {
+      "title": "订单已提交 — 付款待核实",
+      "text": "我们已收到您的订单和付款通知。商店将核实转账并确认付款；在此期间您的商品会保留。",
+      "paidTitle": "付款已确认",
+      "paidText": "商店已核实您的付款，订单正在备货。",
+      "rejectedTitle": "付款未通过",
+      "rejectedText": "商店无法核实您的付款，订单已取消。请在\"我的订单\"中查看详情。",
+      "orderNumber": "订单 <strong>{order}</strong>",
+      "loading": "正在加载订单详情...",
+      "loadFailed": "您的订单已登记，但无法加载详情。您可以重试，或在\"我的订单\"中查看。",
+      "retry": "重试",
+      "summaryTitle": "订单摘要",
+      "size": "尺码 {size}",
+      "quantity": "数量：{count}",
+      "discount": "折扣",
+      "shipping": "运费",
+      "total": "合计",
+      "paymentStatus": "付款状态",
+      "statusPending": "待核实",
+      "statusPaid": "已付款",
+      "statusRejected": "已拒绝",
+      "viewOrder": "查看我的订单",
+      "backToStore": "返回商店"
     },
     "drafts": {
       "title": "离线保存的草稿",
@@ -1116,7 +1145,8 @@
       "usdtHint": "通过前，请在区块浏览器中查询该 TxID，并核对金额和收款钱包。",
       "approve": "通过付款",
       "reject": "拒绝",
-      "confirmReject": "要拒绝该付款吗？订单将被取消，库存将释放。"
+      "confirmReject": "要拒绝该付款吗？订单将被取消，库存将释放。",
+      "noAttachment": "客户已通知转账，但未附凭证或参考号。请在批准前核实银行入账。"
     }
   },
   "AdminProducts": {

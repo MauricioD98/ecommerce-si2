@@ -26,7 +26,11 @@ export class PaymentProofsService {
     private readonly settlement: PaymentSettlementService,
   ) {}
 
-  /** El cliente sube el comprobante (QR) o el TxID (USDT). Se puede reemplazar mientras no se revisó. */
+  /**
+   * El cliente informa el pago: QR bancario (captura y referencia opcionales), USDT (TxID obligatorio) o
+   * billetera (referencia obligatoria). Se puede reemplazar mientras no se revisó; reenviar el mismo aviso
+   * actualiza la única fila del pedido (orderId es único), nunca crea otra.
+   */
   async submit(orderId: string, userId: string, method: PaymentMethod, txIdRaw: string | undefined, file?: UploadedImage) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, userId },
@@ -58,8 +62,15 @@ export class PaymentProofsService {
         : isWalletReady(settings);
     if (!enabled) throw new BadRequestException(i18nMessage('errors.PAYMENT_METHOD_UNAVAILABLE'));
 
-    if (method === PaymentMethod.BANK_QR && !image) {
-      throw new BadRequestException(i18nMessage('errors.IMAGE_REQUIRED'));
+    // QR bancario: el cliente avisa que transfirió; la captura y la referencia son opcionales. El aviso
+    // NO es un pago: queda PENDIENTE y solo la tienda lo aprueba (approve) tras ver el ingreso en su banco.
+    if (method === PaymentMethod.BANK_QR && txId) {
+      if (txId.length < 3) throw new BadRequestException(i18nMessage('errors.INVALID_REFERENCE'));
+      const reused = await this.prisma.paymentProof.findFirst({
+        where: { txId: { equals: txId, mode: 'insensitive' }, orderId: { not: orderId }, status: { not: PaymentProofStatus.RECHAZADO } },
+        select: { id: true },
+      });
+      if (reused) throw new BadRequestException(i18nMessage('errors.REFERENCE_ALREADY_USED'));
     }
     if (method === PaymentMethod.USDT) {
       if (!txId || !isValidTxId(settings?.usdtNetwork ?? null, txId)) {

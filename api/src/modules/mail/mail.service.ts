@@ -37,18 +37,40 @@ export class MailService {
     return withTenantParam(this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3000');
   }
 
+  // Sin tienda identificable se usa la marca de la plataforma, nunca el nombre de otra tienda
   private async currentStoreName(): Promise<string> {
     const tenantId = tenantStorage.getStore()?.tenantId;
-    if (!tenantId) return 'Stella Femme';
+    if (!tenantId) return platformBrand();
     try {
       const tenant = await this.control.tenant.findUnique({
         where: { id: tenantId },
         select: { name: true },
       });
-      return tenant?.name?.trim() || 'Stella Femme';
+      return tenant?.name?.trim() || platformBrand();
     } catch {
-      return 'Stella Femme';
+      return platformBrand();
     }
+  }
+
+  // Dirección autorizada para enviar: la cuenta SMTP o, si no hay usuario SMTP, la de MAIL_FROM.
+  // Nunca se usa una dirección de la tienda: el SMTP de la plataforma no está autorizado a enviar por ella.
+  private authorizedSenderAddress(): string | undefined {
+    const smtpUser = this.config.get<string>('SMTP_USER')?.trim();
+    if (smtpUser) return smtpUser;
+    const mailFrom = this.config.get<string>('MAIL_FROM')?.trim();
+    if (!mailFrom) return undefined;
+    const match = /<([^<>\s]+@[^<>\s]+)>/.exec(mailFrom);
+    if (match) return match[1];
+    return /^[^\s<>"]+@[^\s<>"]+$/.test(mailFrom) ? mailFrom : undefined;
+  }
+
+  // "Tienda vía NovaSoft" <dirección autorizada>: el cliente ve la tienda y el envío sigue saliendo por
+  // la cuenta de la plataforma. Sin dirección conocida se deja el remitente por defecto del mailer.
+  private storeViaPlatformFrom(storeName: string): string | undefined {
+    const address = this.authorizedSenderAddress();
+    if (!address) return undefined;
+    const display = `${storeName} vía ${platformBrand()}`.replace(/["\\\r\n]+/g, ' ').trim();
+    return `"${display}" <${address}>`;
   }
 
   private storeFromHeader(brandName: string): string | undefined {
@@ -134,19 +156,27 @@ export class MailService {
     });
   }
 
+  // storeName lo resuelve InvoiceService en el backend a partir del tenant del pedido: acá no se
+  // vuelve a adivinar (ni se cae a un nombre por defecto) para no mezclar tiendas.
   async sendInvoice(params: {
     to: string;
     firstName?: string | null;
+    storeName: string;
     orderNumber: string;
     total: number;
     pdf: Buffer;
     filename: string;
   }): Promise<boolean> {
-    const storeName = await this.currentStoreName();
+    const storeName = params.storeName.replace(/[\r\n]+/g, ' ').trim();
+    if (!storeName) {
+      // No debería pasar (InvoiceService no emite sin tienda), pero sin nombre no se envía con otro
+      this.logger.error(`Factura del pedido #${params.orderNumber} sin nombre de tienda: no se envía`);
+      return false;
+    }
     return this.send({
       to: params.to,
-      from: this.storeFromHeader(storeName),
-      subject: `Tu factura del pedido #${params.orderNumber}`,
+      from: this.storeViaPlatformFrom(storeName),
+      subject: `Tu factura de ${storeName} - pedido #${params.orderNumber}`,
       html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`, storeName),
       attachments: [{ filename: params.filename, content: params.pdf, contentType: 'application/pdf' }],
     });

@@ -47,6 +47,8 @@ export interface PaymentProofSummary {
 
 export interface Order {
     id: string;
+    // Número del pedido (el de los correos); falta en respuestas de una API anterior
+    orderNumber?: string;
     userId: string;
     shippingAddress: string;
     fulfillmentType: FulfillmentType;
@@ -78,4 +80,4 @@ export interface PaginatedMyOrders {
     total: number;
     page: number;
     limit: number;
-}
+}

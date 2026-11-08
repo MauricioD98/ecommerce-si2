@@ -287,7 +287,7 @@
     "steps": {
       "delivery": "Livraison",
       "payment": "Paiement",
-      "completed": "Terminé"
+      "completed": "Confirmation"
     },
     "delivery": {
       "title": "Mode de livraison",
@@ -357,7 +357,7 @@
       "cardUnavailable": "Cette boutique n’accepte pas encore les cartes : choisissez un autre moyen de paiement.",
       "cardCurrencyMismatch": "Le paiement par carte est indisponible : la boutique facturerait dans une autre devise que le Bs. Choisissez un autre moyen de paiement.",
       "bankQr": "QR bancaire",
-      "bankQrDescription": "Payez depuis votre appli bancaire et importez le justificatif",
+      "bankQrDescription": "Payez depuis votre appli bancaire et signalez-nous le virement",
       "usdt": "USDT",
       "usdtDescription": "Transfert sur le réseau {network}",
       "verifying": "Nous vérifions votre achat. Inutile de le refaire.",
@@ -440,7 +440,7 @@
     },
     "manual": {
       "qrTitle": "Scannez le QR avec votre appli bancaire",
-      "qrSubtitle": "Payez le montant exact, puis importez une capture du justificatif.",
+      "qrSubtitle": "Payez le montant exact avec l'application de votre banque, puis indiquez-nous que vous avez effectué le virement.",
       "usdtTitle": "Envoyez des USDT au portefeuille de la boutique",
       "usdtSubtitle": "Une fois le transfert confirmé, collez le TxID (hash) de la transaction.",
       "qrAlt": "QR bancaire de la boutique",
@@ -474,9 +474,38 @@
       "submitFailed": "Impossible d’envoyer le justificatif.",
       "orderFailed": "Impossible de créer la commande.",
       "reviewNote": "Votre commande reste réservée pendant que la boutique vérifie le paiement.",
-      "submittedTitle": "Justificatif reçu !",
-      "submittedText": "La boutique vérifiera le paiement et confirmera votre commande. Vous pouvez la suivre dans Mes commandes.",
-      "viewOrder": "Voir ma commande"
+      "submittedTitle": "Nous avons reçu votre avis de paiement !",
+      "submittedText": "La boutique vérifiera le paiement et confirmera votre commande. Vous pouvez suivre son statut dans Mes commandes.",
+      "viewOrder": "Voir ma commande",
+      "transferDone": "J'ai effectué le virement",
+      "referenceLabel": "Référence du virement (facultatif)",
+      "referencePlaceholder": "Ex. numéro d'opération de votre banque",
+      "referenceHint": "Aide la boutique à retrouver votre paiement plus vite.",
+      "attachOptional": "Joindre le justificatif (facultatif)"
+    },
+    "confirmation": {
+      "title": "Commande envoyée — paiement en attente de vérification",
+      "text": "Nous avons reçu votre commande et votre avis de paiement. La boutique vérifiera le virement et confirmera le paiement ; vos articles restent réservés en attendant.",
+      "paidTitle": "Paiement confirmé",
+      "paidText": "La boutique a vérifié votre paiement et votre commande est en préparation.",
+      "rejectedTitle": "Le paiement n'a pas été approuvé",
+      "rejectedText": "La boutique n'a pas pu vérifier votre paiement et la commande a été annulée. Consultez le détail dans Mes commandes.",
+      "orderNumber": "Commande <strong>{order}</strong>",
+      "loading": "Chargement du détail de la commande...",
+      "loadFailed": "Votre commande est enregistrée, mais nous n'avons pas pu charger son détail. Vous pouvez réessayer ou la consulter dans Mes commandes.",
+      "retry": "Réessayer",
+      "summaryTitle": "Récapitulatif de la commande",
+      "size": "Taille {size}",
+      "quantity": "Quantité : {count}",
+      "discount": "Remise",
+      "shipping": "Livraison",
+      "total": "Total",
+      "paymentStatus": "Statut du paiement",
+      "statusPending": "En attente de vérification",
+      "statusPaid": "Payé",
+      "statusRejected": "Refusé",
+      "viewOrder": "Voir ma commande",
+      "backToStore": "Retour à la boutique"
     },
     "drafts": {
       "title": "Brouillons enregistrés hors ligne",
@@ -1116,7 +1145,8 @@
       "usdtHint": "Recherchez le TxID dans l’explorateur du réseau et vérifiez le montant et le portefeuille de destination avant d’approuver.",
       "approve": "Approuver le paiement",
       "reject": "Refuser",
-      "confirmReject": "Refuser le paiement ? La commande sera annulée et le stock libéré."
+      "confirmReject": "Refuser le paiement ? La commande sera annulée et le stock libéré.",
+      "noAttachment": "Le client a signalé le virement sans justificatif ni référence. Vérifiez l'encaissement sur votre compte avant d'approuver."
     }
   },
   "AdminProducts": {

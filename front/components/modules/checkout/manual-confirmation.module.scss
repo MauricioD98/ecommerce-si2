@@ -1,0 +1,227 @@
+.wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 40rem;
+    margin: 0 auto;
+}
+
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.5rem;
+
+    h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #000;
+        margin: 0.5rem 0 0;
+    }
+}
+
+.icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    color: #fff;
+}
+
+.iconPending {
+    background: #d97706;
+}
+
+.iconPaid {
+    background: #059669;
+}
+
+.iconRejected {
+    background: #dc2626;
+}
+
+.lead {
+    margin: 0;
+    color: #4b5563;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+}
+
+.orderNumber {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: #666;
+    word-break: break-all;
+
+    strong {
+        color: #000;
+    }
+}
+
+.muted {
+    margin: 0;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+.errorBox {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 0.875rem;
+
+    p {
+        margin: 0;
+    }
+}
+
+.summary {
+    padding: 1.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #fafafa;
+
+    h3 {
+        margin: 0 0 0.75rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #000;
+    }
+}
+
+.items {
+    list-style: none;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    font-size: 0.9375rem;
+}
+
+.itemName {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    color: #1f2937;
+    min-width: 0;
+}
+
+.itemMeta {
+    font-size: 0.8125rem;
+    color: #6b7280;
+}
+
+.itemPrice {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.row,
+.total {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-top: 0.5rem;
+    font-size: 0.9375rem;
+    color: #4b5563;
+}
+
+.total {
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: #000;
+}
+
+.statusPending {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.statusPaid {
+    color: #047857;
+    font-weight: 600;
+}
+
+.statusRejected {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.primaryButton,
+.secondaryButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:focus-visible {
+        outline: 2px solid #000;
+        outline-offset: 2px;
+    }
+}
+
+.primaryButton {
+    background: #000;
+    color: #fff;
+    border: none;
+
+    &:hover {
+        background: #1a1a1a;
+    }
+}
+
+.secondaryButton {
+    background: #fff;
+    color: #1f2937;
+    border: 1px solid #d1d5db;
+
+    &:hover {
+        background: #f9fafb;
+    }
+}
+
+@media (max-width: 640px) {
+    .actions {
+        flex-direction: column;
+
+        .primaryButton,
+        .secondaryButton {
+            width: 100%;
+        }
+    }
+}

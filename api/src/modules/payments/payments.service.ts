@@ -761,6 +761,7 @@ export class PaymentsService {
     await this.mailService.sendInvoice({
       to: data.customer.email,
       firstName: data.customer.name,
+      storeName: data.store.name,
       orderNumber: data.number,
       total: data.total,
       pdf: buffer,

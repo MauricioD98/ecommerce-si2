@@ -676,6 +676,7 @@ private map(order: Order & { orderItems: (OrderItem &{ product: Product})[];
   const language = currentLanguage();
   return {
     id: order.id,
+    orderNumber: order.orderNumber,
     userId: order.userId,
     status: order.status,
     paymentStatus: order.paymentStatus,

@@ -55,6 +55,9 @@ export class OrderResponseDto {
   @ApiProperty()
   id: string;
 
+  @ApiProperty({ description: 'Número del pedido (el mismo que figura en los correos)' })
+  orderNumber: string;
+
   @ApiProperty()
   userId: string;
 
@@ -132,4 +135,4 @@ export class PaginatedOrderResponseDto {
 
   @ApiProperty()
   limit: number;
-}
+}

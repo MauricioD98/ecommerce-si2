@@ -28,7 +28,7 @@ export const platformBrand = () => process.env.PLATFORM_NAME || 'NovaSoft';
 export const layout = (
   title: string,
   content: string,
-  { brand = 'STELLA FEMME', footer = `Recibiste este correo porque tienes una cuenta en ${brand}.` } = {},
+  { brand = platformBrand(), footer = `Recibiste este correo porque tienes una cuenta en ${brand}.` } = {},
 ): string => `<!DOCTYPE html>
 <html lang="es">
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
@@ -49,14 +49,14 @@ export const layout = (
 </body>
 </html>`;
 
-export const welcomeEmail = (name: string, storeUrl: string, storeName = 'Stella Femme') =>
+export const welcomeEmail = (name: string, storeUrl: string, storeName = platformBrand()) =>
   layout(
     `¡Bienvenido, ${name}!`,
     `<p>Tu cuenta en ${escapeHtml(storeName)} ya está lista. Explora el catálogo, elige tu sucursal y compra con retiro en tienda o envío a domicilio.</p>${button('Ir a la tienda', storeUrl)}`,
     { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.` },
   );
 
-export const resetPasswordEmail = (name: string, otp: string, storeName = 'Stella Femme') =>
+export const resetPasswordEmail = (name: string, otp: string, storeName = platformBrand()) =>
   layout(
     'Tu código de recuperación',
     `<p>Hola ${escapeHtml(name)}, usa este código para restablecer tu contraseña:</p>
@@ -65,15 +65,16 @@ export const resetPasswordEmail = (name: string, otp: string, storeName = 'Stell
     { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.` },
   );
 
-export const invoiceEmail = (name: string, orderNumber: string, total: string, storeName = 'Stella Femme') =>
+// storeName es obligatorio: la factura de una compra siempre lleva el nombre de la tienda donde se hizo
+export const invoiceEmail = (name: string, orderNumber: string, total: string, storeName: string) =>
   layout(
-    'Gracias por tu compra',
-    `<p>Hola ${escapeHtml(name)}, recibimos el pago de tu pedido <strong>#${escapeHtml(orderNumber)}</strong> por <strong>${escapeHtml(total)}</strong>.</p>
-     <p>Adjuntamos tu factura en PDF.</p>`,
+    `Gracias por tu compra en ${storeName}`,
+    `<p>Hola ${escapeHtml(name)}, ${escapeHtml(storeName)} recibió el pago de tu pedido <strong>#${escapeHtml(orderNumber)}</strong> por <strong>${escapeHtml(total)}</strong>.</p>
+     <p>Adjuntamos la factura de tu compra en ${escapeHtml(storeName)} en PDF.</p>`,
     { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque realizaste una compra en ${storeName}.` },
   );
 
-export const campaignEmail = (subject: string, htmlBody: string, storeName = 'Stella Femme') =>
+export const campaignEmail = (subject: string, htmlBody: string, storeName = platformBrand()) =>
   layout(subject, sanitizeCampaignHtml(htmlBody), {
     brand: storeName.toUpperCase(),
     footer: `Recibiste este correo porque tienes una cuenta en ${storeName}.`,

@@ -18,6 +18,7 @@ import { StripePaymentProvider, StripePaymentForm, StripePaymentPlaceholder } fr
 import PaymentMethodCard from './PaymentMethodCard';
 import QrPaymentSection from './QrPaymentSection';
 import ManualPaymentSection from './ManualPaymentSection';
+import ManualOrderConfirmation from './ManualOrderConfirmation';
 import { OrderItem } from '@/types/orders.types';
 import { CartItem } from '@/types/cart.types';
 import { FulfillmentType } from '@/types/branch.types';
@@ -36,6 +37,27 @@ const DISPLAY_CURRENCY = 'bob';
 
 export const revalidate = false;
 
+// Pedido manual (QR bancario, USDT, billetera) ya avisado en esta pestaña: una recarga vuelve a mostrar la
+// confirmación (con los datos del servidor) en lugar de mandar al carrito vacío. Por usuario.
+const confirmedKey = (userId: string) => `sf_manual_confirmed:${userId}`;
+const readConfirmed = (userId: string | null): string | null => {
+    if (!userId || typeof sessionStorage === 'undefined') return null;
+    try {
+        return sessionStorage.getItem(confirmedKey(userId));
+    } catch {
+        return null;
+    }
+};
+const writeConfirmed = (userId: string | null, orderId: string | null) => {
+    if (!userId || typeof sessionStorage === 'undefined') return;
+    try {
+        if (orderId) sessionStorage.setItem(confirmedKey(userId), orderId);
+        else sessionStorage.removeItem(confirmedKey(userId));
+    } catch {
+        // Almacenamiento bloqueado: solo se pierde el retomar tras recargar
+    }
+};
+
 export default function CheckoutClient() {
     const { isAuthenticated, user } = useAuth();
     const userId = user?.id ?? null;
@@ -50,8 +72,11 @@ export default function CheckoutClient() {
         }
     }, [isAuthenticated, router]);
 
-    // Pasos: 1 = Entrega, 2 = Pago, 3 = Completado
+    // Pasos: 1 = Entrega, 2 = Pago, 3 = Confirmación
     const [currentStep, setCurrentStep] = useState<number>(1);
+    // Pedido manual cuyo aviso de pago el servidor ya registró (paso 3)
+    const [confirmedOrderId, setConfirmedOrderId] = useState<string | null>(null);
+    const justConfirmedRef = useRef<string | null>(null);
     const [selectedPayment, setSelectedPayment] = useState<string>("");
     const [stripeError, setStripeError] = useState<string | null>(null);
     const [isCreatingOrder, setIsCreatingOrder] = useState(false);
@@ -63,6 +88,13 @@ export default function CheckoutClient() {
     const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddress | null>(null);
 
     const { totalPrice, totals, items, clearAllCart, syncCartProducts } = useCart();
+    // useCart devuelve funciones nuevas en cada render: se leen por ref para no reiniciar la recuperación
+    const clearCartRef = useRef(clearAllCart);
+    const itemsRef = useRef(items);
+    useEffect(() => {
+        clearCartRef.current = clearAllCart;
+        itemsRef.current = items;
+    });
     const { clientSecret, createPaymentIntent, error: paymentError } = usePayment();
     const { startCheckout, resumeCheckout, error: orderError, setError: setOrderError } = useOrder();
     const { selectedBranch, selectedBranchId } = useBranches();
@@ -126,13 +158,37 @@ export default function CheckoutClient() {
         const own = await getOwnAttempts(userId).catch(() => [] as CheckoutAttempt[]);
         const attempt = own[0] ?? null;
         activeAttempt.current = attempt;
+
+        // Recarga en el paso 3: con el carrito vacío se vuelve a mostrar la confirmación de ese pedido.
+        // Si el carrito tiene productos nuevos, es otra compra y la confirmación vieja se descarta.
+        const storedConfirmed = readConfirmed(userId);
+        // justConfirmed: el aviso se acaba de registrar en esta pantalla y el carrito todavía puede no haberse vaciado
+        const justConfirmed = storedConfirmed !== null && justConfirmedRef.current === storedConfirmed;
+        if (storedConfirmed && (justConfirmed || (itemsRef.current.length === 0 && (!attempt || attempt.orderId === storedConfirmed)))) {
+            setConfirmedOrderId(storedConfirmed);
+            setVerifying(false);
+            setCurrentStep(3);
+            setResumeChecked(true);
+            return;
+        }
+        if (storedConfirmed) writeConfirmed(userId, null);
+
         if (attempt?.state === 'CONFIRMED' && attempt.orderId) {
             setVerifying(false);
             setCurrentStep(2);
             try {
                 const response = await OrderService.getOrder(attempt.orderId);
-                const current = (response.data ?? response) as unknown as { id: string; total: number; discountApplied?: number; shippingCost?: number; status?: string; paymentStatus?: string };
-                if (current.status !== 'PENDIENTE' || current.paymentStatus === 'COMPLETADO') {
+                const current = (response.data ?? response) as unknown as { id: string; total: number; discountApplied?: number; shippingCost?: number; status?: string; paymentStatus?: string; paymentProof?: { status: string } | null };
+                if (current.status === 'PENDIENTE' && current.paymentStatus === 'PENDIENTE' && current.paymentProof?.status === 'PENDIENTE') {
+                    // El aviso de pago llegó al servidor pero se perdió la respuesta: no se vuelve a pedir
+                    await forgetAttemptsOfOrder(userId, attempt.orderId);
+                    activeAttempt.current = null;
+                    justConfirmedRef.current = attempt.orderId;
+                    writeConfirmed(userId, attempt.orderId);
+                    clearCartRef.current();
+                    setConfirmedOrderId(attempt.orderId);
+                    setCurrentStep(3);
+                } else if (current.status !== 'PENDIENTE' || current.paymentStatus === 'COMPLETADO') {
                     await forgetAttemptsOfOrder(userId, attempt.orderId);
                     activeAttempt.current = null;
                 } else {
@@ -161,10 +217,23 @@ export default function CheckoutClient() {
     // Tras guardar un borrador el carrito queda vacío a propósito: no hay que competir con esa navegación
     const leavingForDraft = useRef(false);
     useEffect(() => {
-        if (resumeChecked && items.length === 0 && !orderId && !verifying && !leavingForDraft.current) {
+        if (resumeChecked && items.length === 0 && !orderId && !confirmedOrderId && !verifying && !leavingForDraft.current) {
             router.push("/cart");
         }
-    }, [resumeChecked, items.length, orderId, verifying, router]);
+    }, [resumeChecked, items.length, orderId, confirmedOrderId, verifying, router]);
+
+    // El servidor registró el aviso de pago (respuesta 2xx): recién entonces se pasa al paso 3. El pago sigue
+    // pendiente; el carrito se vacía porque el pedido ya tiene su stock reservado.
+    const handleManualSubmitted = useCallback((submittedOrderId: string) => {
+        justConfirmedRef.current = submittedOrderId;
+        writeConfirmed(userId, submittedOrderId);
+        setConfirmedOrderId(submittedOrderId);
+        setCurrentStep(3);
+        clearCartRef.current();
+        forgetAttemptsOfOrder(userId, submittedOrderId).catch(() => undefined);
+        activeAttempt.current = null;
+        if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [userId]);
 
     // Al llegar al paso 2, preseleccionar automáticamente solo medios habilitados y permitidos por el plan
     useEffect(() => {
@@ -542,10 +611,7 @@ export default function CheckoutClient() {
                                                 options={paymentOptions}
                                                 amount={payableTotal}
                                                 ensureOrder={() => ensureOrderCreated()}
-                                                onSubmitted={(submittedOrderId) => {
-                                                    clearAllCart();
-                                                    forgetAttemptsOfOrder(userId, submittedOrderId).catch(() => undefined);
-                                                }}
+                                                onSubmitted={handleManualSubmitted}
                                             />
                                         </PaymentMethodCard>
                                     )}
@@ -564,10 +630,7 @@ export default function CheckoutClient() {
                                                 options={paymentOptions}
                                                 amount={payableTotal}
                                                 ensureOrder={() => ensureOrderCreated()}
-                                                onSubmitted={(submittedOrderId) => {
-                                                    clearAllCart();
-                                                    forgetAttemptsOfOrder(userId, submittedOrderId).catch(() => undefined);
-                                                }}
+                                                onSubmitted={handleManualSubmitted}
                                             />
                                         </PaymentMethodCard>
                                     )}
@@ -586,7 +649,7 @@ export default function CheckoutClient() {
                                                 options={paymentOptions}
                                                 amount={payableTotal}
                                                 ensureOrder={() => ensureOrderCreated()}
-                                                onSubmitted={clearAllCart}
+                                                onSubmitted={handleManualSubmitted}
                                             />
                                         </PaymentMethodCard>
                                     )}
@@ -623,6 +686,10 @@ export default function CheckoutClient() {
 
                             {renderSummary()}
                         </div>
+                    )}
+
+                    {currentStep === 3 && confirmedOrderId && (
+                        <ManualOrderConfirmation orderId={confirmedOrderId} onLeave={() => writeConfirmed(userId, null)} />
                     )}
                 </div>
             </div>

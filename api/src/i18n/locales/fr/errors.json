@@ -50,6 +50,8 @@
   "ORDER_NOT_AWAITING_PROOF": "Cette commande n’attend pas de justificatif de paiement.",
   "INVALID_TXID": "Le TxID (hash de la transaction) n’est pas valide.",
   "TXID_ALREADY_USED": "Ce TxID a déjà été utilisé pour une autre commande.",
+  "INVALID_REFERENCE": "La référence du virement doit comporter au moins 3 caractères.",
+  "REFERENCE_ALREADY_USED": "Cette référence de virement a déjà été utilisée pour une autre commande.",
   "PROOF_NOT_PENDING": "Ce paiement n’a aucun justificatif en attente de vérification.",
   "APPEARANCE_IMAGE_TOO_LARGE": "L’image dépasse {max} Ko.",
   "INVALID_DASHBOARD_WIDGET": "Le widget « {id} » n’est pas valide : vérifiez sa position, sa taille et son type de graphique.",

@@ -287,7 +287,7 @@
     "steps": {
       "delivery": "Delivery",
       "payment": "Payment",
-      "completed": "Completed"
+      "completed": "Confirmation"
     },
     "delivery": {
       "title": "Delivery method",
@@ -357,7 +357,7 @@
       "cardUnavailable": "This store doesn’t accept card payments yet: choose another payment method.",
       "cardCurrencyMismatch": "Card payments are unavailable: the store would charge in a currency other than Bs. Choose another payment method.",
       "bankQr": "Bank QR",
-      "bankQrDescription": "Pay from your banking app and upload the receipt",
+      "bankQrDescription": "Pay from your banking app and let us know you transferred",
       "usdt": "USDT",
       "usdtDescription": "Transfer on the {network} network",
       "verifying": "We’re verifying your purchase. There’s no need to repeat it.",
@@ -442,7 +442,7 @@
     },
     "manual": {
       "qrTitle": "Scan the QR with your banking app",
-      "qrSubtitle": "Pay the exact amount, then upload a screenshot of the receipt.",
+      "qrSubtitle": "Pay the exact amount with your banking app, then let us know you made the transfer.",
       "usdtTitle": "Send USDT to the store’s wallet",
       "usdtSubtitle": "Once the transfer is confirmed, paste the transaction TxID (hash).",
       "qrAlt": "Store bank QR",
@@ -476,8 +476,8 @@
       "submitFailed": "Couldn’t send the receipt.",
       "orderFailed": "Couldn’t create the order.",
       "reviewNote": "Your order stays reserved while the store verifies the payment.",
-      "submittedTitle": "We got your receipt!",
-      "submittedText": "The store will verify the payment and confirm your order. You can track it in My orders.",
+      "submittedTitle": "We received your payment notice!",
+      "submittedText": "The store will verify the payment and confirm your order. You can follow its status in My orders.",
       "viewOrder": "View my order",
       "walletTitle": "Transfer from your digital wallet",
       "walletSubtitle": "Transfer the amount to our account and enter the transfer reference.",
@@ -485,7 +485,36 @@
       "walletAccount": "Destination account",
       "walletTxId": "Transaction ID or Reference",
       "walletTxIdPlaceholder": "e.g. AIRTM-849201, TK-123456, WB-987654",
-      "walletTxIdHint": "Enter the transfer reference or ID from your wallet."
+      "walletTxIdHint": "Enter the transfer reference or ID from your wallet.",
+      "transferDone": "I've made the transfer",
+      "referenceLabel": "Transfer reference (optional)",
+      "referencePlaceholder": "E.g. your bank transaction number",
+      "referenceHint": "Helps the store find your payment faster.",
+      "attachOptional": "Attach receipt (optional)"
+    },
+    "confirmation": {
+      "title": "Order sent — payment pending verification",
+      "text": "We received your order and your payment notice. The store will verify the transfer and confirm the payment; your items stay reserved in the meantime.",
+      "paidTitle": "Payment confirmed",
+      "paidText": "The store verified your payment and your order is being prepared.",
+      "rejectedTitle": "Payment was not approved",
+      "rejectedText": "The store couldn't verify your payment and the order was cancelled. Check the details in My orders.",
+      "orderNumber": "Order <strong>{order}</strong>",
+      "loading": "Loading order details...",
+      "loadFailed": "Your order was placed, but we couldn't load its details. You can retry or see it in My orders.",
+      "retry": "Retry",
+      "summaryTitle": "Order summary",
+      "size": "Size {size}",
+      "quantity": "Quantity: {count}",
+      "discount": "Discount",
+      "shipping": "Shipping",
+      "total": "Total",
+      "paymentStatus": "Payment status",
+      "statusPending": "Pending verification",
+      "statusPaid": "Paid",
+      "statusRejected": "Rejected",
+      "viewOrder": "View my order",
+      "backToStore": "Back to the store"
     },
     "drafts": {
       "title": "Drafts saved offline",
@@ -1126,7 +1155,8 @@
       "usdtHint": "Look up the TxID in the network explorer and check the amount and destination wallet before approving.",
       "approve": "Approve payment",
       "reject": "Reject",
-      "confirmReject": "Reject the payment? The order will be cancelled and the stock released."
+      "confirmReject": "Reject the payment? The order will be cancelled and the stock released.",
+      "noAttachment": "The customer reported the transfer without a receipt or reference. Check the deposit in your bank before approving."
     }
   },
   "AdminProducts": {

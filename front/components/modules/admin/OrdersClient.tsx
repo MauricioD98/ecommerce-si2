@@ -330,6 +330,10 @@ function ProofModal({
                         ) : (
                             <div className={styles.loadingState}>{t('loading')}</div>
                         ))}
+                    {/* QR bancario: el cliente puede avisar la transferencia sin adjuntar nada */}
+                    {!proof.hasImage && !proof.txId && (
+                        <div className={styles.errorMessage} role="note">{t('proof.noAttachment')}</div>
+                    )}
                     <small className={styles.cellSub}>{proof.method === 'USDT' ? t('proof.usdtHint') : proof.method === 'WALLET' ? 'Verifica en tu cuenta de billetera (Airtm, Takenos o Wallbit) que los fondos hayan ingresado antes de aprobar el pedido.' : t('proof.qrHint')}</small>
 
                     <div className={styles.modalFooter}>

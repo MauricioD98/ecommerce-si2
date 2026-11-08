@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ControlPrismaService } from '../../tenancy/control-prisma.service';
+import { resolveInvoiceIssuer } from './invoice-issuer';
 
 // Datos que necesita el PDF. Es independiente de Prisma: la venta presencial (POS) puede armar
 // su propio InvoiceData y llamar directamente a renderInvoice().
 export interface InvoiceData {
+  // Tienda que emite la factura (nunca un nombre fijo): ver resolveInvoiceIssuer
+  store: { name: string; logo?: Buffer | null };
   number: string;
   date: Date;
   branch: { name: string; address?: string | null; phone?: string | null } | null;
@@ -20,10 +24,17 @@ const money = (value: number): string => `Bs ${value.toFixed(2)}`;
 
 @Injectable()
 export class InvoiceService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private control: ControlPrismaService,
+  ) {}
 
-  // Factura de un pedido existente
-  async generateOrderInvoice(orderId: string): Promise<{ buffer: Buffer; filename: string; data: InvoiceData }> {
+  // Factura de un pedido existente de la tienda del contexto actual (request o runInTenant). El pedido
+  // se busca en el schema de esa tienda: un id de otra tienda da NotFound, no su factura.
+  async generateOrderInvoice(
+    orderId: string,
+  ): Promise<{ buffer: Buffer; filename: string; data: InvoiceData }> {
+    const issuer = await resolveInvoiceIssuer(this.control, this.prisma);
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -37,6 +48,7 @@ export class InvoiceService {
     }
 
     const data: InvoiceData = {
+      store: { name: issuer.name, logo: issuer.logo },
       number: order.orderNumber,
       date: order.createdAt,
       branch: order.branch,
@@ -54,12 +66,14 @@ export class InvoiceService {
       total: Number(order.totalAmount),
     };
 
-    return { buffer: await this.renderInvoice(data), filename: `factura-${order.orderNumber}.pdf`, data };
+    const storeSlug = issuer.slug.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'tienda';
+    const filename = `factura-${storeSlug}-${order.orderNumber}.pdf`;
+    return { buffer: await this.renderInvoice(data), filename, data };
   }
 
   renderInvoice(data: InvoiceData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: `Factura ${data.number}`, Author: 'STELLA FEMME' } });
+      const doc = new PDFDocument({ size: 'A4', margin: 50, info: { Title: `Factura ${data.number} - ${data.store.name}`, Author: data.store.name } });
       const chunks: Buffer[] = [];
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -79,8 +93,21 @@ export class InvoiceService {
     const right = doc.page.width - doc.page.margins.right;
     const contentWidth = right - left;
 
-    // Encabezado
-    doc.font('Helvetica-Bold').fontSize(24).fillColor('#000').text('STELLA FEMME', left, 50);
+    // Encabezado: logo (si la tienda subió uno PNG/JPEG) y nombre de la tienda que emite
+    let nameX = left;
+    if (data.store.logo) {
+      try {
+        doc.image(data.store.logo, left, 42, { fit: [48, 48] });
+        nameX = left + 58;
+      } catch {
+        // Imagen ilegible: se omite y queda solo el nombre
+      }
+    }
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(20)
+      .fillColor('#000')
+      .text(data.store.name.toUpperCase(), nameX, 52, { width: contentWidth * 0.6 - (nameX - left), height: 26, ellipsis: true, lineBreak: false });
     doc.font('Helvetica-Bold').fontSize(16).text('FACTURA', left, 50, { width: contentWidth, align: 'right' });
     doc
       .font('Helvetica')
@@ -187,7 +214,7 @@ export class InvoiceService {
       .font('Helvetica')
       .fontSize(9)
       .fillColor('#6b7280')
-      .text('Los precios ya incluyen las ofertas vigentes de la sucursal. ¡Gracias por tu compra!', left, y + 20, {
+      .text(`Los precios ya incluyen las ofertas vigentes de la sucursal. ¡Gracias por tu compra en ${data.store.name}!`, left, y + 20, {
         width: contentWidth,
         align: 'center',
       });
