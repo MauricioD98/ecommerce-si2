@@ -1,5 +1,6 @@
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Product } from '@/types/product.types';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,11 +9,17 @@ import { useTranslations } from 'next-intl';
 import styles from "./product-card.module.scss";
 import { getEffectivePrice, hasProductDiscount } from '@/utils/pricing';
 import { useCart } from '@/hooks/useCart';
+import SizePickerModal from './SizePickerModal';
+import pickerStyles from './size-picker-modal.module.scss';
 
 export default function ProductCard({ product }: { product: Product }) {
     const { items, addProductToCart } = useCart();
     const [added, setAdded] = useState(false);
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
+    const [toast, setToast] = useState<string | null>(null);
+    const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
     const t = useTranslations('Store.card');
+    const tPicker = useTranslations('Store.sizePicker');
     const id = product.id;
 
     const inCartQty = useMemo(() => {
@@ -25,24 +32,43 @@ export default function ProductCard({ product }: { product: Product }) {
     const isInStock = availableStock > 0;
     const hasDiscount = hasProductDiscount(product);
 
+    const hasSizes = !!product.sizes && product.sizes.length > 0;
+
+    useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
+
+    const showAdded = (message: string) => {
+        setAdded(true);
+        setToast(message);
+        timersRef.current.push(setTimeout(() => setAdded(false), 1500));
+        timersRef.current.push(setTimeout(() => setToast(null), 3000));
+    };
+
+    // Con tallas se pide elegirla en el selector (antes se tomaba la primera con stock sin preguntar).
+    // Sin tallas se mantiene el comportamiento anterior: se añade sin talla.
     const handleQuickAdd = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
         if (!isInStock) return;
 
-        // Si tiene tallas, elegir la primera con stock disponible
-        let sizeToAdd: string | undefined = undefined;
-        if (product.sizes && product.sizes.length > 0) {
-            const availableRow = product.stockBySize?.find((s) => s.stock > 0);
-            sizeToAdd = availableRow ? availableRow.size : product.sizes[0];
+        if (hasSizes) {
+            setIsPickerOpen(true);
+            return;
         }
 
-        addProductToCart(product, sizeToAdd, 1);
-        setAdded(true);
-        setTimeout(() => setAdded(false), 1500);
+        addProductToCart(product, undefined, 1);
+        showAdded(t('added'));
+    };
+
+    const closePicker = useCallback(() => setIsPickerOpen(false), []);
+
+    const handleConfirmSize = (freshProduct: typeof product, size: string) => {
+        setIsPickerOpen(false);
+        addProductToCart(freshProduct, size, 1);
+        showAdded(tPicker('addedToast', { name: freshProduct.name, size }));
     };
 
     return (
+        <>
         <Link href={`/${id}`} className={styles.card}>
             <div className={styles.imageWrapper}>
                 <Image
@@ -78,7 +104,8 @@ export default function ProductCard({ product }: { product: Product }) {
                     className={`${styles.addBtn} ${added ? styles.added : ""}`}
                     disabled={!isInStock}
                     onClick={handleQuickAdd}
-                    aria-label={t('addLabel', { name: product.name })}
+                    aria-label={hasSizes ? tPicker('openLabel', { name: product.name }) : t('addLabel', { name: product.name })}
+                    aria-haspopup={hasSizes ? 'dialog' : undefined}
                 >
                     {added ? (
                         <>
@@ -94,5 +121,15 @@ export default function ProductCard({ product }: { product: Product }) {
                 </button>
             </div>
         </Link>
+
+        {/* Fuera del <Link>: los clics del selector no deben navegar al detalle */}
+        {isPickerOpen && (
+            <SizePickerModal product={product} onClose={closePicker} onConfirm={handleConfirmSize} />
+        )}
+        {toast && typeof document !== 'undefined' && createPortal(
+            <div className={pickerStyles.toast} role="status" aria-live="polite">{toast}</div>,
+            document.body,
+        )}
+        </>
     );
 }
