@@ -6,13 +6,17 @@ import { PlatformLoginDto } from './dto/platform-login.dto';
 import { TenantLoginDto } from './dto/tenant-login.dto';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import { PlatformAuthService } from './platform-auth.service';
+import { PlatformAuditService, auditErrorCode } from './audit/platform-audit.service';
 
 // Login de los administradores del SaaS (/plataforma, JWT de plataforma) y login de usuarios en la
 // tienda que eligieron antes de autenticar (JWT de tienda). Va bajo /platform, excluido de TenantMiddleware.
 @ApiTags('platform')
 @Controller('platform/auth')
 export class PlatformAuthController {
-  constructor(private readonly auth: PlatformAuthService) {}
+  constructor(
+    private readonly auth: PlatformAuthService,
+    private readonly audit: PlatformAuditService,
+  ) {}
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
@@ -21,8 +25,24 @@ export class PlatformAuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Login de administrador de plataforma (email y contraseña)' })
   async login(@Body() dto: PlatformLoginDto) {
-    const data = await this.auth.login(dto.email, dto.password);
-    return { success: true, data, message: 'Sesión iniciada' };
+    // Auditoría: el intento (exitoso o no) con el email usado. Nunca la contraseña ni el token emitido.
+    try {
+      const data = await this.auth.login(dto.email, dto.password);
+      await this.audit.record({
+        actor: { type: 'PLATFORM_ADMIN', id: data.admin.id, email: data.admin.email },
+        action: 'PLATFORM_LOGIN',
+        result: 'SUCCESS',
+      });
+      return { success: true, data, message: 'Sesión iniciada' };
+    } catch (error) {
+      await this.audit.record({
+        actor: { type: 'ANONYMOUS', id: null, email: String(dto.email ?? '').trim().toLowerCase().slice(0, 254) || null },
+        action: 'PLATFORM_LOGIN',
+        result: 'FAILURE',
+        errorCode: auditErrorCode(error),
+      });
+      throw error;
+    }
   }
 
   @Post('tenant-login')

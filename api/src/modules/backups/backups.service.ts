@@ -362,7 +362,10 @@ export class BackupsService implements OnModuleInit, OnModuleDestroy {
     if (file.length > this.maxBytes) throw new JobFailure('BACKUP_TOO_LARGE', `El respaldo mide ${file.length} bytes (máximo ${this.maxBytes})`);
     const fileName = await this.writeFileAtomic(jobId, file);
     await this.pool.query(
-      `UPDATE public.backup_jobs SET status = 'AVAILABLE', file_name = $2, size_bytes = $3, sha256 = $4, backup_created_at = $5,
+      // backup_created_at es TIMESTAMP sin zona, igual que created_at (CURRENT_TIMESTAMP = hora de la sesión).
+      // El ISO del manifiesto termina en "Z": sin ::timestamptz PostgreSQL descarta la zona y guarda la hora UTC
+      // como si fuera local, y al leerla (pg la interpreta como local) queda corrida el desfase horario.
+      `UPDATE public.backup_jobs SET status = 'AVAILABLE', file_name = $2, size_bytes = $3, sha256 = $4, backup_created_at = $5::timestamptz,
               summary = $6::jsonb, lock_key = NULL, finished_at = now() WHERE id = $1`,
       [jobId, fileName, file.length, sha256Hex(file), payload.manifest.createdAt, JSON.stringify(summarize(payload))],
     );
@@ -419,7 +422,7 @@ export class BackupsService implements OnModuleInit, OnModuleDestroy {
     await this.pool.query(
       `INSERT INTO public.backup_jobs (id, kind, scope, tenant_id, status, origin, file_name, size_bytes, sha256, backup_created_at, summary,
                                        requested_by_type, requested_by_id, requested_by_email, started_at, finished_at)
-       VALUES ($1, 'BACKUP', $2, $3, 'AVAILABLE', 'UPLOADED', $4, $5, $6, $7, $8::jsonb, $9, $10, $11, now(), now())`,
+       VALUES ($1, 'BACKUP', $2, $3, 'AVAILABLE', 'UPLOADED', $4, $5, $6, $7::timestamptz, $8::jsonb, $9, $10, $11, now(), now())`,
       [id, header.scope, header.tenantId, fileName, file.length, sha256Hex(file), header.createdAt,
         JSON.stringify({ ...summarize(payload), originalBackupId: header.backupId }), actor.type, actor.id, actor.email],
     );

@@ -31,6 +31,12 @@ html {
   height: 100%;
 }
 
+/* Chat de Botpress oculto en checkout, perfil y paneles (ver BotpressChat.tsx). El widget monta botón,
+   ventana y vista previa dentro de .bpChatContainer, así que ocultarlo oculta todo, aunque cargue tarde. */
+html[data-chat-hidden] .bpChatContainer {
+  display: none !important;
+}
+
 html,
 body {
   max-width: 100vw;

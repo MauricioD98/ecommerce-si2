@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { PlatformAdminGuard } from '../platform/guards/platform-admin.guard';
+import { PlatformAuditService, auditActorFromRequest } from '../platform/audit/platform-audit.service';
 import { backupMaxBytes } from './backup-config';
 import { BackupsService, type BackupActor } from './backups.service';
 import { PlatformBackupListQueryDto, RestoreBackupDto } from './dto/backup.dto';
@@ -33,7 +34,10 @@ const PLATFORM = { kind: 'platform' } as const;
 @Controller('platform/backups')
 @UseGuards(PlatformAdminGuard)
 export class PlatformBackupsController {
-  constructor(private readonly backups: BackupsService) {}
+  constructor(
+    private readonly backups: BackupsService,
+    private readonly audit: PlatformAuditService,
+  ) {}
 
   @Get('config')
   config() {
@@ -50,21 +54,39 @@ export class PlatformBackupsController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Respaldo completo: plano de control + todas las tiendas, en una foto consistente' })
   async createPlatform(@Req() req: Request) {
-    return { success: true, data: await this.backups.createPlatformBackup(actorOf(req)) };
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_CREATED', successResult: 'REQUESTED', details: { scope: 'PLATFORM' } },
+      async () => {
+        return { success: true, data: await this.backups.createPlatformBackup(actorOf(req)) };
+      },
+      (res) => ({ targetId: res.data.id }),
+    );
   }
 
   @Post('tenants/:tenantId')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Respaldo de una tienda concreta (la tienda se valida contra public.tenants)' })
   async createTenant(@Req() req: Request, @Param('tenantId', ParseUUIDPipe) tenantId: string) {
-    return { success: true, data: await this.backups.createTenantBackup(tenantId, actorOf(req), PLATFORM) };
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_CREATED', successResult: 'REQUESTED', tenantId, details: { scope: 'TENANT' } },
+      async () => {
+        return { success: true, data: await this.backups.createTenantBackup(tenantId, actorOf(req), PLATFORM) };
+      },
+      (res) => ({ targetId: res.data.id }),
+    );
   }
 
   @Post('upload')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: backupMaxBytes(), files: 1 } }))
   async upload(@Req() req: Request, @UploadedFile() file?: UploadedBackup) {
-    return { success: true, data: await this.backups.upload(file?.buffer, PLATFORM, actorOf(req)) };
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_UPLOADED' },
+      async () => {
+        return { success: true, data: await this.backups.upload(file?.buffer, PLATFORM, actorOf(req)) };
+      },
+      (res) => ({ targetId: res.data.id, tenantId: res.data.tenantId, details: { scope: res.data.scope } }),
+    );
   }
 
   @Get(':id')
@@ -73,9 +95,15 @@ export class PlatformBackupsController {
   }
 
   @Get(':id/download')
-  async download(@Param('id', ParseUUIDPipe) id: string) {
-    const { file, downloadName } = await this.backups.download(id, PLATFORM);
-    return new StreamableFile(file, { type: 'application/octet-stream', disposition: `attachment; filename="${downloadName}"`, length: file.length });
+  async download(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    const job = await this.backups.get(id, PLATFORM).catch(() => null);
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_DOWNLOADED', targetId: id, tenantId: job?.tenantId ?? null, details: { scope: job?.scope ?? null } },
+      async () => {
+        const { file, downloadName } = await this.backups.download(id, PLATFORM);
+        return new StreamableFile(file, { type: 'application/octet-stream', disposition: `attachment; filename="${downloadName}"`, length: file.length });
+      },
+    );
   }
 
   @Get(':id/preview')
@@ -87,12 +115,25 @@ export class PlatformBackupsController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Restaura una copia de tienda o de plataforma (validación aislada + transacción única)' })
   async restore(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string, @Body() dto: RestoreBackupDto) {
-    return { success: true, data: await this.backups.startRestore(id, PLATFORM, actorOf(req), dto) };
+    const job = await this.backups.get(id, PLATFORM).catch(() => null);
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_RESTORE_STARTED', successResult: 'REQUESTED', targetId: id, tenantId: job?.tenantId ?? null, details: { scope: job?.scope ?? null } },
+      async () => {
+        return { success: true, data: await this.backups.startRestore(id, PLATFORM, actorOf(req), dto) };
+      },
+      (res) => ({ targetId: res.data.id }),
+    );
   }
 
   @Delete(':id')
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
-    return { success: true, data: await this.backups.remove(id, PLATFORM) };
+  async remove(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    const job = await this.backups.get(id, PLATFORM).catch(() => null);
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'BACKUP_DELETED', targetId: id, tenantId: job?.tenantId ?? null, details: { scope: job?.scope ?? null } },
+      async () => {
+        return { success: true, data: await this.backups.remove(id, PLATFORM) };
+      },
+    );
   }
 }
 

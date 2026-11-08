@@ -1454,7 +1454,7 @@
       "DAMAGED": "Defective / Write-off"
     },
     "title": "Returns Desk",
-    "subtitle": "Find the original sale, indicate what comes back and in what condition. Items in good condition return to sellable stock; defective ones go to write-offs and can’t be sold again.",
+    "subtitle": "Find the sale and select the products you want to return",
     "branchNotice": "Goods go back into <strong>{branch}</strong>’s inventory.",
     "branchLabel": "Branch receiving the return",
     "selectBranch": "Choose the receiving branch",
@@ -1500,7 +1500,13 @@
     "refunded": "Refunded: <strong>{amount}</strong>",
     "wentSellable": "went back to sellable stock",
     "wentDamaged": "went to write-offs",
-    "unitsSummary": "{sellable, plural, one {# unit} other {# units}} to sellable stock · {damaged} to write-offs"
+    "unitsSummary": "{sellable, plural, one {# unit} other {# units}} to sellable stock · {damaged} to write-offs",
+    "unitPrice": "{price} each",
+    "maxQuantity": "Maximum {count}",
+    "decrease": "Remove one unit",
+    "increase": "Add one unit",
+    "processButton": "Process refund",
+    "includeItem": "Return {name}"
   },
   "AdminInventory": {
     "title": "Inventory and Offers",
@@ -1583,17 +1589,17 @@
   },
   "AdminPos": {
     "title": "Point of Sale",
-    "subtitle": "Charge in-store sales at the counter. Inventory is deducted from the same branch as the online store.",
+    "subtitle": "Select products and complete the charge",
     "selectBranch": "Choose a branch",
     "selectBranchFirst": "Choose a branch to start charging.",
-    "searchPlaceholder": "Search product by name...",
+    "searchPlaceholder": "Search by name or code",
     "loading": "Loading products...",
     "noProducts": "No products found.",
     "noStock": "Out of stock",
     "stock": "Stock: {count}",
     "size": "Size",
     "sizeSoldOut": "Size {size} sold out at this branch",
-    "ticket": "Ticket",
+    "ticket": "Sales ticket",
     "emptyTicket": "Add products from the catalog.",
     "unitPrice": "{price} each",
     "removeOne": "Remove one",
@@ -1604,7 +1610,7 @@
     "noName": "No name",
     "methods": {
       "CASH": "Cash",
-      "PHYSICAL_CARD": "Card (POS)",
+      "PHYSICAL_CARD": "Card",
       "QR": "QR / Transfer"
     },
     "amountReceived": "Amount Received",
@@ -1634,7 +1640,18 @@
       "thanks": "Thank you for your purchase!",
       "newSale": "New sale",
       "print": "Print receipt"
-    }
+    },
+    "categoriesLabel": "Categories",
+    "allCategories": "All",
+    "scrollCategories": "More categories",
+    "lineSize": "Size {size}",
+    "sizeStock": "Stock {size}: {count}",
+    "sizeGroup": "Sizes of {name}",
+    "addSize": "Add {name} size {size} to the ticket",
+    "addProduct": "Add {name} to the ticket",
+    "subtotal": "Subtotal",
+    "nitPlaceholder": "e.g. 12345678",
+    "razonPlaceholder": "e.g. Walk-in customer"
   },
   "AdminMarketing": {
     "title": "Marketing",
@@ -1870,7 +1887,463 @@
     "showPassword": "Show",
     "hidePassword": "Hide",
     "showPasswordLabel": "Show password",
-    "hidePasswordLabel": "Hide password"
+    "hidePasswordLabel": "Hide password",
+    "nav": {
+      "label": "Panel sections",
+      "open": "Open menu",
+      "close": "Close menu",
+      "pending": "Pending",
+      "home": "Home",
+      "stores": "Stores",
+      "branches": "Branches",
+      "plans": "Plans & subscriptions",
+      "backups": "Backups",
+      "admins": "Admins & audit",
+      "system": "System status"
+    },
+    "home": {
+      "title": "Home",
+      "subtitle": "Current platform status with real data from the API.",
+      "updatedAt": "Data as of {time}",
+      "loading": "Loading the platform overview...",
+      "errorTitle": "The overview could not be loaded",
+      "retry": "Retry",
+      "emptyTitle": "There are no stores yet",
+      "emptyText": "Once the first store signs up, its figures will appear here.",
+      "noData": "No data",
+      "unavailable": "Not available",
+      "attentionTitle": "Needs attention",
+      "attentionEmpty": "No stores with errors, being created or with payment problems.",
+      "shortcutsTitle": "Shortcuts",
+      "stats": {
+        "total": "Total stores",
+        "attentionHint": "{failed} with errors · {provisioning} being created · {signups} failed sign-ups",
+        "subscriptionsTitle": "Subscriptions",
+        "subsActive": "Active subscriptions",
+        "subsActiveHint": "{trialing} trialing · {total} stores with a subscription",
+        "noSubscriptions": "{count, plural, one {# store} other {# stores}} without a Stripe subscription",
+        "paymentIssues": "Payment problems",
+        "paymentIssuesHint": "Past due, unpaid or incomplete",
+        "withoutSubscription": "No subscription",
+        "withoutSubscriptionHint": "Stores without a Stripe subscription (plan assigned manually)",
+        "mrrLabel": "Estimated MRR",
+        "mrrUnavailable": "Plan prices could not be read from Stripe.",
+        "fieldUnavailable": "The API does not report this value.",
+        "mrrNoPaying": "No active or past-due subscriptions.",
+        "mrrPartial": "Partial: {count, plural, one {# subscription without a Stripe price is} other {# subscriptions without a Stripe price are}} not included.",
+        "mrrExplain": "Estimated MRR: the monthly list price of each plan in Stripe for every active or past-due subscription. It is not money collected: it ignores coupons, proration, taxes and failed charges, and an annual subscription is counted at its plan’s monthly price.",
+        "otherSubscriptions": "Also: {ended} ended · {paused} paused · {other} in another status."
+      },
+      "attention": {
+        "paymentIssue": "Subscription: {status}",
+        "failedSignups": "{count, plural, one {# paid sign-up} other {# paid sign-ups}} failed while creating the store",
+        "failedSignupsHint": "They are retried through the API (POST /platform/subscriptions/signups/:id/retry); there is no screen for it yet.",
+        "signupsUnavailable": "Failed sign-ups are not available in this API version."
+      },
+      "backups": {
+        "title": "Latest backups",
+        "loading": "Loading backups...",
+        "loadFailed": "Backups could not be loaded.",
+        "unavailable": "Backups not available: {reason}",
+        "empty": "No data: no backup has been generated yet.",
+        "lastOk": "Latest available backup",
+        "lastPlatform": "Latest full platform backup",
+        "noneOk": "None",
+        "more": "Showing the {count} most recent operations.",
+        "goTo": "Go to Backups"
+      }
+    },
+    "sections": {
+      "stores": {
+        "summary": "Search stores, suspend, reactivate and retry their setup."
+      },
+      "branches": {
+        "summary": "Branches from every store in one place.",
+        "today": "Branches live inside each store and are currently managed only from that store’s panel. The platform API does not expose them yet."
+      },
+      "plans": {
+        "summary": "SaaS plans and store subscriptions.",
+        "today": "Today each store’s plan and subscription status are shown in Stores, and the estimated MRR in Home. There is no dedicated plans view or subscription history yet."
+      },
+      "backups": {
+        "summary": "Full platform backup and per-store backups."
+      },
+      "admins": {
+        "summary": "Platform admin accounts and action log.",
+        "today": "Admin accounts are created from the command line (npm run platform:admin). There is no admin management in the panel or general audit log yet; only backups record who requested them."
+      },
+      "system": {
+        "summary": "Health of the API, the database and external services.",
+        "today": "The API does not have a system status endpoint yet, so no indicators are shown."
+      }
+    },
+    "pending": {
+      "badge": "Pending section",
+      "title": "This section is not implemented yet",
+      "noSampleData": "No sample data is shown: information will appear here once it exists on the platform.",
+      "goTo": "Go to {section}"
+    },
+    "tenants": {
+      "searchPlaceholder": "Search by name, identifier, domain or owner",
+      "planFilter": "Filter by plan",
+      "allPlans": "All plans",
+      "clearFilters": "Clear filters",
+      "resultCount": "{shown} of {total} stores",
+      "viewDetail": "Details",
+      "openStorefrontHint": "“Open” shows the public store as a visitor sees it, without signing in to any account.",
+      "plans": {
+        "free": "Free",
+        "legacy": "Legacy",
+        "none": "No plan"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "working": "Applying...",
+        "whatHappens": "What will happen:",
+        "suspend": {
+          "title": "Suspend “{name}”",
+          "confirm": "Suspend store",
+          "typeToConfirm": "Type the identifier {slug} to confirm",
+          "effects": [
+            "The online store, its admin panel, the mobile app and the point of sale (POS) stop working until it is reactivated. On other server instances the change can take up to 60 seconds.",
+            "No store data is deleted.",
+            "It does not cancel or change the Stripe subscription: if there is one, it keeps being charged.",
+            "A Stripe event does not undo a manual suspension.",
+            "Only this store is affected."
+          ]
+        },
+        "reactivate": {
+          "title": "Reactivate “{name}”",
+          "confirm": "Reactivate store",
+          "billingWarning": "The subscription is “{status}”. If Stripe sends another event with that status, the store may be suspended again automatically.",
+          "effects": [
+            "The online store, panel, mobile app and point of sale work again immediately.",
+            "Data stays as it was when it was suspended.",
+            "It does not change the plan or the Stripe subscription.",
+            "Only this store is affected."
+          ]
+        },
+        "retry": {
+          "title": "Retry creating “{name}”",
+          "confirm": "Retry",
+          "effects": [
+            "Runs the store setup again: creates its schema if missing, applies migrations and creates the base roles and the owner user.",
+            "It may take several seconds.",
+            "If it succeeds the store becomes active; if it fails again it stays in error and the reason is shown.",
+            "Only this store is affected."
+          ]
+        }
+      },
+      "detail": {
+        "back": "Back to Stores",
+        "loading": "Loading the store...",
+        "notFound": "There is no store with that identifier.",
+        "loadFailed": "The store could not be loaded",
+        "actionsTitle": "Actions",
+        "provisioningNoActions": "The store is being created: no actions are available until it finishes.",
+        "supportPending": "The panel does not let you sign in to the owner’s account or act on their behalf. Assisted support tools (for example, helping the owner regain access) are pending.",
+        "generalTitle": "General information",
+        "owner": "Owner",
+        "updatedAt": "Last modified",
+        "slug": "Identifier",
+        "id": "Internal ID",
+        "domain": "Custom domain",
+        "domainVerified": "verified",
+        "domainUnverified": "not verified",
+        "noDomain": "No custom domain",
+        "schemaVersion": "Database version",
+        "provisionError": "Setup error",
+        "subscriptionTitle": "Subscription and payments",
+        "connectAccount": "Stripe payments account connected",
+        "chargesEnabled": "Can charge its customers",
+        "platformFee": "Platform fee",
+        "subscriptionLink": "View in Plans & subscriptions",
+        "integrationsTitle": "Integrations",
+        "noIntegrations": "No integrations configured.",
+        "integrationDecart": "Virtual try-on (Decart)",
+        "integrationWebPush": "Push notifications",
+        "configuredAt": "Configured on {date}",
+        "branchesPending": "The store’s branches cannot be viewed from the platform yet.",
+        "branchesLink": "View this store’s branches",
+        "backupsTitle": "Backups of this store",
+        "noBackups": "No data: there are no backups of this store yet.",
+        "backupsHint": "To create, download or restore backups, use the Backups section.",
+        "yes": "Yes",
+        "no": "No",
+        "branchesText": "Read-only oversight of this store’s branches."
+      }
+    },
+    "branches": {
+      "subtitle": "Branches of every store, for oversight.",
+      "reload": "Refresh branches",
+      "readOnly": "Read-only view. Creating, editing or deleting branches, inventory and staff are managed in each store’s panel.",
+      "searchPlaceholder": "Search by branch, address or store",
+      "storeFilter": "Filter by store",
+      "allStores": "All stores",
+      "statusFilter": "Filter by branch status",
+      "allStatuses": "All statuses",
+      "active": "Active",
+      "inactive": "Inactive",
+      "loadFailed": "Branches could not be loaded",
+      "loading": "Querying each store’s branches...",
+      "summary": "{branches, plural, one {# branch} other {# branches}} in {stores, plural, one {# store queried} other {# stores queried}}",
+      "summaryMissing": "{count, plural, one {# store without available data} other {# stores without available data}}",
+      "missingTitle": "Stores without available data",
+      "notProvisioned": "The store has not finished being created: it has no branches to query yet.",
+      "unavailable": "Its branches could not be queried. This does not mean it has 0.",
+      "storeUnavailable": "This store’s data is not available.",
+      "noStores": "There are no stores whose branches can be queried.",
+      "storeHasNone": "{name} has no registered branches.",
+      "noneAnywhere": "None of the queried stores has registered branches.",
+      "noResults": "No branches match the filters.",
+      "columns": {
+        "store": "Store",
+        "branch": "Branch",
+        "status": "Status",
+        "address": "Address",
+        "created": "Created"
+      },
+      "noAddress": "No address",
+      "storesWithoutBranches": "No registered branches: {names}.",
+      "cityNote": "Branches have no city field: the address is shown as the store entered it."
+    },
+    "plans": {
+      "subtitle": "Store subscriptions to the SaaS, with the data Stripe reports through webhooks.",
+      "loading": "Loading subscriptions...",
+      "loadFailed": "Subscriptions could not be loaded",
+      "missingApiTitle": "Feature not available in the running API",
+      "missingApiText": "The server does not have this feature yet. The database migration must be applied and the API restarted.",
+      "summaryTitle": "Summary",
+      "groups": {
+        "active": "Active",
+        "trialing": "Trialing",
+        "payment": "Payment problems",
+        "cancelScheduled": "Cancellation scheduled",
+        "ended": "Ended",
+        "none": "No subscription",
+        "unsynced": "Not synced"
+      },
+      "unsyncedNotice": "{count, plural, one {# subscription has} other {# subscriptions have}} no synced details yet (interval, renewal or cancellation). They are filled in by the next Stripe event or with “Read from Stripe”.",
+      "noSubscriptionsYet": "No data: no store has a linked Stripe subscription.",
+      "attentionEmpty": "No subscriptions with payment problems or prices from outside this project.",
+      "attention": {
+        "payment": "Subscription: {status}",
+        "foreignPrice": "Its Stripe price is not one of this project’s plans: the plan is not updated automatically."
+      },
+      "searchPlaceholder": "Search store by name or identifier",
+      "statusFilter": "Filter by subscription status",
+      "columns": {
+        "billing": "Billing",
+        "period": "Renewal / end",
+        "synced": "Synced"
+      },
+      "interval": {
+        "monthly": "Monthly",
+        "annual": "Annual"
+      },
+      "foreignPrice": "Price from outside this project",
+      "endedOn": "Ended on {date}",
+      "cancelsOn": "Cancels on {date}",
+      "cancelScheduled": "Cancellation scheduled",
+      "renewsOn": "Renews on {date}",
+      "periodEnds": "Period until {date}",
+      "catalogTitle": "This project’s plans",
+      "catalogText": "Prices read from Stripe only for the prices configured in this project (STRIPE_PRICE_*). Other products in the Stripe account are not used.",
+      "catalogUnavailable": "Not available: the catalog could not be read.",
+      "priceNotConfigured": "not configured",
+      "sync": {
+        "button": "Read from Stripe",
+        "title": "Read “{name}” subscription from Stripe",
+        "confirm": "Read from Stripe",
+        "done": "“{name}” subscription synced with Stripe.",
+        "effects": [
+          "Queries Stripe for the subscription already linked to this store and updates its status, plan, interval and dates.",
+          "It does not create, change or cancel anything in Stripe.",
+          "It applies the same rules as a webhook: if Stripe reports an unpaid, canceled or paused subscription, the store is suspended.",
+          "Only this store is affected."
+        ]
+      }
+    },
+    "admins": {
+      "subtitle": "Platform administrators and a log of important actions.",
+      "title": "Platform administrators",
+      "scopeNote": "SaaS administration accounts only. Store owners, admins and staff are not listed here.",
+      "loading": "Loading administrators...",
+      "loadFailed": "Administrators could not be loaded.",
+      "columns": {
+        "admin": "Administrator",
+        "status": "Status",
+        "lastLogin": "Last sign-in",
+        "created": "Created"
+      },
+      "status": {
+        "active": "Active",
+        "locked": "Temporarily locked",
+        "inactive": "Deactivated"
+      },
+      "lockedUntil": "Until {date}",
+      "neverLoggedIn": "Never signed in",
+      "managePending": "Creating or deactivating administrators is still done from the command line (npm run platform:admin); the panel only lists them."
+    },
+    "audit": {
+      "title": "Audit log",
+      "loading": "Loading log...",
+      "loadFailed": "The audit log could not be loaded",
+      "since": "Log available since {date}.",
+      "sinceUnknown": "The audit start marker was not found.",
+      "noHistoryBefore": "There is no earlier history: before that date only backups record who requested them (Backups section).",
+      "unavailableTitle": "Audit log not available",
+      "unavailableText": "The server does not have the audit table yet: the database migration must be applied. Meanwhile actions work, but they are not recorded.",
+      "empty": "No actions have been recorded yet.",
+      "noResults": "No actions match the filters.",
+      "loadMore": "Load more",
+      "domainRemoved": "domain removed",
+      "jobUnknown": "Result not available: the operation is no longer listed in Backups (for example, it was deleted).",
+      "columns": {
+        "date": "Date",
+        "actor": "Who",
+        "action": "Action",
+        "store": "Affected store",
+        "result": "Result"
+      },
+      "results": {
+        "SUCCESS": "Succeeded",
+        "FAILURE": "Failed",
+        "REQUESTED": "Requested"
+      },
+      "actors": {
+        "system": "System (billing)",
+        "key": "Script key",
+        "anonymous": "Anonymous attempt",
+        "anonymousWith": "Attempt with {email}"
+      },
+      "filters": {
+        "action": "Filter by action",
+        "allActions": "All actions",
+        "store": "Filter by store",
+        "allStores": "All stores",
+        "admin": "Filter by administrator",
+        "allAdmins": "All administrators",
+        "result": "Filter by result",
+        "allResults": "All results",
+        "from": "From",
+        "to": "To"
+      },
+      "actions": {
+        "AUDIT_STARTED": "Audit log started",
+        "PLATFORM_LOGIN": "Sign-in",
+        "TENANT_CREATED": "Store created",
+        "TENANT_SUSPENDED": "Store suspended",
+        "TENANT_REACTIVATED": "Store reactivated",
+        "TENANT_SUSPENDED_BY_BILLING": "Suspended by billing",
+        "TENANT_REACTIVATED_BY_BILLING": "Reactivated by billing",
+        "TENANT_PROVISION_RETRIED": "Setup retried",
+        "TENANT_DOMAIN_CHANGED": "Domain changed",
+        "TENANT_INTEGRATION_CHANGED": "Integration changed",
+        "SUBSCRIPTION_SYNCED": "Subscription read from Stripe",
+        "SIGNUP_RETRIED": "Paid sign-up retried",
+        "BACKUP_CREATED": "Backup created",
+        "BACKUP_UPLOADED": "Backup uploaded",
+        "BACKUP_DOWNLOADED": "Backup downloaded",
+        "BACKUP_RESTORE_STARTED": "Restore",
+        "BACKUP_DELETED": "Backup deleted"
+      }
+    },
+    "system": {
+      "subtitle": "Real checks run by the API when this page is queried.",
+      "recheck": "Check again",
+      "loading": "Checking...",
+      "loadFailed": "The system status could not be retrieved",
+      "missingApiTitle": "Feature not available in the running API",
+      "missingApiText": "The server does not have this feature yet: the API must be updated and restarted.",
+      "honestNote": "Each card shows the time of its check. Anything that cannot be checked from here is shown as “Not available”; there are no assumed indicators.",
+      "checkedAt": "Checked: {date}",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "none": "None",
+      "status": {
+        "ok": "OK",
+        "warning": "Review",
+        "error": "Problem",
+        "unavailable": "Not available"
+      },
+      "duration": {
+        "days": "{d} d {h} h",
+        "hours": "{h} h {m} min",
+        "minutes": "{m} min {s} s"
+      },
+      "api": {
+        "title": "API",
+        "okLabel": "Responding",
+        "responding": "Responding",
+        "yes": "Yes (this request)",
+        "uptime": "Running for",
+        "startedAt": "Process started"
+      },
+      "database": {
+        "title": "Database",
+        "okLabel": "Responding",
+        "query": "Test query",
+        "answered": "Answered",
+        "latency": "Latency"
+      },
+      "migrations": {
+        "title": "Migrations",
+        "okLabel": "Up to date",
+        "controlApplied": "Platform: applied",
+        "controlPending": "Platform: pending",
+        "controlFailed": "Platform: failed",
+        "storesOutdated": "Outdated stores",
+        "storesOutdatedValue": "{outdated} of {total}",
+        "unknownVersion": "unknown version"
+      },
+      "backups": {
+        "title": "Backups",
+        "okLabel": "No recent failures",
+        "key": "Encryption key",
+        "active": "In progress",
+        "stuck": "Stuck (over 2 h)",
+        "last7": "Last 7 days",
+        "last7Value": "{ok} succeeded · {failed} failed",
+        "lastSuccess": "Last successful backup",
+        "lastPlatform": "Last full backup",
+        "lastFailure": "Last error"
+      },
+      "sync": {
+        "title": "Sync with external services",
+        "okLabel": "No problems recorded",
+        "pending": "Pending events",
+        "unresolved": "Store not resolvable",
+        "dead": "Retries exhausted",
+        "processed24h": "Processed (24 h)",
+        "lastProcessed": "Last processed event",
+        "oldestOpen": "Oldest pending",
+        "attempts": "{count, plural, one {# attempt} other {# attempts}}",
+        "eventStatus": {
+          "PENDING": "Pending",
+          "UNRESOLVED": "Unresolved",
+          "DEAD": "Exhausted",
+          "PROCESSED": "Processed"
+        },
+        "note": "Stripe webhook inbox (payments, subscriptions and connected accounts). Event contents are not shown."
+      },
+      "signups": {
+        "title": "Store sign-ups",
+        "okLabel": "No problems",
+        "failed": "Paid sign-ups with errors",
+        "stuck": "Being created for over 15 min"
+      },
+      "config": {
+        "title": "Service configuration",
+        "okLabel": "Reviewed",
+        "stripe": "Stripe",
+        "stripeConnection": "Connection to Stripe",
+        "email": "Email",
+        "emailSmtp": "SMTP server configured",
+        "emailConsole": "Console mode (no emails are sent)",
+        "emailConnection": "Connection to the email server"
+      }
+    }
   },
   "AdminPayments": {
     "title": "Payment settings",
@@ -2256,7 +2729,8 @@
       "store": "Store",
       "status": "Status",
       "size": "Size",
-      "actions": "Actions"
+      "actions": "Actions",
+      "scope": "Scope"
     },
     "kind": {
       "BACKUP": "Backup",
@@ -2343,7 +2817,27 @@
       "typeToConfirm": "Type {phrase} to confirm",
       "cancel": "Cancel",
       "confirm": "Restore now",
-      "starting": "Starting…"
+      "starting": "Starting…",
+      "titlePlatform": "Restore the ENTIRE platform",
+      "titleTenant": "Restore the store “{name}”",
+      "scopePlatformTitle": "Entire platform restore",
+      "scopePlatformText": "Replaces the control plane and {count, plural, one {the # store included} other {the # stores included}} in the backup. It affects every account and panel of those stores.",
+      "scopeTenantTitle": "Single store restore: {name}",
+      "scopeTenantText": "Only this store’s data is replaced. Other stores and the platform are not changed."
+    },
+    "scopeBadge": {
+      "platform": "Entire platform",
+      "tenant": "Store"
+    },
+    "originalDate": "Backup created on {date}",
+    "filter": {
+      "label": "Filter history by scope",
+      "all": "All history",
+      "platform": "Entire platform only",
+      "tenants": "Stores only",
+      "oneTenant": "Store: {name}",
+      "count": "{shown} of {total} operations",
+      "noResults": "No operations match the filter."
     }
   }
 }

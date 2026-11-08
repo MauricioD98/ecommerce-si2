@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArchiveRestore, Download, Loader2, Trash2 } from 'lucide-react';
+import { ArchiveRestore, Download, Globe2, Loader2, Store, Trash2 } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from '@/components/modules/admin/admin-table.module.scss';
 import { intlLocale } from '@/i18n/config';
@@ -50,16 +50,18 @@ interface Props {
     onDownload: (job: BackupJob) => void;
     onRestore: (job: BackupJob) => void;
     onDelete: (job: BackupJob) => void;
+    /** Texto cuando no hay filas (p. ej. "ninguna coincide con el filtro") */
+    emptyText?: string;
 }
 
-export default function BackupJobsTable({ jobs, showStore = false, canAct, busyId, onDownload, onRestore, onDelete }: Props) {
+export default function BackupJobsTable({ jobs, showStore = false, canAct, busyId, onDownload, onRestore, onDelete, emptyText }: Props) {
     const t = useTranslations('Backups');
     const locale = intlLocale(useLocale());
     const errorLabel = useBackupErrorLabel();
     const formatDate = (value: string | null) =>
         value ? new Date(value).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
-    if (jobs.length === 0) return <div className={styles.emptyState}>{t('empty')}</div>;
+    if (jobs.length === 0) return <div className={styles.emptyState}>{emptyText ?? t('empty')}</div>;
 
     return (
         <div className={styles.tableWrapper}>
@@ -68,7 +70,7 @@ export default function BackupJobsTable({ jobs, showStore = false, canAct, busyI
                     <tr>
                         <th>{t('columns.date')}</th>
                         <th>{t('columns.type')}</th>
-                        {showStore && <th>{t('columns.store')}</th>}
+                        {showStore && <th>{t('columns.scope')}</th>}
                         <th>{t('columns.status')}</th>
                         <th className={styles.numeric}>{t('columns.size')}</th>
                         <th className={styles.numeric}>{t('columns.actions')}</th>
@@ -83,9 +85,11 @@ export default function BackupJobsTable({ jobs, showStore = false, canAct, busyI
                             <tr key={job.id}>
                                 <td>
                                     <div className={styles.cellMain}>
-                                        <span className={styles.cellTitle}>{formatDate(job.backupCreatedAt ?? job.createdAt)}</span>
-                                        {job.kind === 'RESTORE' && (
-                                            <span className={styles.cellSub}>{t('requestedAt', { date: formatDate(job.createdAt) })}</span>
+                                        {/* Fecha de la operación (created_at). Una copia subida conserva además la fecha en
+                                            que se generó originalmente. */}
+                                        <span className={styles.cellTitle}>{formatDate(job.createdAt)}</span>
+                                        {job.origin === 'UPLOADED' && job.backupCreatedAt && (
+                                            <span className={styles.cellSub}>{t('originalDate', { date: formatDate(job.backupCreatedAt) })}</span>
                                         )}
                                     </div>
                                 </td>
@@ -93,12 +97,30 @@ export default function BackupJobsTable({ jobs, showStore = false, canAct, busyI
                                     <div className={styles.cellMain}>
                                         <span className={styles.cellTitle}>{t(`kind.${job.kind}`)}</span>
                                         <span className={styles.cellSub}>
-                                            {t(`scope.${job.scope}`)}
-                                            {job.origin ? ` · ${t(`origin.${job.origin}`)}` : ''}
+                                            {/* Sin la columna de alcance (panel de una tienda) el alcance va acá */}
+                                            {!showStore && t(`scope.${job.scope}`)}
+                                            {!showStore && job.origin ? ' · ' : ''}
+                                            {job.origin ? t(`origin.${job.origin}`) : ''}
                                         </span>
                                     </div>
                                 </td>
-                                {showStore && <td>{job.scope === 'PLATFORM' ? t('allStores') : job.tenantName ?? job.tenantSlug ?? job.tenantId}</td>}
+                                {showStore && (
+                                    <td data-scope={job.scope}>
+                                        {job.scope === 'PLATFORM' ? (
+                                            <span className={`${styles.badge} ${styles.scopePlatform}`}>
+                                                <Globe2 size={12} aria-hidden /> {t('scopeBadge.platform')}
+                                            </span>
+                                        ) : (
+                                            <div className={styles.cellMain}>
+                                                <span className={`${styles.badge} ${styles.badgeMuted}`}>
+                                                    <Store size={12} aria-hidden /> {t('scopeBadge.tenant')}
+                                                </span>
+                                                <span className={styles.cellTitle}>{job.tenantName ?? job.tenantSlug ?? job.tenantId}</span>
+                                                {job.tenantSlug && job.tenantName && <span className={styles.cellSub}>{job.tenantSlug}</span>}
+                                            </div>
+                                        )}
+                                    </td>
+                                )}
                                 <td>
                                     <div className={styles.cellMain}>
                                         <span className={`${styles.badge} ${STATUS_BADGE[job.status]}`}>

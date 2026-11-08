@@ -17,6 +17,8 @@ export interface ReturnableOrderItem {
     productId: string;
     productName: string;
     sku: string;
+    // Foto del producto; falta en respuestas de una API anterior
+    imageUrl?: string | null;
     size: string | null;
     quantity: number;
     unitPrice: number;

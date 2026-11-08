@@ -1,4 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Req, UseGuards } from '@nestjs/common';
+import type { Request } from 'express';
+import { PlatformAuditService, auditActorFromRequest } from './audit/platform-audit.service';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
@@ -9,7 +11,10 @@ import { SubscriptionsService } from './subscriptions.service';
 @ApiTags('platform')
 @Controller('platform/subscriptions')
 export class SubscriptionsController {
-  constructor(private readonly subscriptions: SubscriptionsService) {}
+  constructor(
+    private readonly subscriptions: SubscriptionsService,
+    private readonly audit: PlatformAuditService,
+  ) {}
 
   // Público: precios reales (Stripe) de cada plan, mensual y anual, y si se pueden contratar
   @Get('plans')
@@ -43,13 +48,45 @@ export class SubscriptionsController {
     return { success: true, data, message: 'Estado del alta' };
   }
 
+  // ---- Supervisión desde el panel de plataforma ----------------------------------------------
+
+  @Get('tenants')
+  @UseGuards(PlatformAdminGuard)
+  @ApiHeader({ name: PLATFORM_KEY_HEADER, required: true })
+  @ApiOperation({ summary: 'Suscripciones de todas las tiendas (datos guardados por los webhooks; no consulta Stripe)' })
+  async tenantSubscriptions() {
+    return { success: true, data: await this.subscriptions.listTenantSubscriptions(), message: 'Suscripciones' };
+  }
+
+  // Solo lectura en Stripe: relee la suscripción vinculada y aplica las mismas reglas que un webhook
+  @Post('tenants/:id/sync')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(PlatformAdminGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiHeader({ name: PLATFORM_KEY_HEADER, required: true })
+  @ApiOperation({ summary: 'Volver a leer en Stripe la suscripción de una tienda (no modifica Stripe)' })
+  async syncTenant(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'SUBSCRIPTION_SYNCED', tenantId: id },
+      async () => {
+        return { success: true, data: await this.subscriptions.syncTenantFromStripe(id), message: 'Suscripción sincronizada' };
+      },
+      (res) => ({ details: { subscriptionStatus: res.data?.subscriptionStatus ?? null } }),
+    );
+  }
+
   @Post('signups/:id/retry')
   @HttpCode(HttpStatus.OK)
   @UseGuards(PlatformAdminGuard)
   @ApiHeader({ name: PLATFORM_KEY_HEADER, required: true })
   @ApiOperation({ summary: 'Reintentar un alta pagada cuyo aprovisionamiento falló' })
-  async retry(@Param('id', ParseUUIDPipe) id: string) {
-    await this.subscriptions.retrySignup(id);
-    return { success: true, data: { id }, message: 'Alta reintentada' };
+  async retry(@Req() req: Request, @Param('id', ParseUUIDPipe) id: string) {
+    return this.audit.track(
+      { actor: auditActorFromRequest(req), action: 'SIGNUP_RETRIED', details: { signupId: id } },
+      async () => {
+        await this.subscriptions.retrySignup(id);
+        return { success: true, data: { id }, message: 'Alta reintentada' };
+      },
+    );
   }
 }

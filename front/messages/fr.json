@@ -1444,7 +1444,7 @@
       "DAMAGED": "Défectueux / Perte"
     },
     "title": "Point de retour",
-    "subtitle": "Recherchez la vente d’origine, indiquez ce qui revient et dans quel état. Ce qui est en bon état retourne au stock vendable ; ce qui est défectueux passe en pertes et ne peut plus être vendu.",
+    "subtitle": "Recherchez la vente et sélectionnez les produits à retourner",
     "branchNotice": "La marchandise est réintégrée à l’inventaire de <strong>{branch}</strong>.",
     "branchLabel": "Succursale qui reçoit le retour",
     "selectBranch": "Choisissez la succursale qui reçoit",
@@ -1490,7 +1490,13 @@
     "refunded": "Remboursé : <strong>{amount}</strong>",
     "wentSellable": "retourné au stock vendable",
     "wentDamaged": "passé en pertes",
-    "unitsSummary": "{sellable, plural, one {# unité} other {# unités}} au stock vendable · {damaged} en pertes"
+    "unitsSummary": "{sellable, plural, one {# unité} other {# unités}} au stock vendable · {damaged} en pertes",
+    "unitPrice": "{price} l’unité",
+    "maxQuantity": "Maximum {count}",
+    "decrease": "Retirer une unité",
+    "increase": "Ajouter une unité",
+    "processButton": "Traiter le remboursement",
+    "includeItem": "Retourner {name}"
   },
   "AdminInventory": {
     "title": "Inventaire et offres",
@@ -1573,17 +1579,17 @@
   },
   "AdminPos": {
     "title": "Point de vente",
-    "subtitle": "Encaissez les ventes physiques au comptoir. L’inventaire est déduit de la même succursale que la boutique en ligne.",
+    "subtitle": "Sélectionnez les produits et finalisez l’encaissement",
     "selectBranch": "Choisissez une succursale",
     "selectBranchFirst": "Choisissez une succursale pour commencer à encaisser.",
-    "searchPlaceholder": "Rechercher un produit par nom...",
+    "searchPlaceholder": "Rechercher par nom ou code",
     "loading": "Chargement des produits...",
     "noProducts": "Aucun produit trouvé.",
     "noStock": "Rupture de stock",
     "stock": "Stock : {count}",
     "size": "Taille",
     "sizeSoldOut": "Taille {size} épuisée dans cette succursale",
-    "ticket": "Ticket",
+    "ticket": "Ticket de vente",
     "emptyTicket": "Ajoutez des produits depuis le catalogue.",
     "unitPrice": "{price} l’unité",
     "removeOne": "Retirer un",
@@ -1594,7 +1600,7 @@
     "noName": "Sans nom",
     "methods": {
       "CASH": "Espèces",
-      "PHYSICAL_CARD": "Carte (TPE)",
+      "PHYSICAL_CARD": "Carte",
       "QR": "QR / Virement"
     },
     "amountReceived": "Montant reçu",
@@ -1624,7 +1630,18 @@
       "thanks": "Merci pour votre achat !",
       "newSale": "Nouvelle vente",
       "print": "Imprimer le reçu"
-    }
+    },
+    "categoriesLabel": "Catégories",
+    "allCategories": "Tout",
+    "scrollCategories": "Plus de catégories",
+    "lineSize": "Taille {size}",
+    "sizeStock": "Stock {size} : {count}",
+    "sizeGroup": "Tailles de {name}",
+    "addSize": "Ajouter {name} taille {size} au ticket",
+    "addProduct": "Ajouter {name} au ticket",
+    "subtotal": "Sous-total",
+    "nitPlaceholder": "ex. 12345678",
+    "razonPlaceholder": "ex. Client au comptoir"
   },
   "AdminMarketing": {
     "title": "Marketing",
@@ -1860,7 +1877,463 @@
     "showPassword": "Afficher",
     "hidePassword": "Masquer",
     "showPasswordLabel": "Afficher le mot de passe",
-    "hidePasswordLabel": "Masquer le mot de passe"
+    "hidePasswordLabel": "Masquer le mot de passe",
+    "nav": {
+      "label": "Sections du panneau",
+      "open": "Ouvrir le menu",
+      "close": "Fermer le menu",
+      "pending": "À venir",
+      "home": "Accueil",
+      "stores": "Boutiques",
+      "branches": "Succursales",
+      "plans": "Forfaits et abonnements",
+      "backups": "Sauvegardes",
+      "admins": "Administrateurs et audit",
+      "system": "État du système"
+    },
+    "home": {
+      "title": "Accueil",
+      "subtitle": "État actuel de la plateforme avec les données réelles de l’API.",
+      "updatedAt": "Données de {time}",
+      "loading": "Chargement de la vue d’ensemble...",
+      "errorTitle": "Impossible de charger la vue d’ensemble",
+      "retry": "Réessayer",
+      "emptyTitle": "Aucune boutique pour le moment",
+      "emptyText": "Dès l’inscription de la première boutique, ses chiffres apparaîtront ici.",
+      "noData": "Aucune donnée",
+      "unavailable": "Non disponible",
+      "attentionTitle": "À surveiller",
+      "attentionEmpty": "Aucune boutique en erreur, en cours de création ou avec un problème de paiement.",
+      "shortcutsTitle": "Raccourcis",
+      "stats": {
+        "total": "Total des boutiques",
+        "attentionHint": "{failed} en erreur · {provisioning} en création · {signups} inscriptions échouées",
+        "subscriptionsTitle": "Abonnements",
+        "subsActive": "Abonnements actifs",
+        "subsActiveHint": "{trialing} en essai · {total} boutiques abonnées",
+        "noSubscriptions": "{count, plural, one {# boutique} other {# boutiques}} sans abonnement Stripe",
+        "paymentIssues": "Problèmes de paiement",
+        "paymentIssuesHint": "En retard, impayé ou incomplet",
+        "withoutSubscription": "Sans abonnement",
+        "withoutSubscriptionHint": "Boutiques sans abonnement Stripe (forfait attribué manuellement)",
+        "mrrLabel": "MRR estimé",
+        "mrrUnavailable": "Impossible de lire le prix des forfaits dans Stripe.",
+        "fieldUnavailable": "L’API ne fournit pas cette donnée.",
+        "mrrNoPaying": "Aucun abonnement actif ou en retard de paiement.",
+        "mrrPartial": "Partiel : {count, plural, one {# abonnement sans prix Stripe n’est pas compté} other {# abonnements sans prix Stripe ne sont pas comptés}}.",
+        "mrrExplain": "MRR estimé : prix mensuel catalogue de chaque forfait dans Stripe pour chaque abonnement actif ou en retard de paiement. Ce n’est pas de l’argent encaissé : il ne tient pas compte des coupons, des proratas, des taxes ni des paiements échoués, et un abonnement annuel est compté au prix mensuel de son forfait.",
+        "otherSubscriptions": "En outre : {ended, plural, one {# terminé} other {# terminés}} · {paused} en pause · {other} dans un autre état."
+      },
+      "attention": {
+        "paymentIssue": "Abonnement : {status}",
+        "failedSignups": "{count, plural, one {# inscription payée} other {# inscriptions payées}} en erreur lors de la création de la boutique",
+        "failedSignupsHint": "Elles se relancent via l’API (POST /platform/subscriptions/signups/:id/retry) ; il n’existe pas encore d’écran pour cela.",
+        "signupsUnavailable": "Les inscriptions échouées ne sont pas disponibles dans cette version de l’API."
+      },
+      "backups": {
+        "title": "Dernières sauvegardes",
+        "loading": "Chargement des sauvegardes...",
+        "loadFailed": "Impossible de charger les sauvegardes.",
+        "unavailable": "Sauvegardes non disponibles : {reason}",
+        "empty": "Aucune donnée : aucune sauvegarde n’a encore été générée.",
+        "lastOk": "Dernière sauvegarde disponible",
+        "lastPlatform": "Dernière sauvegarde complète de la plateforme",
+        "noneOk": "Aucune",
+        "more": "Affichage des {count} opérations les plus récentes.",
+        "goTo": "Aller aux Sauvegardes"
+      }
+    },
+    "sections": {
+      "stores": {
+        "summary": "Rechercher des boutiques, les suspendre, les réactiver et relancer leur création."
+      },
+      "branches": {
+        "summary": "Les succursales de toutes les boutiques au même endroit.",
+        "today": "Les succursales appartiennent à chaque boutique et ne se gèrent aujourd’hui que depuis le panneau de cette boutique. L’API de la plateforme ne les expose pas encore."
+      },
+      "plans": {
+        "summary": "Forfaits du SaaS et abonnements des boutiques.",
+        "today": "Aujourd’hui, le forfait et l’état de l’abonnement de chaque boutique s’affichent dans Boutiques, et le MRR estimé dans Accueil. Il n’existe pas encore de vue dédiée aux forfaits ni d’historique des abonnements."
+      },
+      "backups": {
+        "summary": "Sauvegarde complète de la plateforme et sauvegardes par boutique."
+      },
+      "admins": {
+        "summary": "Comptes administrateurs de la plateforme et journal des actions.",
+        "today": "Les comptes administrateurs se créent en ligne de commande (npm run platform:admin). Il n’existe pas encore de gestion des administrateurs dans le panneau ni de journal d’audit général ; seules les sauvegardes enregistrent qui les a demandées."
+      },
+      "system": {
+        "summary": "Santé de l’API, de la base de données et des services externes.",
+        "today": "L’API n’a pas encore de point d’accès d’état du système, aucun indicateur n’est donc affiché."
+      }
+    },
+    "pending": {
+      "badge": "Section à venir",
+      "title": "Cette section n’est pas encore implémentée",
+      "noSampleData": "Aucune donnée d’exemple n’est affichée : les informations apparaîtront ici lorsqu’elles existeront sur la plateforme.",
+      "goTo": "Aller à {section}"
+    },
+    "tenants": {
+      "searchPlaceholder": "Rechercher par nom, identifiant, domaine ou propriétaire",
+      "planFilter": "Filtrer par forfait",
+      "allPlans": "Tous les forfaits",
+      "clearFilters": "Effacer les filtres",
+      "resultCount": "{shown} sur {total} boutiques",
+      "viewDetail": "Détail",
+      "openStorefrontHint": "« Ouvrir » affiche la boutique publique telle qu’un visiteur la voit, sans se connecter à aucun compte.",
+      "plans": {
+        "free": "Gratuit",
+        "legacy": "Legacy",
+        "none": "Sans forfait"
+      },
+      "actions": {
+        "cancel": "Annuler",
+        "working": "Application...",
+        "whatHappens": "Ce qui va se passer :",
+        "suspend": {
+          "title": "Suspendre « {name} »",
+          "confirm": "Suspendre la boutique",
+          "typeToConfirm": "Saisissez l’identifiant {slug} pour confirmer",
+          "effects": [
+            "La boutique en ligne, son panneau d’administration, l’application mobile et la caisse (POS) cessent de fonctionner jusqu’à la réactivation. Sur les autres instances du serveur, le changement peut prendre jusqu’à 60 secondes.",
+            "Aucune donnée de la boutique n’est supprimée.",
+            "L’abonnement Stripe n’est ni annulé ni modifié : s’il existe, il continue d’être facturé.",
+            "Un événement Stripe n’annule pas une suspension manuelle.",
+            "Seule cette boutique est concernée."
+          ]
+        },
+        "reactivate": {
+          "title": "Réactiver « {name} »",
+          "confirm": "Réactiver la boutique",
+          "billingWarning": "L’abonnement est « {status} ». Si Stripe envoie un autre événement avec cet état, la boutique peut être de nouveau suspendue automatiquement.",
+          "effects": [
+            "La boutique en ligne, le panneau, l’application mobile et la caisse fonctionnent de nouveau immédiatement.",
+            "Les données restent telles qu’elles étaient lors de la suspension.",
+            "Le forfait et l’abonnement Stripe ne changent pas.",
+            "Seule cette boutique est concernée."
+          ]
+        },
+        "retry": {
+          "title": "Relancer la création de « {name} »",
+          "confirm": "Relancer",
+          "effects": [
+            "Relance la création de la boutique : crée son schéma s’il manque, applique les migrations et crée les rôles de base et l’utilisateur propriétaire.",
+            "Cela peut prendre plusieurs secondes.",
+            "En cas de succès la boutique devient active ; en cas de nouvel échec elle reste en erreur et le motif s’affiche.",
+            "Seule cette boutique est concernée."
+          ]
+        }
+      },
+      "detail": {
+        "back": "Retour aux Boutiques",
+        "loading": "Chargement de la boutique...",
+        "notFound": "Aucune boutique ne correspond à cet identifiant.",
+        "loadFailed": "Impossible de charger la boutique",
+        "actionsTitle": "Actions",
+        "provisioningNoActions": "La boutique est en cours de création : aucune action n’est disponible avant la fin.",
+        "supportPending": "Le panneau ne permet pas de se connecter au compte du propriétaire ni d’agir en son nom. Les outils de support assisté (par exemple, aider le propriétaire à récupérer l’accès) sont à venir.",
+        "generalTitle": "Informations générales",
+        "owner": "Propriétaire",
+        "updatedAt": "Dernière modification",
+        "slug": "Identifiant",
+        "id": "ID interne",
+        "domain": "Domaine personnalisé",
+        "domainVerified": "vérifié",
+        "domainUnverified": "non vérifié",
+        "noDomain": "Pas de domaine personnalisé",
+        "schemaVersion": "Version de la base de données",
+        "provisionError": "Erreur de création",
+        "subscriptionTitle": "Abonnement et paiements",
+        "connectAccount": "Compte de paiement Stripe connecté",
+        "chargesEnabled": "Peut encaisser ses clients",
+        "platformFee": "Commission de la plateforme",
+        "subscriptionLink": "Voir dans Forfaits et abonnements",
+        "integrationsTitle": "Intégrations",
+        "noIntegrations": "Aucune intégration configurée.",
+        "integrationDecart": "Cabine d’essayage virtuelle (Decart)",
+        "integrationWebPush": "Notifications push",
+        "configuredAt": "Configurée le {date}",
+        "branchesPending": "Les succursales de la boutique ne sont pas encore consultables depuis la plateforme.",
+        "branchesLink": "Voir les succursales de cette boutique",
+        "backupsTitle": "Sauvegardes de cette boutique",
+        "noBackups": "Aucune donnée : pas encore de sauvegarde de cette boutique.",
+        "backupsHint": "Pour créer, télécharger ou restaurer des sauvegardes, utilisez la section Sauvegardes.",
+        "yes": "Oui",
+        "no": "Non",
+        "branchesText": "Supervision en lecture seule des succursales de cette boutique."
+      }
+    },
+    "branches": {
+      "subtitle": "Succursales de toutes les boutiques, pour la supervision.",
+      "reload": "Actualiser les succursales",
+      "readOnly": "Vue en lecture seule. La création, la modification ou la suppression des succursales, l’inventaire et le personnel se gèrent dans le panneau de chaque boutique.",
+      "searchPlaceholder": "Rechercher par succursale, adresse ou boutique",
+      "storeFilter": "Filtrer par boutique",
+      "allStores": "Toutes les boutiques",
+      "statusFilter": "Filtrer par état de la succursale",
+      "allStatuses": "Tous les états",
+      "active": "Active",
+      "inactive": "Inactive",
+      "loadFailed": "Impossible de charger les succursales",
+      "loading": "Consultation des succursales de chaque boutique...",
+      "summary": "{branches, plural, one {# succursale} other {# succursales}} dans {stores, plural, one {# boutique consultée} other {# boutiques consultées}}",
+      "summaryMissing": "{count, plural, one {# boutique sans données disponibles} other {# boutiques sans données disponibles}}",
+      "missingTitle": "Boutiques sans données disponibles",
+      "notProvisioned": "La boutique n’a pas fini d’être créée : elle n’a pas encore de succursales à consulter.",
+      "unavailable": "Impossible de consulter ses succursales. Cela ne signifie pas qu’elle en a 0.",
+      "storeUnavailable": "Les données de cette boutique ne sont pas disponibles.",
+      "noStores": "Aucune boutique dont les succursales peuvent être consultées.",
+      "storeHasNone": "{name} n’a aucune succursale enregistrée.",
+      "noneAnywhere": "Aucune des boutiques consultées n’a de succursale enregistrée.",
+      "noResults": "Aucune succursale ne correspond aux filtres.",
+      "columns": {
+        "store": "Boutique",
+        "branch": "Succursale",
+        "status": "État",
+        "address": "Adresse",
+        "created": "Créée"
+      },
+      "noAddress": "Sans adresse",
+      "storesWithoutBranches": "Sans succursale enregistrée : {names}.",
+      "cityNote": "Les succursales n’ont pas de champ ville : l’adresse est affichée telle que la boutique l’a saisie."
+    },
+    "plans": {
+      "subtitle": "Abonnements des boutiques au SaaS, avec les données que Stripe transmet par webhook.",
+      "loading": "Chargement des abonnements...",
+      "loadFailed": "Impossible de charger les abonnements",
+      "missingApiTitle": "Fonction non disponible dans l’API en cours d’exécution",
+      "missingApiText": "Le serveur n’a pas encore cette fonction. Il faut appliquer la migration de la base de données et redémarrer l’API.",
+      "summaryTitle": "Résumé",
+      "groups": {
+        "active": "Actifs",
+        "trialing": "En essai",
+        "payment": "Problèmes de paiement",
+        "cancelScheduled": "Annulation programmée",
+        "ended": "Terminés",
+        "none": "Sans abonnement",
+        "unsynced": "Non synchronisés"
+      },
+      "unsyncedNotice": "{count, plural, one {# abonnement n’a} other {# abonnements n’ont}} pas encore de détail synchronisé (intervalle, renouvellement ou annulation). Il se complète au prochain événement Stripe ou avec « Lire depuis Stripe ».",
+      "noSubscriptionsYet": "Aucune donnée : aucune boutique n’a d’abonnement Stripe lié.",
+      "attentionEmpty": "Aucun abonnement avec un problème de paiement ou un prix étranger à ce projet.",
+      "attention": {
+        "payment": "Abonnement : {status}",
+        "foreignPrice": "Son prix Stripe ne correspond à aucun forfait de ce projet : le forfait n’est pas mis à jour automatiquement."
+      },
+      "searchPlaceholder": "Rechercher une boutique par nom ou identifiant",
+      "statusFilter": "Filtrer par état de l’abonnement",
+      "columns": {
+        "billing": "Facturation",
+        "period": "Renouvellement / fin",
+        "synced": "Synchronisé"
+      },
+      "interval": {
+        "monthly": "Mensuel",
+        "annual": "Annuel"
+      },
+      "foreignPrice": "Prix étranger à ce projet",
+      "endedOn": "Terminé le {date}",
+      "cancelsOn": "Annulé le {date}",
+      "cancelScheduled": "Annulation programmée",
+      "renewsOn": "Renouvelé le {date}",
+      "periodEnds": "Période jusqu’au {date}",
+      "catalogTitle": "Forfaits de ce projet",
+      "catalogText": "Prix lus dans Stripe uniquement pour les prix configurés dans ce projet (STRIPE_PRICE_*). Les autres produits du compte Stripe ne sont pas utilisés.",
+      "catalogUnavailable": "Non disponible : impossible de lire le catalogue.",
+      "priceNotConfigured": "non configuré",
+      "sync": {
+        "button": "Lire depuis Stripe",
+        "title": "Lire depuis Stripe l’abonnement de « {name} »",
+        "confirm": "Lire depuis Stripe",
+        "done": "Abonnement de « {name} » synchronisé avec Stripe.",
+        "effects": [
+          "Consulte dans Stripe l’abonnement déjà lié à cette boutique et met à jour son état, son forfait, son intervalle et ses dates.",
+          "Ne crée, ne modifie et n’annule rien dans Stripe.",
+          "Applique les mêmes règles qu’un webhook : si Stripe signale un abonnement impayé, annulé ou en pause, la boutique est suspendue.",
+          "Seule cette boutique est concernée."
+        ]
+      }
+    },
+    "admins": {
+      "subtitle": "Administrateurs de la plateforme et journal des actions importantes.",
+      "title": "Administrateurs de la plateforme",
+      "scopeNote": "Uniquement les comptes d’administration du SaaS. Les propriétaires, administrateurs et employés des boutiques n’apparaissent pas ici.",
+      "loading": "Chargement des administrateurs...",
+      "loadFailed": "Impossible de charger les administrateurs.",
+      "columns": {
+        "admin": "Administrateur",
+        "status": "État",
+        "lastLogin": "Dernière connexion",
+        "created": "Création"
+      },
+      "status": {
+        "active": "Actif",
+        "locked": "Bloqué temporairement",
+        "inactive": "Désactivé"
+      },
+      "lockedUntil": "Jusqu’au {date}",
+      "neverLoggedIn": "Jamais connecté",
+      "managePending": "La création ou la désactivation d’administrateurs se fait encore en ligne de commande (npm run platform:admin) ; le panneau les consulte seulement."
+    },
+    "audit": {
+      "title": "Audit",
+      "loading": "Chargement du journal...",
+      "loadFailed": "Impossible de charger l’audit",
+      "since": "Journal disponible depuis le {date}.",
+      "sinceUnknown": "Le repère de début de l’audit est introuvable.",
+      "noHistoryBefore": "Il n’y a pas d’historique antérieur : avant cette date, seules les sauvegardes indiquent qui les a demandées (section Sauvegardes).",
+      "unavailableTitle": "Audit non disponible",
+      "unavailableText": "Le serveur n’a pas encore la table d’audit : il faut appliquer la migration de la base de données. En attendant, les actions fonctionnent mais ne sont pas enregistrées.",
+      "empty": "Aucune action enregistrée pour le moment.",
+      "noResults": "Aucune action ne correspond aux filtres.",
+      "loadMore": "Charger plus",
+      "domainRemoved": "domaine retiré",
+      "jobUnknown": "Résultat non disponible : l’opération ne figure plus dans Sauvegardes (par exemple, elle a été supprimée).",
+      "columns": {
+        "date": "Date",
+        "actor": "Qui",
+        "action": "Action",
+        "store": "Boutique concernée",
+        "result": "Résultat"
+      },
+      "results": {
+        "SUCCESS": "Réussi",
+        "FAILURE": "Échec",
+        "REQUESTED": "Demandé"
+      },
+      "actors": {
+        "system": "Système (facturation)",
+        "key": "Clé de scripts",
+        "anonymous": "Tentative anonyme",
+        "anonymousWith": "Tentative avec {email}"
+      },
+      "filters": {
+        "action": "Filtrer par action",
+        "allActions": "Toutes les actions",
+        "store": "Filtrer par boutique",
+        "allStores": "Toutes les boutiques",
+        "admin": "Filtrer par administrateur",
+        "allAdmins": "Tous les administrateurs",
+        "result": "Filtrer par résultat",
+        "allResults": "Tous les résultats",
+        "from": "Du",
+        "to": "Au"
+      },
+      "actions": {
+        "AUDIT_STARTED": "Début de l’audit",
+        "PLATFORM_LOGIN": "Connexion",
+        "TENANT_CREATED": "Création de boutique",
+        "TENANT_SUSPENDED": "Suspension de boutique",
+        "TENANT_REACTIVATED": "Réactivation de boutique",
+        "TENANT_SUSPENDED_BY_BILLING": "Suspension par facturation",
+        "TENANT_REACTIVATED_BY_BILLING": "Réactivation par facturation",
+        "TENANT_PROVISION_RETRIED": "Création relancée",
+        "TENANT_DOMAIN_CHANGED": "Changement de domaine",
+        "TENANT_INTEGRATION_CHANGED": "Changement d’intégration",
+        "SUBSCRIPTION_SYNCED": "Lecture de l’abonnement dans Stripe",
+        "SIGNUP_RETRIED": "Inscription payée relancée",
+        "BACKUP_CREATED": "Sauvegarde générée",
+        "BACKUP_UPLOADED": "Copie importée",
+        "BACKUP_DOWNLOADED": "Copie téléchargée",
+        "BACKUP_RESTORE_STARTED": "Restauration",
+        "BACKUP_DELETED": "Copie supprimée"
+      }
+    },
+    "system": {
+      "subtitle": "Vérifications réelles effectuées par l’API lors de la consultation de cette page.",
+      "recheck": "Vérifier à nouveau",
+      "loading": "Vérification...",
+      "loadFailed": "Impossible d’obtenir l’état du système",
+      "missingApiTitle": "Fonction non disponible dans l’API en cours d’exécution",
+      "missingApiText": "Le serveur n’a pas encore cette fonction : il faut mettre à jour et redémarrer l’API.",
+      "honestNote": "Chaque carte indique l’heure de sa vérification. Ce qui ne peut pas être vérifié d’ici est indiqué « Non disponible » ; il n’y a pas d’indicateurs supposés.",
+      "checkedAt": "Vérifié : {date}",
+      "configured": "Configuré",
+      "notConfigured": "Non configuré",
+      "none": "Aucun",
+      "status": {
+        "ok": "Correct",
+        "warning": "À vérifier",
+        "error": "Problème",
+        "unavailable": "Non disponible"
+      },
+      "duration": {
+        "days": "{d} j {h} h",
+        "hours": "{h} h {m} min",
+        "minutes": "{m} min {s} s"
+      },
+      "api": {
+        "title": "API",
+        "okLabel": "Répond",
+        "responding": "Répond",
+        "yes": "Oui (cette requête)",
+        "uptime": "En service depuis",
+        "startedAt": "Démarrage du processus"
+      },
+      "database": {
+        "title": "Base de données",
+        "okLabel": "Répond",
+        "query": "Requête de test",
+        "answered": "Répondue",
+        "latency": "Latence"
+      },
+      "migrations": {
+        "title": "Migrations",
+        "okLabel": "À jour",
+        "controlApplied": "Plateforme : appliquées",
+        "controlPending": "Plateforme : en attente",
+        "controlFailed": "Plateforme : en erreur",
+        "storesOutdated": "Boutiques non à jour",
+        "storesOutdatedValue": "{outdated} sur {total}",
+        "unknownVersion": "version inconnue"
+      },
+      "backups": {
+        "title": "Sauvegardes",
+        "okLabel": "Aucun échec récent",
+        "key": "Clé de chiffrement",
+        "active": "En cours",
+        "stuck": "Bloquées (plus de 2 h)",
+        "last7": "7 derniers jours",
+        "last7Value": "{ok} réussies · {failed} en erreur",
+        "lastSuccess": "Dernière sauvegarde réussie",
+        "lastPlatform": "Dernière sauvegarde complète",
+        "lastFailure": "Dernière erreur"
+      },
+      "sync": {
+        "title": "Synchronisation avec les services externes",
+        "okLabel": "Aucun problème enregistré",
+        "pending": "Événements en attente",
+        "unresolved": "Boutique introuvable",
+        "dead": "Tentatives épuisées",
+        "processed24h": "Traités (24 h)",
+        "lastProcessed": "Dernier événement traité",
+        "oldestOpen": "Plus ancien en attente",
+        "attempts": "{count, plural, one {# tentative} other {# tentatives}}",
+        "eventStatus": {
+          "PENDING": "En attente",
+          "UNRESOLVED": "Non résolu",
+          "DEAD": "Épuisé",
+          "PROCESSED": "Traité"
+        },
+        "note": "Boîte de réception des webhooks Stripe (paiements, abonnements et comptes connectés). Le contenu des événements n’est pas affiché."
+      },
+      "signups": {
+        "title": "Inscriptions de boutiques",
+        "okLabel": "Aucun problème",
+        "failed": "Inscriptions payées en erreur",
+        "stuck": "En création depuis plus de 15 min"
+      },
+      "config": {
+        "title": "Configuration des services",
+        "okLabel": "Vérifiée",
+        "stripe": "Stripe",
+        "stripeConnection": "Connexion à Stripe",
+        "email": "E-mail",
+        "emailSmtp": "Serveur SMTP configuré",
+        "emailConsole": "Mode console (aucun e-mail envoyé)",
+        "emailConnection": "Connexion au serveur de messagerie"
+      }
+    }
   },
   "AdminPayments": {
     "title": "Gestion des paiements",
@@ -2246,7 +2719,8 @@
       "store": "Boutique",
       "status": "État",
       "size": "Taille",
-      "actions": "Actions"
+      "actions": "Actions",
+      "scope": "Portée"
     },
     "kind": {
       "BACKUP": "Sauvegarde",
@@ -2333,7 +2807,27 @@
       "typeToConfirm": "Saisissez {phrase} pour confirmer",
       "cancel": "Annuler",
       "confirm": "Restaurer maintenant",
-      "starting": "Démarrage…"
+      "starting": "Démarrage…",
+      "titlePlatform": "Restaurer TOUTE la plateforme",
+      "titleTenant": "Restaurer la boutique « {name} »",
+      "scopePlatformTitle": "Restauration de toute la plateforme",
+      "scopePlatformText": "Remplace le plan de contrôle et {count, plural, one {la # boutique incluse} other {les # boutiques incluses}} dans la copie. Cela concerne tous les comptes et panneaux de ces boutiques.",
+      "scopeTenantTitle": "Restauration d’une seule boutique : {name}",
+      "scopeTenantText": "Seules les données de cette boutique sont remplacées. Les autres boutiques et la plateforme ne sont pas modifiées."
+    },
+    "scopeBadge": {
+      "platform": "Toute la plateforme",
+      "tenant": "Boutique"
+    },
+    "originalDate": "Copie générée le {date}",
+    "filter": {
+      "label": "Filtrer l’historique par portée",
+      "all": "Tout l’historique",
+      "platform": "Toute la plateforme uniquement",
+      "tenants": "Boutiques uniquement",
+      "oneTenant": "Boutique : {name}",
+      "count": "{shown} sur {total} opérations",
+      "noResults": "Aucune opération ne correspond au filtre."
     }
   }
 }

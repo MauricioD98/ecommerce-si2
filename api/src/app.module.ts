@@ -38,6 +38,7 @@ import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { AppearanceModule } from './modules/appearance/appearance.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { BackupsModule } from './modules/backups/backups.module';
+import { PlatformAuditModule } from './modules/platform/audit/platform-audit.module';
 
 
 @Module({
@@ -65,7 +66,7 @@ import { BackupsModule } from './modules/backups/backups.module';
     }),
     // Habilita @Cron(...) en toda la app (usado por CartCleanupService para liberar carritos abandonados)
     ScheduleModule.forRoot(),
-    TenancyModule, PlatformModule, PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule, ChatbotModule, TryOnModule, StoreModule, AppearanceModule, AnalyticsModule, OfflineSyncModule, SalesForecastModule, CustomerSegmentationModule, BackupsModule],
+    TenancyModule, PlatformModule, PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule, ChatbotModule, TryOnModule, StoreModule, AppearanceModule, AnalyticsModule, OfflineSyncModule, SalesForecastModule, CustomerSegmentationModule, BackupsModule, PlatformAuditModule],
   controllers: [AppController],
   providers: [AppService, { provide: APP_FILTER, useClass: I18nExceptionFilter }],
 })

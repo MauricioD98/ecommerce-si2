@@ -326,6 +326,7 @@ export class ReturnsService {
         productId: item.productId,
         productName: item.product.name,
         sku: item.product.sku,
+        imageUrl: item.product.imageUrl ?? null,
         size: item.size,
         quantity: item.quantity,
         unitPrice: Number(item.price),

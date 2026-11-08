@@ -40,7 +40,7 @@ export class PosService {
   // Catálogo del POS: solo productos con stock en la sucursal del cajero (o la elegida, si tiene alcance global)
   async getCatalog(
     cashier: AuthUser,
-    query: { branchId?: string; search?: string; page?: number; limit?: number },
+    query: { branchId?: string; search?: string; category?: string; page?: number; limit?: number },
   ) {
     const branchId = hasAllBranches(cashier) ? (query.branchId ?? cashier.branchId) : cashier.branchId;
     if (!branchId) {
@@ -52,6 +52,7 @@ export class PosService {
       inStockOnly: true,
       isActive: true,
       search: query.search,
+      category: query.category,
       page: query.page ?? 1,
       limit: query.limit ?? 24,
     });

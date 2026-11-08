@@ -151,6 +151,16 @@
     color: #6b7280;
 }
 
+/* Respaldos: una operación sobre TODA la plataforma se distingue de la de una tienda */
+.scopePlatform {
+    background: #0a0a0a;
+    color: #fff;
+}
+
+.badge > svg {
+    vertical-align: -2px;
+}
+
 .badgeDanger {
     background: color-mix(in srgb, var(--destructive) 10%, transparent);
     color: var(--destructive);
@@ -992,4 +1002,36 @@ fieldset.field {
         font-weight: 500;
         color: var(--foreground);
     }
+}
+
+/* Respaldos: franja de alcance al inicio del diálogo de restauración */
+.restoreScopePlatform,
+.restoreScopeTenant {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+
+    svg {
+        flex: none;
+        margin-top: 0.125rem;
+    }
+
+    p {
+        margin-top: 0.25rem;
+    }
+}
+
+.restoreScopePlatform {
+    background: #0a0a0a;
+    color: #fff;
+}
+
+.restoreScopeTenant {
+    background: #fff;
+    border: 2px solid #0a0a0a;
+    color: #0a0a0a;
 }

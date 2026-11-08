@@ -7,6 +7,8 @@ export class ReturnableOrderItemDto {
   @ApiProperty() productId: string;
   @ApiProperty({ example: 'Vestido largo rojo de fiesta' }) productName: string;
   @ApiProperty({ example: 'VES-001' }) sku: string;
+  @ApiProperty({ nullable: true, description: 'Foto del producto (miniatura en el punto de devolución)' })
+  imageUrl: string | null;
   @ApiProperty({ example: 'M', nullable: true }) size: string | null;
   @ApiProperty({ example: 2, description: 'Unidades vendidas en esta línea' }) quantity: number;
   @ApiProperty({ example: 129.9, description: 'Precio unitario histórico al que se vendió' }) unitPrice: number;

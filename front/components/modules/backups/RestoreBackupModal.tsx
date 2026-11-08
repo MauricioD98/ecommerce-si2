@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FormEvent, useEffect, useState } from 'react';
-import { AlertTriangle, ArchiveRestore } from 'lucide-react';
+import { AlertTriangle, ArchiveRestore, Globe2, Store } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import AdminModal from '@/components/modules/admin/AdminModal';
 import styles from '@/components/modules/admin/admin-table.module.scss';
@@ -70,12 +70,38 @@ export default function RestoreBackupModal({ api, job, onClose, onStarted }: Pro
     };
 
     return (
-        <AdminModal title={t('restoreModal.title')} onClose={onClose}>
+        <AdminModal
+            title={
+                job.scope === 'PLATFORM'
+                    ? t('restoreModal.titlePlatform')
+                    : t('restoreModal.titleTenant', { name: job.tenantName ?? job.tenantSlug ?? '' })
+            }
+            onClose={onClose}
+        >
             <form className={styles.form} onSubmit={submit}>
                 {!preview && !loadError && <div className={styles.loadingState}>{t('restoreModal.validating')}</div>}
                 {loadError && <div className={styles.errorMessage}>{loadError}</div>}
                 {preview && (
                     <>
+                        {/* Alcance, antes que todo lo demás: una restauración de plataforma se ve distinta */}
+                        <div
+                            className={preview.scope === 'PLATFORM' ? styles.restoreScopePlatform : styles.restoreScopeTenant}
+                            data-restore-scope={preview.scope}
+                        >
+                            {preview.scope === 'PLATFORM' ? <Globe2 size={20} aria-hidden /> : <Store size={20} aria-hidden />}
+                            <div>
+                                <strong>
+                                    {preview.scope === 'PLATFORM'
+                                        ? t('restoreModal.scopePlatformTitle')
+                                        : t('restoreModal.scopeTenantTitle', { name: preview.tenant?.name ?? '' })}
+                                </strong>
+                                <p>
+                                    {preview.scope === 'PLATFORM'
+                                        ? t('restoreModal.scopePlatformText', { count: preview.tenants?.length ?? 0 })
+                                        : t('restoreModal.scopeTenantText')}
+                                </p>
+                            </div>
+                        </div>
                         <div className={styles.cellMain}>
                             <span className={styles.statLabel}>{t('restoreModal.affected')}</span>
                             <span className={styles.cellTitle}>

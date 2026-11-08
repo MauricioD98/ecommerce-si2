@@ -22,9 +22,12 @@ interface Props {
     showStore?: boolean;
     // Controles extra junto a los botones de crear (p. ej. el selector de tienda del panel de plataforma)
     extraControls?: React.ReactNode;
+    // Filtro del historial (solo afecta lo que se muestra; el sondeo y las reglas usan la lista completa)
+    filterControls?: React.ReactNode;
+    jobFilter?: (job: BackupJob) => boolean;
 }
 
-export default function BackupsPanel({ api, createActions, showStore = false, extraControls }: Props) {
+export default function BackupsPanel({ api, createActions, showStore = false, extraControls, filterControls, jobFilter }: Props) {
     const t = useTranslations('Backups');
     const { jobs, config, isLoading, error, setError, reload, hasActive } = useBackupJobs(api, t('loadFailed'));
     const [notice, setNotice] = useState<string | null>(null);
@@ -136,12 +139,24 @@ export default function BackupsPanel({ api, createActions, showStore = false, ex
             <p className={styles.cellSub}>{t('uploadHint')}</p>
             {hasActive && <p className={styles.cellSub}>{t('activeHint')}</p>}
 
+            {filterControls && (
+                <div className={styles.toolbar}>
+                    {filterControls}
+                    {jobFilter && !isLoading && (
+                        <span className={styles.cellSub} aria-live="polite">
+                            {t('filter.count', { shown: jobs.filter(jobFilter).length, total: jobs.length })}
+                        </span>
+                    )}
+                </div>
+            )}
+
             <div className={styles.tableCard}>
                 {isLoading ? (
                     <div className={styles.loadingState}>{t('loading')}</div>
                 ) : (
                     <BackupJobsTable
-                        jobs={jobs}
+                        jobs={jobFilter ? jobs.filter(jobFilter) : jobs}
+                        emptyText={jobFilter && jobs.length > 0 ? t('filter.noResults') : undefined}
                         showStore={showStore}
                         canAct={available && !hasActive}
                         busyId={busyId}

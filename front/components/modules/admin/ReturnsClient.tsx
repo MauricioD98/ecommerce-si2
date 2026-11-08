@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, PackageCheck, RotateCcw, Search, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, Minus, PackageCheck, Plus, RotateCcw, Search, Shirt, TriangleAlert } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from './returns.module.scss';
 import { formatMoney, intlLocale } from '@/i18n/config';
@@ -174,7 +174,7 @@ export default function ReturnsClient() {
                     {/* Izquierda: buscador de la venta original */}
                     <section className={styles.panel}>
                         <h2 className={styles.panelTitle}>
-                            <Search size={18} /> {t('searchTitle')}
+                            <Search size={22} /> {t('searchTitle')}
                         </h2>
 
                         <form className={styles.searchForm} onSubmit={handleSearch}>
@@ -233,7 +233,7 @@ export default function ReturnsClient() {
                     {/* Derecha: armado de la devolución */}
                     <section className={styles.panel}>
                         <h2 className={styles.panelTitle}>
-                            <RotateCcw size={18} /> {t('processTitle')}
+                            <RotateCcw size={22} /> {t('processTitle')}
                         </h2>
 
                         {receipt && <ReturnSummaryCard record={receipt} onDismiss={() => setReceipt(null)} />}
@@ -244,119 +244,137 @@ export default function ReturnsClient() {
                             </div>
                         ) : (
                             <>
-                                <div className={styles.orderRecap}>
-                                    <span>
-                                        {t.rich('saleRecap', { number: selectedOrder.orderNumber, customer: selectedOrder.customerName, strong: (chunks) => <strong>{chunks}</strong> })}
-                                    </span>
-                                    <span className={styles.orderCardMeta}>{formatDate(selectedOrder.createdAt)}</span>
-                                </div>
-
                                 <div className={styles.itemList}>
                                     {selectedOrder.items.map((item) => {
                                         const line = draft[item.orderItemId];
                                         const exhausted = item.returnableQuantity <= 0;
+                                        const checkboxId = `return-item-${item.orderItemId}`;
 
                                         return (
                                             <div
                                                 key={item.orderItemId}
-                                                className={`${styles.itemCard} ${exhausted ? styles.itemCardDisabled : ''}`}
+                                                className={`${styles.itemCard} ${line ? styles.itemCardSelected : ''} ${exhausted ? styles.itemCardDisabled : ''}`}
                                             >
-                                                <label className={styles.itemHeader}>
+                                                <div className={styles.itemMain}>
                                                     <input
+                                                        id={checkboxId}
                                                         type="checkbox"
+                                                        className={styles.itemCheck}
                                                         checked={!!line}
                                                         disabled={exhausted}
                                                         onChange={() => toggleItem(item.orderItemId, item.returnableQuantity)}
+                                                        aria-label={t('includeItem', { name: item.productName })}
                                                     />
-                                                    <span className={styles.itemInfo}>
-                                                        <span className={styles.itemName}>
-                                                            {item.productName}
-                                                            {item.size && <span className={styles.itemSize}>{t('sizeTag', { size: item.size })}</span>}
-                                                        </span>
-                                                        <span className={styles.itemMeta}>
-                                                            {t('itemMeta', { price: money(item.unitPrice), sold: item.quantity })}
-                                                            {item.alreadyReturned > 0 && t('alreadyReturned', { count: item.alreadyReturned })}
-                                                        </span>
-                                                    </span>
-                                                    {exhausted ? (
-                                                        <span className={styles.badgeMuted}>{t('noBalance')}</span>
-                                                    ) : (
-                                                        <span className={styles.badgeInfo}>{t('upTo', { count: item.returnableQuantity })}</span>
-                                                    )}
-                                                </label>
+                                                    <label htmlFor={checkboxId} className={styles.itemThumbWrap}>
+                                                        {item.imageUrl ? (
+                                                            <img src={item.imageUrl} alt="" className={styles.itemThumb} />
+                                                        ) : (
+                                                            <span className={styles.itemThumbEmpty}><Shirt size={28} /></span>
+                                                        )}
+                                                    </label>
+
+                                                    <div className={styles.itemBody}>
+                                                        <div className={styles.itemHead}>
+                                                            <label htmlFor={checkboxId} className={styles.itemInfo}>
+                                                                <span className={styles.itemName}>
+                                                                    {item.productName}
+                                                                    {item.size && <span className={styles.itemSize}>{t('sizeTag', { size: item.size })}</span>}
+                                                                </span>
+                                                                <span className={styles.itemMeta}>
+                                                                    {t('unitPrice', { price: money(item.unitPrice) })}
+                                                                    {item.alreadyReturned > 0 && t('alreadyReturned', { count: item.alreadyReturned })}
+                                                                </span>
+                                                            </label>
+                                                            {exhausted ? (
+                                                                <span className={styles.badgeMuted}>{t('noBalance')}</span>
+                                                            ) : (
+                                                                <span className={styles.badgeInfo}>{t('upTo', { count: item.returnableQuantity })}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                        {line && (
+                                                            <div className={styles.itemForm}>
+                                                                <div className={styles.field}>
+                                                                    <span id={`${checkboxId}-qty`}>{t('quantity')}</span>
+                                                                    <div className={styles.stepper} role="group" aria-labelledby={`${checkboxId}-qty`}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => updateLine(item.orderItemId, { quantity: Math.max(1, line.quantity - 1) })}
+                                                                            disabled={line.quantity <= 1}
+                                                                            aria-label={t('decrease')}
+                                                                        >
+                                                                            <Minus size={16} />
+                                                                        </button>
+                                                                        <span aria-live="polite">{line.quantity}</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => updateLine(item.orderItemId, { quantity: Math.min(item.returnableQuantity, line.quantity + 1) })}
+                                                                            disabled={line.quantity >= item.returnableQuantity}
+                                                                            aria-label={t('increase')}
+                                                                        >
+                                                                            <Plus size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                    <small className={styles.fieldHint}>{t('maxQuantity', { count: item.returnableQuantity })}</small>
+                                                                </div>
+
+                                                                <label className={styles.field}>
+                                                                    <span>{t('size')}</span>
+                                                                    {/* Solo lectura: la talla es la que se vendió, el backend la toma de la orden */}
+                                                                    <input
+                                                                        type="text"
+                                                                        className={`${styles.input} ${styles.inputSmall}`}
+                                                                        value={item.size ?? t('noSize')}
+                                                                        readOnly
+                                                                        aria-label={t('sizeLabel', { name: item.productName })}
+                                                                    />
+                                                                </label>
+
+                                                                <label className={styles.field}>
+                                                                    <span>{t('reason')}</span>
+                                                                    <select
+                                                                        className={styles.input}
+                                                                        value={line.reason}
+                                                                        onChange={(e) => updateLine(item.orderItemId, { reason: e.target.value as ReturnReason })}
+                                                                    >
+                                                                        {RETURN_REASONS.map((reason) => (
+                                                                            <option key={reason} value={reason}>
+                                                                                {t(`reasons.${reason}`)}
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </label>
+
+                                                                <fieldset className={styles.conditionGroup}>
+                                                                    <legend>{t('condition')}</legend>
+                                                                    {ITEM_CONDITIONS.map((condition) => (
+                                                                        <label key={condition} className={styles.radioOption}>
+                                                                            <input
+                                                                                type="radio"
+                                                                                name={`condition-${item.orderItemId}`}
+                                                                                checked={line.condition === condition}
+                                                                                onChange={() => updateLine(item.orderItemId, { condition })}
+                                                                            />
+                                                                            <span>{t(`conditions.${condition}`)}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </fieldset>
+                                                            </div>
+                                                        )}
 
                                                 {line && (
-                                                    <div className={styles.itemForm}>
-                                                        <label className={styles.field}>
-                                                            <span>{t('quantity')}</span>
-                                                            <input
-                                                                type="number"
-                                                                className={`${styles.input} ${styles.inputSmall}`}
-                                                                min={1}
-                                                                max={item.returnableQuantity}
-                                                                step={1}
-                                                                value={line.quantity}
-                                                                onChange={(e) => {
-                                                                    // Se acota al saldo de la línea: el backend igual lo revalida
-                                                                    const next = Number(e.target.value);
-                                                                    if (!Number.isFinite(next)) return;
-                                                                    updateLine(item.orderItemId, {
-                                                                        quantity: Math.max(1, Math.min(Math.trunc(next), item.returnableQuantity)),
-                                                                    });
-                                                                }}
-                                                            />
-                                                        </label>
-
-                                                        <label className={styles.field}>
-                                                            <span>{t('size')}</span>
-                                                            {/* Solo lectura: la talla es la que se vendió, el backend la toma de la orden */}
-                                                            <input
-                                                                type="text"
-                                                                className={`${styles.input} ${styles.inputSmall}`}
-                                                                value={item.size ?? t('noSize')}
-                                                                readOnly
-                                                                aria-label={t('sizeLabel', { name: item.productName })}
-                                                            />
-                                                        </label>
-
-                                                        <label className={styles.field}>
-                                                            <span>{t('reason')}</span>
-                                                            <select
-                                                                className={styles.input}
-                                                                value={line.reason}
-                                                                onChange={(e) => updateLine(item.orderItemId, { reason: e.target.value as ReturnReason })}
-                                                            >
-                                                                {RETURN_REASONS.map((reason) => (
-                                                                    <option key={reason} value={reason}>
-                                                                        {t(`reasons.${reason}`)}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        </label>
-
-                                                        <fieldset className={styles.conditionGroup}>
-                                                            <legend>{t('condition')}</legend>
-                                                            {ITEM_CONDITIONS.map((condition) => (
-                                                                <label key={condition} className={styles.radioOption}>
-                                                                    <input
-                                                                        type="radio"
-                                                                        name={`condition-${item.orderItemId}`}
-                                                                        checked={line.condition === condition}
-                                                                        onChange={() => updateLine(item.orderItemId, { condition })}
-                                                                    />
-                                                                    <span>{t(`conditions.${condition}`)}</span>
-                                                                </label>
-                                                            ))}
-                                                        </fieldset>
-
-                                                        <p className={styles.conditionHint}>
+                                                    <p className={`${styles.conditionHint} ${line.condition === 'DAMAGED' ? styles.conditionHintDamaged : ''}`}>
+                                                        {line.condition === 'SELLABLE' ? <PackageCheck size={16} /> : <TriangleAlert size={16} />}
+                                                        <span>
                                                             {line.condition === 'SELLABLE'
                                                                 ? branchName
                                                                     ? t('sellableHintBranch', { branch: branchName })
                                                                     : t('sellableHint')
                                                                 : t('damagedHint')}
-                                                        </p>
-                                                    </div>
+                                                        </span>
+                                                    </p>
                                                 )}
                                             </div>
                                         );
@@ -364,7 +382,7 @@ export default function ReturnsClient() {
                                 </div>
 
                                 <label className={styles.field}>
-                                    <span>{t('notes')}</span>
+                                    <span className={styles.notesLabel}>{t('notes')}</span>
                                     <textarea
                                         className={styles.textarea}
                                         rows={2}
@@ -376,17 +394,17 @@ export default function ReturnsClient() {
                                 </label>
 
                                 <div className={styles.totals}>
-                                    <div className={styles.totalRow}>
-                                        <span>{t('toRefund')}</span>
-                                        <strong>{money(summary.refund)}</strong>
+                                    <div className={styles.totalInfo}>
+                                        <span className={styles.totalLabel}>{t('toRefund')}</span>
+                                        <div className={styles.totalMeta}>
+                                            <span><PackageCheck size={16} /> {t('toSellable', { count: summary.sellable })}</span>
+                                            <span><TriangleAlert size={16} /> {t('toDamaged', { count: summary.damaged })}</span>
+                                        </div>
                                     </div>
-                                    <div className={styles.totalMeta}>
-                                        <span><PackageCheck size={14} /> {t('toSellable', { count: summary.sellable })}</span>
-                                        <span><TriangleAlert size={14} /> {t('toDamaged', { count: summary.damaged })}</span>
-                                    </div>
+                                    <strong className={styles.totalAmount}>{money(summary.refund)}</strong>
                                 </div>
 
-                                {processError && <div className={styles.errorMessage}>{processError}</div>}
+                                {processError && <div className={styles.errorMessage} role="alert">{processError}</div>}
 
                                 <button
                                     type="button"
@@ -394,7 +412,7 @@ export default function ReturnsClient() {
                                     disabled={summary.lines === 0 || isProcessing}
                                     onClick={handleProcess}
                                 >
-                                    {isProcessing ? t('processing') : t('process', { amount: money(summary.refund) })}
+                                    {isProcessing ? t('processing') : t('processButton')}
                                 </button>
                             </>
                         )}

@@ -1444,7 +1444,7 @@
       "DAMAGED": "有瑕疵 / 损耗"
     },
     "title": "退货处",
-    "subtitle": "查找原始销售，说明退回哪些商品及其状况。完好的商品回到可售库存；有瑕疵的计入损耗，不能再销售。",
+    "subtitle": "查找销售记录并选择要退回的商品",
     "branchNotice": "商品将重新入库到 <strong>{branch}</strong>。",
     "branchLabel": "接收退货的分店",
     "selectBranch": "选择接收分店",
@@ -1490,7 +1490,13 @@
     "refunded": "已退款：<strong>{amount}</strong>",
     "wentSellable": "已回到可售库存",
     "wentDamaged": "已计入损耗",
-    "unitsSummary": "{sellable} 件回到可售库存 · {damaged} 件计入损耗"
+    "unitsSummary": "{sellable} 件回到可售库存 · {damaged} 件计入损耗",
+    "unitPrice": "单价 {price}",
+    "maxQuantity": "最多 {count}",
+    "decrease": "减少一件",
+    "increase": "增加一件",
+    "processButton": "处理退款",
+    "includeItem": "退回 {name}"
   },
   "AdminInventory": {
     "title": "库存和优惠",
@@ -1573,17 +1579,17 @@
   },
   "AdminPos": {
     "title": "收银台",
-    "subtitle": "在柜台收取门店销售款。库存与网店从同一分店扣减。",
+    "subtitle": "选择商品并完成收款",
     "selectBranch": "选择分店",
     "selectBranchFirst": "请先选择分店再开始收银。",
-    "searchPlaceholder": "按名称搜索商品...",
+    "searchPlaceholder": "按名称或编码搜索",
     "loading": "正在加载商品...",
     "noProducts": "没有找到商品。",
     "noStock": "无库存",
     "stock": "库存：{count}",
     "size": "尺码",
     "sizeSoldOut": "此分店 {size} 码已售罄",
-    "ticket": "小票",
+    "ticket": "销售小票",
     "emptyTicket": "从商品目录中添加商品。",
     "unitPrice": "单价 {price}",
     "removeOne": "减少一件",
@@ -1594,7 +1600,7 @@
     "noName": "未命名",
     "methods": {
       "CASH": "现金",
-      "PHYSICAL_CARD": "银行卡（POS）",
+      "PHYSICAL_CARD": "银行卡",
       "QR": "扫码 / 转账"
     },
     "amountReceived": "实收金额",
@@ -1624,7 +1630,18 @@
       "thanks": "感谢您的惠顾！",
       "newSale": "新销售",
       "print": "打印小票"
-    }
+    },
+    "categoriesLabel": "分类",
+    "allCategories": "全部",
+    "scrollCategories": "更多分类",
+    "lineSize": "尺码 {size}",
+    "sizeStock": "{size} 码库存：{count}",
+    "sizeGroup": "{name} 的尺码",
+    "addSize": "将 {name}（{size} 码）加入小票",
+    "addProduct": "将 {name} 加入小票",
+    "subtotal": "小计",
+    "nitPlaceholder": "例如 12345678",
+    "razonPlaceholder": "例如 柜台顾客"
   },
   "AdminMarketing": {
     "title": "营销",
@@ -1860,7 +1877,463 @@
     "showPassword": "显示",
     "hidePassword": "隐藏",
     "showPasswordLabel": "显示密码",
-    "hidePasswordLabel": "隐藏密码"
+    "hidePasswordLabel": "隐藏密码",
+    "nav": {
+      "label": "面板分区",
+      "open": "打开菜单",
+      "close": "关闭菜单",
+      "pending": "待开发",
+      "home": "首页",
+      "stores": "店铺",
+      "branches": "分店",
+      "plans": "套餐与订阅",
+      "backups": "备份",
+      "admins": "管理员与审计",
+      "system": "系统状态"
+    },
+    "home": {
+      "title": "首页",
+      "subtitle": "基于 API 真实数据的平台当前状态。",
+      "updatedAt": "数据时间 {time}",
+      "loading": "正在加载平台概览...",
+      "errorTitle": "无法加载概览",
+      "retry": "重试",
+      "emptyTitle": "还没有店铺",
+      "emptyText": "第一家店铺注册后，其数据会显示在这里。",
+      "noData": "暂无数据",
+      "unavailable": "不可用",
+      "attentionTitle": "需要关注",
+      "attentionEmpty": "没有出错、正在创建或付款有问题的店铺。",
+      "shortcutsTitle": "快捷入口",
+      "stats": {
+        "total": "店铺总数",
+        "attentionHint": "{failed} 个出错 · {provisioning} 个创建中 · {signups} 个注册失败",
+        "subscriptionsTitle": "订阅",
+        "subsActive": "有效订阅",
+        "subsActiveHint": "{trialing} 个试用中 · {total} 家店铺有订阅",
+        "noSubscriptions": "{count} 家店铺没有 Stripe 订阅",
+        "paymentIssues": "付款有问题",
+        "paymentIssuesHint": "逾期、未付或未完成",
+        "withoutSubscription": "无订阅",
+        "withoutSubscriptionHint": "没有 Stripe 订阅的店铺（套餐为手动分配）",
+        "mrrLabel": "预估 MRR",
+        "mrrUnavailable": "无法从 Stripe 读取套餐价格。",
+        "fieldUnavailable": "API 未提供此数据。",
+        "mrrNoPaying": "没有有效或逾期的订阅。",
+        "mrrPartial": "部分数据：{count} 个订阅在 Stripe 中没有价格，未计入。",
+        "mrrExplain": "预估 MRR：每个有效或逾期订阅按其套餐在 Stripe 中的月度标价计算。这不是实际收款：不扣除优惠券、按比例计费、税费或失败的扣款，年度订阅按其套餐的月度价格计算。",
+        "otherSubscriptions": "另外：{ended} 个已结束 · {paused} 个已暂停 · {other} 个为其他状态。"
+      },
+      "attention": {
+        "paymentIssue": "订阅：{status}",
+        "failedSignups": "{count} 个已付款注册在创建店铺时出错",
+        "failedSignupsHint": "需通过 API 重试（POST /platform/subscriptions/signups/:id/retry）；目前还没有对应的界面。",
+        "signupsUnavailable": "此版本的 API 不提供注册失败数据。"
+      },
+      "backups": {
+        "title": "最近的备份",
+        "loading": "正在加载备份...",
+        "loadFailed": "无法加载备份。",
+        "unavailable": "备份不可用：{reason}",
+        "empty": "暂无数据：尚未生成任何备份。",
+        "lastOk": "最近一次可用备份",
+        "lastPlatform": "最近一次平台完整备份",
+        "noneOk": "无",
+        "more": "仅显示最近 {count} 项操作。",
+        "goTo": "前往备份"
+      }
+    },
+    "sections": {
+      "stores": {
+        "summary": "搜索店铺，暂停、重新启用店铺并重试创建。"
+      },
+      "branches": {
+        "summary": "在一个地方查看所有店铺的分店。",
+        "today": "分店属于各个店铺，目前只能在该店铺的面板中管理。平台 API 尚未提供分店数据。"
+      },
+      "plans": {
+        "summary": "SaaS 套餐和店铺订阅。",
+        "today": "目前每个店铺的套餐和订阅状态显示在“店铺”中，预估 MRR 显示在“首页”。尚无专门的套餐视图或订阅历史。"
+      },
+      "backups": {
+        "summary": "平台完整备份和各店铺备份。"
+      },
+      "admins": {
+        "summary": "平台管理员账户和操作记录。",
+        "today": "管理员账户通过命令行创建（npm run platform:admin）。面板中尚无管理员管理功能，也没有通用审计日志；只有备份会记录请求者。"
+      },
+      "system": {
+        "summary": "API、数据库和外部服务的运行状况。",
+        "today": "API 尚无系统状态接口，因此不显示任何指标。"
+      }
+    },
+    "pending": {
+      "badge": "待开发分区",
+      "title": "此分区尚未实现",
+      "noSampleData": "不显示示例数据：平台上有相关信息后会显示在这里。",
+      "goTo": "前往{section}"
+    },
+    "tenants": {
+      "searchPlaceholder": "按名称、标识、域名或店主搜索",
+      "planFilter": "按套餐筛选",
+      "allPlans": "全部套餐",
+      "clearFilters": "清除筛选",
+      "resultCount": "{total} 家店铺中显示 {shown} 家",
+      "viewDetail": "详情",
+      "openStorefrontHint": "“打开”以访客身份显示公开店铺，不会登录任何账户。",
+      "plans": {
+        "free": "免费",
+        "legacy": "Legacy",
+        "none": "无套餐"
+      },
+      "actions": {
+        "cancel": "取消",
+        "working": "正在执行...",
+        "whatHappens": "将会发生：",
+        "suspend": {
+          "title": "暂停“{name}”",
+          "confirm": "暂停店铺",
+          "typeToConfirm": "输入标识 {slug} 以确认",
+          "effects": [
+            "在线店铺、管理面板、移动应用和收银台（POS）将停止工作，直到重新启用。在其他服务器实例上，变更最多可能需要 60 秒生效。",
+            "不会删除店铺的任何数据。",
+            "不会取消或更改 Stripe 订阅：如有订阅，将继续扣费。",
+            "Stripe 事件不会撤销手动暂停。",
+            "只影响这家店铺。"
+          ]
+        },
+        "reactivate": {
+          "title": "重新启用“{name}”",
+          "confirm": "重新启用店铺",
+          "billingWarning": "订阅状态为“{status}”。如果 Stripe 再次发送该状态的事件，店铺可能会被自动暂停。",
+          "effects": [
+            "在线店铺、面板、移动应用和收银台立即恢复工作。",
+            "数据保持暂停时的状态。",
+            "不会更改套餐或 Stripe 订阅。",
+            "只影响这家店铺。"
+          ]
+        },
+        "retry": {
+          "title": "重试创建“{name}”",
+          "confirm": "重试",
+          "effects": [
+            "重新执行店铺创建：如缺少则创建其架构，执行迁移，并创建基础角色和店主用户。",
+            "可能需要几秒钟。",
+            "成功后店铺变为启用；再次失败则保持出错状态并显示原因。",
+            "只影响这家店铺。"
+          ]
+        }
+      },
+      "detail": {
+        "back": "返回店铺",
+        "loading": "正在加载店铺...",
+        "notFound": "没有该标识的店铺。",
+        "loadFailed": "无法加载店铺",
+        "actionsTitle": "操作",
+        "provisioningNoActions": "店铺正在创建中：完成前没有可用操作。",
+        "supportPending": "面板不允许登录店主账户或代表店主操作。协助支持工具（例如帮助店主恢复访问）尚待开发。",
+        "generalTitle": "基本信息",
+        "owner": "店主",
+        "updatedAt": "最后修改",
+        "slug": "标识",
+        "id": "内部 ID",
+        "domain": "自有域名",
+        "domainVerified": "已验证",
+        "domainUnverified": "未验证",
+        "noDomain": "无自有域名",
+        "schemaVersion": "数据库版本",
+        "provisionError": "创建错误",
+        "subscriptionTitle": "订阅与收款",
+        "connectAccount": "已连接 Stripe 收款账户",
+        "chargesEnabled": "可向顾客收款",
+        "platformFee": "平台佣金",
+        "subscriptionLink": "在套餐与订阅中查看",
+        "integrationsTitle": "集成",
+        "noIntegrations": "未配置任何集成。",
+        "integrationDecart": "虚拟试穿（Decart）",
+        "integrationWebPush": "推送通知",
+        "configuredAt": "配置于 {date}",
+        "branchesPending": "目前还无法从平台查看该店铺的分店。",
+        "branchesLink": "查看该店铺的分店",
+        "backupsTitle": "该店铺的备份",
+        "noBackups": "暂无数据：该店铺还没有备份。",
+        "backupsHint": "如需创建、下载或恢复备份，请使用“备份”分区。",
+        "yes": "是",
+        "no": "否",
+        "branchesText": "只读查看该店铺的分店。"
+      }
+    },
+    "branches": {
+      "subtitle": "所有店铺的分店，用于监督。",
+      "reload": "刷新分店",
+      "readOnly": "只读视图。创建、编辑或删除分店，以及库存和员工，都在各店铺的面板中管理。",
+      "searchPlaceholder": "按分店、地址或店铺搜索",
+      "storeFilter": "按店铺筛选",
+      "allStores": "全部店铺",
+      "statusFilter": "按分店状态筛选",
+      "allStatuses": "全部状态",
+      "active": "启用",
+      "inactive": "停用",
+      "loadFailed": "无法加载分店",
+      "loading": "正在查询各店铺的分店...",
+      "summary": "已查询 {stores} 家店铺，共 {branches} 家分店",
+      "summaryMissing": "{count} 家店铺数据不可用",
+      "missingTitle": "数据不可用的店铺",
+      "notProvisioned": "店铺尚未创建完成：还没有可查询的分店。",
+      "unavailable": "无法查询其分店。这并不表示分店数为 0。",
+      "storeUnavailable": "该店铺的数据不可用。",
+      "noStores": "没有可查询分店的店铺。",
+      "storeHasNone": "{name} 没有登记的分店。",
+      "noneAnywhere": "已查询的店铺都没有登记的分店。",
+      "noResults": "没有符合筛选条件的分店。",
+      "columns": {
+        "store": "店铺",
+        "branch": "分店",
+        "status": "状态",
+        "address": "地址",
+        "created": "创建时间"
+      },
+      "noAddress": "无地址",
+      "storesWithoutBranches": "没有登记分店：{names}。",
+      "cityNote": "分店没有城市字段：地址按店铺填写的内容显示。"
+    },
+    "plans": {
+      "subtitle": "各店铺对 SaaS 的订阅，数据来自 Stripe 的 webhook。",
+      "loading": "正在加载订阅...",
+      "loadFailed": "无法加载订阅",
+      "missingApiTitle": "当前运行的 API 不支持此功能",
+      "missingApiText": "服务器尚未包含此功能。需要执行数据库迁移并重启 API。",
+      "summaryTitle": "概览",
+      "groups": {
+        "active": "有效",
+        "trialing": "试用中",
+        "payment": "付款问题",
+        "cancelScheduled": "已安排取消",
+        "ended": "已结束",
+        "none": "无订阅",
+        "unsynced": "未同步"
+      },
+      "unsyncedNotice": "{count} 个订阅尚未同步详细信息（周期、续订或取消）。下一次 Stripe 事件或“从 Stripe 读取”后会补全。",
+      "noSubscriptionsYet": "暂无数据：没有店铺关联 Stripe 订阅。",
+      "attentionEmpty": "没有付款有问题或使用本项目以外价格的订阅。",
+      "attention": {
+        "payment": "订阅：{status}",
+        "foreignPrice": "其 Stripe 价格不属于本项目的套餐：套餐不会自动更新。"
+      },
+      "searchPlaceholder": "按名称或标识搜索店铺",
+      "statusFilter": "按订阅状态筛选",
+      "columns": {
+        "billing": "计费",
+        "period": "续订 / 结束",
+        "synced": "已同步"
+      },
+      "interval": {
+        "monthly": "月付",
+        "annual": "年付"
+      },
+      "foreignPrice": "非本项目价格",
+      "endedOn": "于 {date} 结束",
+      "cancelsOn": "将于 {date} 取消",
+      "cancelScheduled": "已安排取消",
+      "renewsOn": "将于 {date} 续订",
+      "periodEnds": "周期至 {date}",
+      "catalogTitle": "本项目的套餐",
+      "catalogText": "仅读取本项目所配置价格（STRIPE_PRICE_*）在 Stripe 中的价格。Stripe 账户中的其他产品不会使用。",
+      "catalogUnavailable": "不可用：无法读取套餐目录。",
+      "priceNotConfigured": "未配置",
+      "sync": {
+        "button": "从 Stripe 读取",
+        "title": "从 Stripe 读取“{name}”的订阅",
+        "confirm": "从 Stripe 读取",
+        "done": "“{name}”的订阅已与 Stripe 同步。",
+        "effects": [
+          "在 Stripe 中查询已关联到该店铺的订阅，并更新其状态、套餐、周期和日期。",
+          "不会在 Stripe 中创建、修改或取消任何内容。",
+          "适用与 webhook 相同的规则：如果 Stripe 显示订阅未付、已取消或已暂停，店铺将被暂停。",
+          "只影响这家店铺。"
+        ]
+      }
+    },
+    "admins": {
+      "subtitle": "平台管理员及重要操作记录。",
+      "title": "平台管理员",
+      "scopeNote": "仅显示 SaaS 管理账户。各店铺的店主、管理员和员工不在此显示。",
+      "loading": "正在加载管理员...",
+      "loadFailed": "无法加载管理员。",
+      "columns": {
+        "admin": "管理员",
+        "status": "状态",
+        "lastLogin": "最近登录",
+        "created": "创建时间"
+      },
+      "status": {
+        "active": "启用",
+        "locked": "暂时锁定",
+        "inactive": "已停用"
+      },
+      "lockedUntil": "至 {date}",
+      "neverLoggedIn": "从未登录",
+      "managePending": "创建或停用管理员目前仍通过命令行完成（npm run platform:admin）；面板仅用于查看。"
+    },
+    "audit": {
+      "title": "审计",
+      "loading": "正在加载记录...",
+      "loadFailed": "无法加载审计记录",
+      "since": "记录自 {date} 起可用。",
+      "sinceUnknown": "未找到审计的起始标记。",
+      "noHistoryBefore": "没有更早的历史：在此日期之前，只有备份记录了请求者（见“备份”分区）。",
+      "unavailableTitle": "审计不可用",
+      "unavailableText": "服务器尚无审计表：需要执行数据库迁移。在此之前操作可以正常进行，但不会被记录。",
+      "empty": "尚无已记录的操作。",
+      "noResults": "没有符合筛选条件的操作。",
+      "loadMore": "加载更多",
+      "domainRemoved": "已移除域名",
+      "jobUnknown": "结果不可用：该操作已不在“备份”中（例如已被删除）。",
+      "columns": {
+        "date": "日期",
+        "actor": "执行者",
+        "action": "操作",
+        "store": "受影响的店铺",
+        "result": "结果"
+      },
+      "results": {
+        "SUCCESS": "成功",
+        "FAILURE": "失败",
+        "REQUESTED": "已提交"
+      },
+      "actors": {
+        "system": "系统（计费）",
+        "key": "脚本密钥",
+        "anonymous": "匿名尝试",
+        "anonymousWith": "使用 {email} 尝试"
+      },
+      "filters": {
+        "action": "按操作筛选",
+        "allActions": "全部操作",
+        "store": "按店铺筛选",
+        "allStores": "全部店铺",
+        "admin": "按管理员筛选",
+        "allAdmins": "全部管理员",
+        "result": "按结果筛选",
+        "allResults": "全部结果",
+        "from": "从",
+        "to": "至"
+      },
+      "actions": {
+        "AUDIT_STARTED": "审计开始",
+        "PLATFORM_LOGIN": "登录",
+        "TENANT_CREATED": "创建店铺",
+        "TENANT_SUSPENDED": "暂停店铺",
+        "TENANT_REACTIVATED": "重新启用店铺",
+        "TENANT_SUSPENDED_BY_BILLING": "因计费暂停",
+        "TENANT_REACTIVATED_BY_BILLING": "因计费重新启用",
+        "TENANT_PROVISION_RETRIED": "重试创建",
+        "TENANT_DOMAIN_CHANGED": "更改域名",
+        "TENANT_INTEGRATION_CHANGED": "更改集成",
+        "SUBSCRIPTION_SYNCED": "从 Stripe 读取订阅",
+        "SIGNUP_RETRIED": "重试已付款注册",
+        "BACKUP_CREATED": "生成备份",
+        "BACKUP_UPLOADED": "上传副本",
+        "BACKUP_DOWNLOADED": "下载副本",
+        "BACKUP_RESTORE_STARTED": "恢复",
+        "BACKUP_DELETED": "删除副本"
+      }
+    },
+    "system": {
+      "subtitle": "打开本页时由 API 实际执行的检查。",
+      "recheck": "重新检查",
+      "loading": "正在检查...",
+      "loadFailed": "无法获取系统状态",
+      "missingApiTitle": "当前运行的 API 不支持此功能",
+      "missingApiText": "服务器尚无此功能：需要更新并重启 API。",
+      "honestNote": "每张卡片显示其检查时间。无法在此检查的项目显示为“不可用”；不显示任何假定的指标。",
+      "checkedAt": "检查时间：{date}",
+      "configured": "已配置",
+      "notConfigured": "未配置",
+      "none": "无",
+      "status": {
+        "ok": "正常",
+        "warning": "需检查",
+        "error": "有问题",
+        "unavailable": "不可用"
+      },
+      "duration": {
+        "days": "{d} 天 {h} 小时",
+        "hours": "{h} 小时 {m} 分钟",
+        "minutes": "{m} 分 {s} 秒"
+      },
+      "api": {
+        "title": "API",
+        "okLabel": "有响应",
+        "responding": "有响应",
+        "yes": "是（本次请求）",
+        "uptime": "已运行",
+        "startedAt": "进程启动时间"
+      },
+      "database": {
+        "title": "数据库",
+        "okLabel": "有响应",
+        "query": "测试查询",
+        "answered": "已响应",
+        "latency": "延迟"
+      },
+      "migrations": {
+        "title": "迁移",
+        "okLabel": "已是最新",
+        "controlApplied": "平台：已应用",
+        "controlPending": "平台：待执行",
+        "controlFailed": "平台：失败",
+        "storesOutdated": "未更新的店铺",
+        "storesOutdatedValue": "{total} 家中 {outdated} 家",
+        "unknownVersion": "版本未知"
+      },
+      "backups": {
+        "title": "备份",
+        "okLabel": "近期无失败",
+        "key": "加密密钥",
+        "active": "进行中",
+        "stuck": "停滞（超过 2 小时）",
+        "last7": "最近 7 天",
+        "last7Value": "{ok} 次成功 · {failed} 次失败",
+        "lastSuccess": "最近一次成功备份",
+        "lastPlatform": "最近一次完整备份",
+        "lastFailure": "最近一次错误"
+      },
+      "sync": {
+        "title": "与外部服务的同步",
+        "okLabel": "未记录问题",
+        "pending": "待处理事件",
+        "unresolved": "无法确定店铺",
+        "dead": "重试已用尽",
+        "processed24h": "已处理（24 小时）",
+        "lastProcessed": "最近处理的事件",
+        "oldestOpen": "最早的待处理事件",
+        "attempts": "{count} 次尝试",
+        "eventStatus": {
+          "PENDING": "待处理",
+          "UNRESOLVED": "未解决",
+          "DEAD": "已用尽",
+          "PROCESSED": "已处理"
+        },
+        "note": "Stripe webhook 收件箱（支付、订阅和关联账户）。不显示事件内容。"
+      },
+      "signups": {
+        "title": "店铺注册",
+        "okLabel": "无问题",
+        "failed": "已付款但出错的注册",
+        "stuck": "创建超过 15 分钟"
+      },
+      "config": {
+        "title": "服务配置",
+        "okLabel": "已检查",
+        "stripe": "Stripe",
+        "stripeConnection": "与 Stripe 的连接",
+        "email": "邮件",
+        "emailSmtp": "已配置 SMTP 服务器",
+        "emailConsole": "控制台模式（不发送邮件）",
+        "emailConnection": "与邮件服务器的连接"
+      }
+    }
   },
   "AdminPayments": {
     "title": "支付管理",
@@ -2246,7 +2719,8 @@
       "store": "店铺",
       "status": "状态",
       "size": "大小",
-      "actions": "操作"
+      "actions": "操作",
+      "scope": "范围"
     },
     "kind": {
       "BACKUP": "备份",
@@ -2333,7 +2807,27 @@
       "typeToConfirm": "输入 {phrase} 以确认",
       "cancel": "取消",
       "confirm": "立即恢复",
-      "starting": "正在启动…"
+      "starting": "正在启动…",
+      "titlePlatform": "恢复整个平台",
+      "titleTenant": "恢复店铺“{name}”",
+      "scopePlatformTitle": "整个平台的恢复",
+      "scopePlatformText": "将替换控制平面以及备份中包含的 {count} 家店铺。会影响这些店铺的所有账户和面板。",
+      "scopeTenantTitle": "单个店铺的恢复：{name}",
+      "scopeTenantText": "只替换该店铺的数据。其他店铺和平台不受影响。"
+    },
+    "scopeBadge": {
+      "platform": "整个平台",
+      "tenant": "店铺"
+    },
+    "originalDate": "备份生成于 {date}",
+    "filter": {
+      "label": "按范围筛选历史",
+      "all": "全部历史",
+      "platform": "仅整个平台",
+      "tenants": "仅店铺",
+      "oneTenant": "店铺：{name}",
+      "count": "{total} 项操作中显示 {shown} 项",
+      "noResults": "没有符合筛选条件的操作。"
     }
   }
 }

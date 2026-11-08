@@ -10,7 +10,8 @@ export const PosService = {
     },
 
     // Catálogo del POS: el backend resuelve la sucursal del cajero y ya filtra solo lo que tiene stock
-    getCatalog: async (params: { branchId?: string; search?: string; page?: number; limit?: number }): Promise<ProductsResponse> => {
+    // search: nombre, descripción o código (SKU); category: id de la categoría
+    getCatalog: async (params: { branchId?: string; search?: string; category?: string; page?: number; limit?: number }): Promise<ProductsResponse> => {
         const response = await apiClient.get<{ data?: RawProduct[]; meta?: PaginationMeta }>("/pos/products", { params });
         return {
             data: (response.data.data ?? []).map(normalizeProduct),

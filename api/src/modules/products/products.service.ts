@@ -142,6 +142,8 @@ export class ProductsService {
       const matches: Prisma.ProductWhereInput[] = [
         { name: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        // El POS busca "por nombre o código": el cajero teclea o escanea el SKU de la etiqueta
+        { sku: { contains: search, mode: 'insensitive' } },
       ];
       // Quien navega en inglés busca "dress", no "vestido": se busca también en la traducción de su
       // idioma. Los filtros JSON de Prisma no tienen modo insensible a mayúsculas: es coincidencia exacta.

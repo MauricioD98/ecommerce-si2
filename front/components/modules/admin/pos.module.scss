@@ -1,19 +1,30 @@
 @use '../../../styles/scrollbars' as scroll;
 
-// El POS llena el alto que le da .content del shell y no lo desborda: el scroll queda adentro del
-// catálogo y del ticket. Por eso .content nunca scrollea cuando estás en esta pantalla.
+// Punto de venta. Personalizable con Apariencia (Configuración → Apariencia):
+//   --color-primary / --color-primary-text  → todo lo "relleno": talla y categoría elegidas, encabezado del
+//                                             ticket, método de pago activo, botón "+" y botón de cobrar
+//   tipografía de la tienda                → se hereda del <body> (app/layout.tsx)
+// Con los valores por defecto (primario #000000) se ve en blanco y negro. Los textos explícitos (color:)
+// evitan heredar el color de marca del layout del panel en botones e inputs.
 .page {
+    --pos-accent: var(--color-primary, #000);
+    --pos-on-accent: var(--color-primary-text, #fff);
+    --pos-surface: #fff;
+    --pos-text: #111;
+    --pos-muted: #6b7280;
+    --pos-chip: #ececec;
+    --pos-line: #d9d9d9;
+
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1.25rem;
     height: 100%;
     min-height: 0;
+    color: var(--pos-text);
 
-    // Abajo de 960px el layout es de una sola columna: forzar alturas fijas dejaría el catálogo y el
-    // ticket en dos ventanitas de 200px. Ahí conviene que scrollee la pantalla completa.
+    // Abajo de 960px el layout es de una sola columna: conviene que scrollee la pantalla completa
     @media (max-width: 959px) {
         height: auto;
-        min-height: 0;
     }
 }
 
@@ -26,30 +37,44 @@
     flex-shrink: 0;
 
     h1 {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: var(--foreground);
+        font-size: 2rem;
+        font-weight: 800;
+        line-height: 1.1;
+        color: var(--pos-text);
     }
 
     p {
-        margin-top: 0.25rem;
-        font-size: 0.9375rem;
-        color: var(--muted-foreground);
+        margin-top: 0.375rem;
+        font-size: 1rem;
+        color: var(--pos-muted);
     }
 }
 
 .branchSelect {
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.375rem;
-    border: 1px solid var(--border);
-    font-size: 0.875rem;
+    min-width: 13rem;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border-radius: 0.625rem;
+    border: 1px solid var(--pos-line);
+    background: var(--pos-surface)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23111' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E")
+        no-repeat right 0.875rem center;
+    appearance: none;
+    color: var(--pos-text);
+    font-size: 1rem;
     font-family: inherit;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid var(--pos-accent);
+        outline-offset: 2px;
+    }
 }
 
 .emptyState {
     padding: 3rem 1rem;
     text-align: center;
-    color: var(--muted-foreground);
+    color: var(--pos-muted);
     font-size: 0.9375rem;
 }
 
@@ -61,24 +86,21 @@
     font-size: 0.875rem;
 }
 
-/* Layout de dos columnas: catálogo a la izquierda, ticket fijo a la derecha */
+/* Layout: catálogo a la izquierda, ticket a la derecha */
 .layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 1.5rem;
 
     @media (min-width: 960px) {
-        // flex:1 + min-height:0 = las dos columnas miden exactamente el alto que sobra debajo del
-        // encabezado. `align-items: start` (lo que había) las dejaba del alto de su contenido, que es
-        // justo lo que hacía crecer la página y arrastrar el menú lateral.
+        // flex:1 + min-height:0 = las dos columnas miden el alto que sobra debajo del encabezado
         flex: 1;
         min-height: 0;
-        grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+        grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr);
         align-items: stretch;
     }
 }
 
-/* Columna central: buscador fijo arriba + grid de productos con su propio scroll */
 .catalog {
     display: flex;
     flex-direction: column;
@@ -86,236 +108,321 @@
     min-height: 0;
 }
 
-// El buscador nunca se va con el scroll: el cajero teclea sin tener que volver arriba
+// El buscador y las categorías nunca se van con el scroll
 .searchBar {
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    padding: 0.625rem 1rem;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    color: var(--muted-foreground);
+    gap: 0.75rem;
+    padding: 0.875rem 1.125rem;
+    background: var(--pos-surface);
+    border: 1px solid var(--pos-line);
+    border-radius: 0.75rem;
+    color: var(--pos-text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     transition: border-color 0.15s ease;
 
     &:focus-within {
-        border-color: #000;
+        border-color: var(--pos-accent);
     }
 
     input {
         flex: 1;
+        min-width: 0;
         border: none;
         outline: none;
-        // Explícito: sin esto, en navegadores con color-scheme oscuro (modo oscuro del SO) el input
-        // hereda el fondo/texto nativos oscuros del navegador y se ve como un bloque gris, aunque el
-        // contenedor sea blanco
+        // Explícito: con color-scheme oscuro del SO el input heredaría el fondo nativo oscuro
         background: transparent;
-        font-size: 0.9375rem;
+        font-size: 1rem;
         font-family: inherit;
-        color: var(--foreground);
+        color: var(--pos-text);
 
         &::placeholder {
-            color: var(--muted-foreground);
+            color: var(--pos-muted);
         }
     }
 }
 
-// Única parte de la columna central que scrollea. El padding-right deja que la scrollbar no se monte
-// encima de las tarjetas de la última columna.
+.categoryBar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.categoryChips {
+    flex: 1;
+    display: flex;
+    gap: 0.5rem;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 2px;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.categoryChip {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 0.625rem;
+    background: var(--pos-chip);
+    color: var(--pos-text);
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: inherit;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+
+    &:hover {
+        background: color-mix(in srgb, var(--pos-chip) 80%, #000);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--pos-accent);
+        outline-offset: 2px;
+    }
+}
+
+.categoryChipActive,
+.categoryChipActive:hover {
+    background: var(--pos-accent);
+    color: var(--pos-on-accent);
+}
+
+.categoryScroll {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2.25rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--pos-muted);
+    cursor: pointer;
+
+    &:hover {
+        background: var(--pos-chip);
+        color: var(--pos-text);
+    }
+}
+
+// Única parte de la columna que scrollea. El padding deja aire para la sombra y la scrollbar.
 .catalogScroll {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 0.25rem;
+    padding: 0.125rem 0.375rem 0.5rem 0.125rem;
     @include scroll.thin-scrollbar;
 
     @media (max-width: 959px) {
         overflow-y: visible;
-        padding-right: 0;
+        padding: 0;
     }
 }
 
 .productGrid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.75rem;
-    // El selector de talla se abre encima de la tarjeta: sin esto, la primera fila lo recorta
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1rem;
     align-content: start;
+
+    // Teléfono: dos tarjetas por fila (una sola quedaría del alto de la pantalla)
+    @media (max-width: 599px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.625rem;
+    }
 }
 
 .productCard {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
-    padding: 0.75rem;
-    background: #fff;
-    border: 1px solid var(--border);
+    gap: 0.5rem;
+    padding: 0.625rem 0.625rem 0.75rem;
+    background: var(--pos-surface);
+    border: 1px solid var(--pos-line);
+    border-radius: 0.875rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+        border-color: color-mix(in srgb, var(--pos-accent) 45%, var(--pos-line));
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+}
+
+// La foto también agrega (atajo táctil); el foco de teclado va al botón "+"
+.productImageButton {
+    display: block;
+    padding: 0;
+    border: none;
+    background: none;
     border-radius: 0.5rem;
+    overflow: hidden;
     cursor: pointer;
-    text-align: left;
-    font-family: inherit;
-    transition: border-color 0.15s ease, transform 0.1s ease;
-
-    &:hover:not(:disabled) {
-        border-color: #000;
-    }
-
-    &:active:not(:disabled) {
-        transform: scale(0.98);
-    }
 
     &:disabled {
-        opacity: 0.5;
         cursor: not-allowed;
+        opacity: 0.55;
     }
 }
 
 .productImage {
+    display: block;
     width: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: 4 / 3;
     object-fit: cover;
-    border-radius: 0.375rem;
-    background: #f5f5f5;
+    background: #f3f3f3;
+    transition: transform 0.2s ease;
+
+    .productImageButton:hover:not(:disabled) & {
+        transform: scale(1.03);
+    }
 }
 
 .productName {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--pos-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.sizeRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.sizeChip {
+    min-width: 2.25rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #9ca3af;
+    border-radius: 0.5rem;
+    background: var(--pos-surface);
+    color: var(--pos-text);
     font-size: 0.8125rem;
-    font-weight: 600;
-    color: var(--foreground);
-    line-height: 1.3;
+    font-weight: 500;
+    font-family: inherit;
+    line-height: 1.2;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        border-color: var(--pos-accent);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--pos-accent);
+        outline-offset: 1px;
+    }
+}
+
+.sizeChipActive,
+.sizeChipActive:hover:not(:disabled) {
+    background: var(--pos-accent);
+    border-color: var(--pos-accent);
+    color: var(--pos-on-accent);
+}
+
+// Agotada en esta sucursal: tachada y sin acción
+.sizeChipSoldOut {
+    border-color: #d1d5db;
+    background: #f5f5f5;
+    color: #9ca3af;
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+
+.productFooter {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+.productMeta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
 }
 
 .productPrice {
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #000;
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--pos-text);
 }
 
 .stockBadge {
-    font-size: 0.6875rem;
-    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    color: var(--pos-muted);
 }
 
 .stockBadgeOut {
     color: var(--destructive);
 }
 
-.productCardWrapper {
-    position: relative;
-}
-
-.sizePicker {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
+.addButton {
+    flex-shrink: 0;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem;
-    background: #fff;
-    border: 1px solid #000;
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.sizePickerLabel {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--muted-foreground);
-}
-
-.sizePickerOptions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.375rem;
-}
-
-.sizePickerOption {
-    padding: 0.375rem 0.625rem;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 0.375rem;
-    color: #000; // explícito: sin esto hereda el naranja de marca (--primary) del layout, no negro
-    font-size: 0.8125rem;
-    font-family: inherit;
-    cursor: pointer;
-
-    // No hay estado "seleccionado" persistente acá (tocar una talla agrega al ticket y cierra el
-    // selector); hover/focus/active hacen de "seleccionada" mientras el vendedor interactúa con
-    // ella. :active se agrega además de :hover porque en tablets táctiles (uso típico del POS)
-    // :hover no siempre dispara antes del tap.
-    &:hover,
-    &:focus-visible,
-    &:active {
-        background: #000;
-        color: #fff;
-        border-color: #000;
-    }
-}
-
-// El stock va en su propia línea, debajo de la letra: en una tablet la talla se sigue leyendo de un
-// golpe y el número no la empuja a lo ancho.
-.sizePickerOptionStock {
-    display: block;
-    margin-top: 2px;
-    font-size: 0.6875rem;
-    color: var(--muted-foreground);
-}
-
-.sizePickerOptionDisabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    background-color: #f3f4f6;
-    text-decoration: line-through;
-
-    // Sin stock: no hay estado "seleccionado" que mostrar, así que se anula el hover/active de arriba.
-    // Los navegadores igual evalúan :hover sobre un botón `disabled`, así que se repite el gris en vez
-    // de dejar que el shorthand lo devuelva a blanco.
-    &:hover,
-    &:focus-visible,
-    &:active {
-        background: #f3f4f6;
-        color: #000;
-        border-color: var(--border);
-    }
-
-    .sizePickerOptionStock {
-        color: var(--destructive);
-    }
-}
-
-.sizePickerCancel {
-    background: none;
+    width: 2.5rem;
+    height: 2.5rem;
     border: none;
-    font-size: 0.75rem;
-    text-decoration: underline;
-    color: #999;
+    border-radius: 0.625rem;
+    background: var(--pos-chip);
+    color: var(--pos-text);
     cursor: pointer;
-    font-family: inherit;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+
+    svg {
+        color: inherit;
+    }
+
+    &:hover:not(:disabled) {
+        background: var(--pos-accent);
+        color: var(--pos-on-accent);
+    }
+
+    &:active:not(:disabled) {
+        transform: scale(0.94);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--pos-accent);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
 }
 
-/* Columna derecha: ticket */
-// Panel derecho: alto completo y estático. Ya no usa `position: sticky` — con el shell de alto fijo
-// no hay nada que "seguir", el panel simplemente mide lo mismo que su columna.
+/* Ticket */
 .ticket {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding: 1.25rem;
-    background: #fff;
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
+    background: var(--pos-surface);
+    border: 1px solid var(--pos-line);
+    border-radius: 0.875rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
 
     @media (min-width: 960px) {
         height: 100%;
         min-height: 0;
-        // Recorta a los hijos para que el footer del ticket quede siempre pegado abajo del panel
-        overflow: hidden;
     }
 }
 
@@ -323,20 +430,24 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 1.125rem;
-    font-weight: 700;
-    color: var(--foreground);
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--pos-accent);
+    color: var(--pos-on-accent);
+    font-size: 1.375rem;
+    font-weight: 800;
+
+    svg {
+        color: inherit;
+    }
 }
 
-// Zona con scroll del ticket: líneas, datos de factura y método de pago. Todo lo que puede crecer.
-// Se incluye acá y no solo las líneas porque en una laptop de 768px de alto, dejar los 3 botones de
-// pago + los 2 campos de factura fijos no deja aire para ver ni un ítem del ticket.
+// Zona con scroll: líneas, totales, datos de factura, método de pago y vuelto
 .ticketScroll {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    padding-right: 0.25rem;
+    gap: 1.25rem;
+    padding: 1rem 1.25rem;
 
     @media (min-width: 960px) {
         flex: 1;
@@ -346,27 +457,44 @@
     }
 }
 
-// Totales y botón de cobrar: nunca se mueven, el cajero siempre los ve
 .ticketFooter {
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border);
+    padding: 0 1.25rem 1.25rem;
 }
 
 .ticketLines {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
 }
 
 .ticketLine {
-    display: flex;
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr) auto auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--pos-line);
+
+    &:first-child {
+        padding-top: 0;
+    }
+
+    @media (max-width: 420px) {
+        grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+
+        .ticketLineTotal {
+            grid-column: 2 / -1;
+            justify-self: end;
+        }
+    }
+}
+
+.ticketThumb {
+    width: 4rem;
+    height: 3.5rem;
+    object-fit: cover;
+    border-radius: 0.375rem;
+    background: #f3f3f3;
 }
 
 .ticketLineInfo {
@@ -375,44 +503,62 @@
     min-width: 0;
 }
 
-.ticketLineSize {
-    font-weight: 400;
-    color: var(--muted-foreground);
+.ticketLineName {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--pos-text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
-.ticketLineName {
+.ticketLineSize {
     font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--foreground);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: var(--pos-text);
 }
 
 .ticketLinePrice {
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--pos-text);
 }
 
-.ticketLineActions {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    flex-shrink: 0;
+.ticketLineTotal {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--pos-text);
+    white-space: nowrap;
+}
+
+// [ − ] 1 [ + ]: un solo control con bordes, como en la maqueta
+.stepper {
+    display: inline-flex;
+    align-items: stretch;
+    border: 1px solid #c4c4c4;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: var(--pos-surface);
 
     button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1.75rem;
-        height: 1.75rem;
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 0.25rem;
+        width: 2rem;
+        height: 2rem;
+        border: none;
+        background: #f5f5f5;
+        color: var(--pos-text);
         cursor: pointer;
 
+        svg {
+            color: inherit;
+        }
+
         &:hover:not(:disabled) {
-            background: #f5f5f5;
+            background: var(--pos-accent);
+            color: var(--pos-on-accent);
         }
 
         &:disabled {
@@ -421,75 +567,102 @@
         }
     }
 
-    // Igual que .paymentMethodButton: el ícono de lucide-react usa stroke="currentColor", así que
-    // fijar `color` acá alcanza para pintarlo (sin esto heredaba el naranja de marca del layout,
-    // ver el comentario en .paymentMethodButton). Solo +/-, no .removeButton (mantiene su rojo).
-    .quantityButton {
-        color: #000;
-
-        svg {
-            color: inherit;
-        }
-
-        &:hover:not(:disabled) {
-            background: #000;
-            color: #fff;
-        }
-    }
-
     span {
-        min-width: 1.25rem;
-        text-align: center;
-        font-size: 0.875rem;
-        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.25rem;
+        border-left: 1px solid #c4c4c4;
+        border-right: 1px solid #c4c4c4;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: var(--pos-text);
     }
 }
 
-.removeButton {
+// Con cantidad 1, el "−" quita la línea: se muestra la papelera en rojo
+.stepper .stepperRemove {
     color: var(--destructive);
-    border-color: color-mix(in srgb, var(--destructive) 40%, transparent) !important;
+
+    &:hover:not(:disabled) {
+        background: var(--destructive);
+        color: #fff;
+    }
+}
+
+.totals {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.subtotalRow {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 1rem;
+    font-size: 1rem;
+    color: var(--pos-text);
+
+    span:last-child {
+        font-weight: 700;
+    }
+}
+
+.totalRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    background: var(--pos-chip);
+    font-size: 1.625rem;
+    font-weight: 800;
+    color: var(--pos-text);
 }
 
 /* Datos del cliente para la factura (NIT/CI y razón social) */
-// minmax(0, 1fr) en vez de 1fr a secas: un input de texto tiene un ancho mínimo intrínseco
-// (~20ch) que con "1fr" (= minmax(auto,1fr)) evita que la columna se encoja, desbordando la
-// tarjeta. minmax(0, 1fr) es lo que Tailwind usa por default en grid-cols-2.
+// minmax(0, 1fr): un input tiene ancho mínimo intrínseco (~20ch) que con 1fr desbordaría la tarjeta
 .customerFields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.625rem;
+    gap: 0.75rem;
+
+    @media (max-width: 420px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.375rem;
     min-width: 0;
 
     label {
-        font-size: 0.75rem;
+        font-size: 0.875rem;
         font-weight: 500;
-        color: var(--muted-foreground);
+        color: var(--pos-text);
     }
 
     input {
         width: 100%;
         min-width: 0;
-        padding: 0.5rem 0.625rem;
-        border: 1px solid var(--border);
-        border-radius: 0.375rem;
-        background: #fff;
-        color: var(--foreground);
-        font-size: 0.875rem;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid var(--pos-line);
+        border-radius: 0.5rem;
+        background: var(--pos-surface);
+        color: var(--pos-text);
+        font-size: 0.9375rem;
         font-family: inherit;
 
         &:focus {
             outline: none;
-            border-color: #000;
+            border-color: var(--pos-accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--pos-accent) 15%, transparent);
         }
 
         &::placeholder {
-            color: var(--muted-foreground);
+            color: #9ca3af;
         }
     }
 }
@@ -497,7 +670,7 @@
 .paymentMethods {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.5rem;
+    gap: 0.625rem;
 }
 
 .paymentMethodButton {
@@ -505,21 +678,21 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
     min-width: 0;
-    padding: 0.625rem 0.375rem;
-    // Explícitos (no heredados): el body de este layout define `color` como el naranja de marca
-    // (--primary), así que sin esto el texto/ícono del botón sale en ese naranja en vez de negro
-    background: #fff;
-    border: 1px solid #d1d5db; // gray-300
-    color: #000;
-    border-radius: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 500;
+    min-height: 4.75rem;
+    padding: 0.75rem 0.5rem;
+    background: #f5f5f5;
+    border: 1px solid var(--pos-line);
+    color: var(--pos-text);
+    border-radius: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 600;
     font-family: inherit;
     text-align: center;
     line-height: 1.2;
     cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
 
     // El ícono de lucide-react usa stroke="currentColor": hereda el `color` de arriba
     svg {
@@ -527,19 +700,21 @@
     }
 
     &:hover {
-        background: #f9fafb; // gray-50
-        border-color: #000;
+        border-color: var(--pos-accent);
+        background: var(--pos-surface);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--pos-accent);
+        outline-offset: 2px;
     }
 }
 
-.paymentMethodActive {
-    background: #000;
-    color: #fff;
-    border-color: #000;
-
-    &:hover {
-        background: #000;
-    }
+.paymentMethodActive,
+.paymentMethodActive:hover {
+    background: var(--pos-accent);
+    color: var(--pos-on-accent);
+    border-color: var(--pos-accent);
 }
 
 /* Calculadora de vuelto (solo Efectivo) */
@@ -547,17 +722,17 @@
     display: flex;
     flex-direction: column;
     gap: 0.625rem;
-    padding: 0.75rem;
+    padding: 0.875rem;
     background: #f9fafb;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
+    border: 1px solid var(--pos-line);
+    border-radius: 0.625rem;
 }
 
 .changeRow {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.9375rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #166534;
 }
@@ -566,34 +741,34 @@
     color: var(--destructive);
 }
 
-.ticketTotal {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
-    font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--foreground);
-}
-
 .chargeButton {
-    padding: 1rem;
-    background: #000;
-    color: #fff;
+    width: 100%;
+    padding: 1.125rem;
+    background: var(--pos-accent);
+    color: var(--pos-on-accent);
     border: none;
-    border-radius: 0.5rem;
-    font-size: 1.0625rem;
-    font-weight: 700;
+    border-radius: 0.625rem;
+    font-size: 1.375rem;
+    font-weight: 800;
+    font-family: inherit;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: filter 0.15s ease, transform 0.1s ease;
 
     &:hover:not(:disabled) {
-        background: #333;
+        filter: brightness(1.15);
+    }
+
+    &:active:not(:disabled) {
+        transform: scale(0.99);
+    }
+
+    &:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--pos-accent) 40%, transparent);
+        outline-offset: 2px;
     }
 
     &:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
     }
 }
@@ -674,12 +849,12 @@
 }
 
 .primaryButton {
-    background: #000;
-    color: #fff;
-    border: 1px solid #000;
+    background: var(--color-primary, #000);
+    color: var(--color-primary-text, #fff);
+    border: 1px solid var(--color-primary, #000);
 
     &:hover {
-        background: #333;
+        filter: brightness(1.15);
     }
 }
 

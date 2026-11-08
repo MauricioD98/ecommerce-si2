@@ -16,6 +16,7 @@ import { TenantResolutionCache } from '../../tenancy/tenant-resolution-cache.ser
 import { withTenantParam } from '../../tenancy/tenant-context';
 import { MailService } from '../mail/mail.service';
 import { i18nMessage } from '../../i18n/i18n-message';
+import { PlatformAuditService, SYSTEM_ACTOR } from './audit/platform-audit.service';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
 import {
   BILLING_INTERVALS,
@@ -28,6 +29,7 @@ import {
   missingBillingEnv,
   planForPrice,
   priceEnvFor,
+  priceLookup,
   priceIdFor,
 } from './plans';
 
@@ -68,6 +70,7 @@ export class SubscriptionsService implements OnModuleInit {
     private readonly provisioning: TenantProvisioningService,
     private readonly mail: MailService,
     private readonly tenantCache: TenantResolutionCache,
+    private readonly audit: PlatformAuditService,
   ) {}
 
   onModuleInit() {
@@ -484,26 +487,112 @@ export class SubscriptionsService implements OnModuleInit {
     });
     if (!tenant) return; // suscripción de otra cosa, o la tienda todavía se está creando
 
-    // Cambio de plan desde el Billing Portal: llega como otro price_id
-    const plan = planForPrice(subscription.items.data[0]?.price.id);
+    // Cambio de plan desde el Billing Portal: llega como otro price_id. Solo se reconocen los Prices
+    // de ESTE proyecto (STRIPE_PRICE_*): un Price ajeno no cambia el plan.
+    const item = subscription.items.data[0];
+    const plan = planForPrice(item?.price.id);
     const suspend = SUSPENDING_STATUSES.has(subscription.status);
     // Solo se reactiva lo que suspendió la FACTURACIÓN: la tienda estaba suspendida y su último estado
     // de pago era uno de los que suspenden. Si el estado anterior era sano, la suspensión la hizo el
     // admin de plataforma (PATCH /platform/tenants/:id/status) y un webhook no debe deshacerla.
     const billingSuspended = tenant.status === 'SUSPENDED' && SUSPENDING_STATUSES.has(tenant.subscriptionStatus ?? '');
+    const suspendNow = suspend && tenant.status === 'ACTIVE';
+    const reactivateNow = !suspend && billingSuspended && subscription.status === 'active';
     await this.control.tenant.update({
       where: { id: tenant.id },
       data: {
         subscriptionStatus: subscription.status,
         ...(plan ? { plan } : {}),
+        // Detalle para la supervisión de la plataforma, tal como lo informa Stripe
+        ...this.subscriptionDetails(subscription),
         // Una tienda FAILED/PROVISIONING no se toca
-        ...(suspend && tenant.status === 'ACTIVE' ? { status: 'SUSPENDED' } : {}),
-        ...(!suspend && billingSuspended && subscription.status === 'active' ? { status: 'ACTIVE' } : {}),
+        ...(suspendNow ? { status: 'SUSPENDED' } : {}),
+        ...(reactivateNow ? { status: 'ACTIVE' } : {}),
       },
     });
     // Invalidar cache del tenant para que el nuevo plan o estado aplique de inmediato
     this.tenantCache.invalidate(tenant.id, tenant.slug);
     if (suspend) this.logger.warn(`Tienda ${tenant.id} suspendida: suscripción ${subscription.status}`);
+    // Auditoría solo cuando el estado de la tienda cambia de verdad (un webhook repetido no lo cambia)
+    if (suspendNow || reactivateNow) {
+      await this.audit.record({
+        actor: SYSTEM_ACTOR,
+        action: suspendNow ? 'TENANT_SUSPENDED_BY_BILLING' : 'TENANT_REACTIVATED_BY_BILLING',
+        result: 'SUCCESS',
+        tenantId: tenant.id,
+        details: { from: tenant.status, to: suspendNow ? 'SUSPENDED' : 'ACTIVE', subscriptionStatus: subscription.status },
+      });
+    }
+  }
+
+  /** Columnas de detalle de la suscripción (public.tenants) a partir del objeto de Stripe */
+  private subscriptionDetails(subscription: Stripe.Subscription) {
+    const item = subscription.items.data[0];
+    const toDate = (seconds: number | null | undefined) => (seconds ? new Date(seconds * 1000) : null);
+    return {
+      stripePriceId: item?.price.id ?? null,
+      billingInterval: intervalFromStripe(item?.price.recurring?.interval),
+      currentPeriodEnd: toDate(item?.current_period_end),
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      cancelAt: toDate(subscription.cancel_at),
+      subscriptionEndedAt: toDate(subscription.ended_at),
+      subscriptionSyncedAt: new Date(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // 2b. Supervisión desde la plataforma (PlatformAdminGuard)
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Suscripciones de todas las tiendas con lo que guardaron los webhooks: no consulta Stripe por cada
+   * tienda. priceRecognized = el Price es uno de los planes de este proyecto (STRIPE_PRICE_*).
+   */
+  async listTenantSubscriptions() {
+    const tenants = await this.control.tenant.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        status: true,
+        plan: true,
+        stripeSubscriptionId: true,
+        subscriptionStatus: true,
+        stripePriceId: true,
+        billingInterval: true,
+        currentPeriodEnd: true,
+        cancelAtPeriodEnd: true,
+        cancelAt: true,
+        subscriptionEndedAt: true,
+        subscriptionSyncedAt: true,
+      },
+    });
+    return tenants.map(({ stripeSubscriptionId, stripePriceId, ...tenant }) => ({
+      ...tenant,
+      hasSubscription: !!stripeSubscriptionId,
+      // null = todavía no se sincronizó el Price (no se sabe)
+      priceRecognized: stripePriceId ? !!priceLookup(stripePriceId) : null,
+    }));
+  }
+
+  /**
+   * Relee en Stripe la suscripción ya vinculada a una tienda y aplica syncTenant (las mismas reglas que
+   * un webhook). Solo LEE en Stripe: no crea, cambia ni cancela nada allí.
+   */
+  async syncTenantFromStripe(tenantId: string) {
+    const tenant = await this.control.tenant.findUnique({ where: { id: tenantId }, select: { stripeSubscriptionId: true } });
+    if (!tenant) throw new NotFoundException(i18nMessage('errors.TENANT_NOT_FOUND'));
+    if (!tenant.stripeSubscriptionId) throw new ConflictException('La tienda no tiene una suscripción de Stripe vinculada');
+    let subscription: Stripe.Subscription;
+    try {
+      subscription = await this.stripe.subscriptions.retrieve(tenant.stripeSubscriptionId);
+    } catch (error) {
+      this.logger.warn(`No se pudo leer la suscripción ${tenant.stripeSubscriptionId}: ${(error as Error).message}`);
+      throw new ServiceUnavailableException('No se pudo consultar la suscripción en Stripe');
+    }
+    await this.syncTenant(subscription);
+    return (await this.listTenantSubscriptions()).find((row) => row.id === tenantId) ?? null;
   }
 
   // ---------------------------------------------------------------------------------------------

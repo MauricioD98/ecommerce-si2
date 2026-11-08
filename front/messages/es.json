@@ -1453,8 +1453,8 @@
       "SELLABLE": "Vender nuevamente",
       "DAMAGED": "Defectuoso / Merma"
     },
-    "title": "Punto de Devolución",
-    "subtitle": "Busca la venta original, indica qué vuelve y en qué estado. Lo que está en buen estado regresa al stock vendible; lo defectuoso entra a mermas y no se puede volver a vender.",
+    "title": "Punto de devolución",
+    "subtitle": "Busca la venta y selecciona los productos que deseas devolver",
     "branchNotice": "La mercadería se reingresa al inventario de <strong>{branch}</strong>.",
     "branchLabel": "Sucursal que recibe la devolución",
     "selectBranch": "Selecciona la sucursal que recibe",
@@ -1500,7 +1500,13 @@
     "refunded": "Reembolsado: <strong>{amount}</strong>",
     "wentSellable": "volvió al stock vendible",
     "wentDamaged": "entró a mermas",
-    "unitsSummary": "{sellable, plural, one {# unidad} other {# unidades}} al stock vendible · {damaged} a mermas"
+    "unitsSummary": "{sellable, plural, one {# unidad} other {# unidades}} al stock vendible · {damaged} a mermas",
+    "unitPrice": "{price} c/u",
+    "maxQuantity": "Máximo {count}",
+    "decrease": "Quitar una unidad",
+    "increase": "Agregar una unidad",
+    "processButton": "Procesar reembolso",
+    "includeItem": "Devolver {name}"
   },
   "AdminInventory": {
     "title": "Inventario y Ofertas",
@@ -1582,18 +1588,18 @@
     "pendingOrders": "{count, plural, one {# pedido guardado en este dispositivo, pendiente de enviar.} other {# pedidos guardados en este dispositivo, pendientes de enviar.}}"
   },
   "AdminPos": {
-    "title": "Punto de Venta",
-    "subtitle": "Cobra ventas físicas en mostrador. El inventario se descuenta de la misma sucursal que la tienda en línea.",
+    "title": "Punto de venta",
+    "subtitle": "Selecciona productos y completa el cobro",
     "selectBranch": "Selecciona una sucursal",
     "selectBranchFirst": "Selecciona una sucursal para empezar a cobrar.",
-    "searchPlaceholder": "Buscar producto por nombre...",
+    "searchPlaceholder": "Buscar por nombre o código",
     "loading": "Cargando productos...",
     "noProducts": "No se encontraron productos.",
     "noStock": "Sin stock",
     "stock": "Stock: {count}",
     "size": "Talla",
     "sizeSoldOut": "Talla {size} agotada en esta sucursal",
-    "ticket": "Ticket",
+    "ticket": "Ticket de venta",
     "emptyTicket": "Agrega productos desde el catálogo.",
     "unitPrice": "{price} c/u",
     "removeOne": "Quitar uno",
@@ -1604,7 +1610,7 @@
     "noName": "Sin nombre",
     "methods": {
       "CASH": "Efectivo",
-      "PHYSICAL_CARD": "Tarjeta (POS)",
+      "PHYSICAL_CARD": "Tarjeta",
       "QR": "QR / Transferencia"
     },
     "amountReceived": "Monto Recibido",
@@ -1634,7 +1640,18 @@
       "thanks": "¡Gracias por su compra!",
       "newSale": "Nueva venta",
       "print": "Imprimir recibo"
-    }
+    },
+    "categoriesLabel": "Categorías",
+    "allCategories": "Todo",
+    "scrollCategories": "Ver más categorías",
+    "lineSize": "Talla {size}",
+    "sizeStock": "Stock {size}: {count}",
+    "sizeGroup": "Tallas de {name}",
+    "addSize": "Agregar {name} talla {size} al ticket",
+    "addProduct": "Agregar {name} al ticket",
+    "subtotal": "Subtotal",
+    "nitPlaceholder": "Ej. 12345678",
+    "razonPlaceholder": "Ej. Cliente de mostrador"
   },
   "AdminMarketing": {
     "title": "Marketing",
@@ -1870,7 +1887,463 @@
     "showPassword": "Mostrar",
     "hidePassword": "Ocultar",
     "showPasswordLabel": "Mostrar contraseña",
-    "hidePasswordLabel": "Ocultar contraseña"
+    "hidePasswordLabel": "Ocultar contraseña",
+    "nav": {
+      "label": "Secciones del panel",
+      "open": "Abrir menú",
+      "close": "Cerrar menú",
+      "pending": "Pendiente",
+      "home": "Inicio",
+      "stores": "Tiendas",
+      "branches": "Sucursales",
+      "plans": "Planes y suscripciones",
+      "backups": "Respaldos",
+      "admins": "Administradores y auditoría",
+      "system": "Estado del sistema"
+    },
+    "home": {
+      "title": "Inicio",
+      "subtitle": "Estado actual de la plataforma con datos reales de la API.",
+      "updatedAt": "Datos de las {time}",
+      "loading": "Cargando el resumen de la plataforma...",
+      "errorTitle": "No se pudo cargar el resumen",
+      "retry": "Reintentar",
+      "emptyTitle": "Todavía no hay tiendas",
+      "emptyText": "Cuando se registre la primera tienda, aquí aparecerán sus cifras.",
+      "noData": "Sin datos",
+      "unavailable": "No disponible",
+      "attentionTitle": "Requieren atención",
+      "attentionEmpty": "Ninguna tienda con error, en creación ni con problemas de pago.",
+      "shortcutsTitle": "Accesos directos",
+      "stats": {
+        "total": "Total de tiendas",
+        "attentionHint": "{failed} con error · {provisioning} creándose · {signups} altas fallidas",
+        "subscriptionsTitle": "Suscripciones",
+        "subsActive": "Suscripciones activas",
+        "subsActiveHint": "{trialing} en prueba · {total} tiendas con suscripción",
+        "noSubscriptions": "{count, plural, one {# tienda} other {# tiendas}} sin suscripción de Stripe",
+        "paymentIssues": "Con problemas de pago",
+        "paymentIssuesHint": "Pago pendiente, impaga o incompleta",
+        "withoutSubscription": "Sin suscripción",
+        "withoutSubscriptionHint": "Tiendas sin suscripción de Stripe (plan asignado a mano)",
+        "mrrLabel": "MRR estimado",
+        "mrrUnavailable": "No se pudo leer el precio de los planes en Stripe.",
+        "fieldUnavailable": "La API no informa este dato.",
+        "mrrNoPaying": "Ninguna suscripción activa o con pago pendiente.",
+        "mrrPartial": "Parcial: {count, plural, one {# suscripción sin precio en Stripe no suma} other {# suscripciones sin precio en Stripe no suman}}.",
+        "mrrExplain": "MRR estimado: precio mensual de lista de cada plan en Stripe por cada suscripción activa o con pago pendiente. No es dinero cobrado: no descuenta cupones, prorrateos, impuestos ni cobros fallidos, y una suscripción anual se cuenta con el precio mensual de su plan.",
+        "otherSubscriptions": "Además: {ended, plural, one {# terminada} other {# terminadas}} · {paused, plural, one {# pausada} other {# pausadas}} · {other} en otro estado."
+      },
+      "attention": {
+        "paymentIssue": "Suscripción: {status}",
+        "failedSignups": "{count, plural, one {# alta pagada} other {# altas pagadas}} con error al crear la tienda",
+        "failedSignupsHint": "Se reintentan desde la API (POST /platform/subscriptions/signups/:id/retry); todavía no hay pantalla para hacerlo.",
+        "signupsUnavailable": "Las altas fallidas no están disponibles en esta versión de la API."
+      },
+      "backups": {
+        "title": "Últimos respaldos",
+        "loading": "Cargando respaldos...",
+        "loadFailed": "No se pudieron cargar los respaldos.",
+        "unavailable": "Respaldos no disponibles: {reason}",
+        "empty": "Sin datos: todavía no se generó ningún respaldo.",
+        "lastOk": "Último respaldo disponible",
+        "lastPlatform": "Último respaldo completo de la plataforma",
+        "noneOk": "Ninguno",
+        "more": "Se muestran las {count} operaciones más recientes.",
+        "goTo": "Ir a Respaldos"
+      }
+    },
+    "sections": {
+      "stores": {
+        "summary": "Buscar tiendas, suspenderlas, reactivarlas y reintentar su creación."
+      },
+      "branches": {
+        "summary": "Sucursales de todas las tiendas en un solo lugar.",
+        "today": "Las sucursales viven dentro de cada tienda y hoy solo se administran desde el panel de esa tienda. La API de la plataforma todavía no las expone."
+      },
+      "plans": {
+        "summary": "Planes del SaaS y suscripciones de las tiendas.",
+        "today": "Hoy el plan y el estado de la suscripción de cada tienda se ven en Tiendas, y el MRR estimado en Inicio. Todavía no hay una vista dedicada de planes ni de historial de suscripciones."
+      },
+      "backups": {
+        "summary": "Respaldo completo de la plataforma y respaldos por tienda."
+      },
+      "admins": {
+        "summary": "Cuentas de administrador de la plataforma y registro de acciones.",
+        "today": "Las cuentas de administrador se crean por consola (npm run platform:admin). Todavía no existe una gestión de administradores en el panel ni un registro de auditoría general; solo los respaldos guardan quién los pidió."
+      },
+      "system": {
+        "summary": "Salud de la API, la base de datos y los servicios externos.",
+        "today": "La API todavía no tiene un endpoint de estado del sistema, así que no se muestra ningún indicador."
+      }
+    },
+    "pending": {
+      "badge": "Sección pendiente",
+      "title": "Esta sección todavía no está implementada",
+      "noSampleData": "No se muestran datos de ejemplo: la información aparecerá aquí cuando exista en la plataforma.",
+      "goTo": "Ir a {section}"
+    },
+    "tenants": {
+      "searchPlaceholder": "Buscar por nombre, identificador, dominio o dueño",
+      "planFilter": "Filtrar por plan",
+      "allPlans": "Todos los planes",
+      "clearFilters": "Quitar filtros",
+      "resultCount": "{shown} de {total} tiendas",
+      "viewDetail": "Detalle",
+      "openStorefrontHint": "«Abrir» muestra la tienda pública como la ve un visitante, sin iniciar sesión en ninguna cuenta.",
+      "plans": {
+        "free": "Gratuito",
+        "legacy": "Legacy",
+        "none": "Sin plan"
+      },
+      "actions": {
+        "cancel": "Cancelar",
+        "working": "Aplicando...",
+        "whatHappens": "Qué va a pasar:",
+        "suspend": {
+          "title": "Suspender «{name}»",
+          "confirm": "Suspender tienda",
+          "typeToConfirm": "Escribe el identificador {slug} para confirmar",
+          "effects": [
+            "La tienda online, su panel de administración, la app móvil y la caja (POS) dejan de funcionar hasta que se reactive. En otras instancias del servidor el cambio puede tardar hasta 60 segundos.",
+            "No se borra ningún dato de la tienda.",
+            "No cancela ni modifica la suscripción en Stripe: si tiene una, se sigue cobrando.",
+            "Un evento de Stripe no deshace una suspensión manual.",
+            "Solo afecta a esta tienda."
+          ]
+        },
+        "reactivate": {
+          "title": "Reactivar «{name}»",
+          "confirm": "Reactivar tienda",
+          "billingWarning": "La suscripción está en «{status}». Si Stripe envía otro evento con ese estado, la tienda puede volver a suspenderse sola.",
+          "effects": [
+            "La tienda online, el panel, la app móvil y la caja vuelven a funcionar de inmediato.",
+            "Los datos quedan como estaban al suspenderla.",
+            "No cambia el plan ni la suscripción en Stripe.",
+            "Solo afecta a esta tienda."
+          ]
+        },
+        "retry": {
+          "title": "Reintentar la creación de «{name}»",
+          "confirm": "Reintentar",
+          "effects": [
+            "Vuelve a ejecutar la creación de la tienda: crea su esquema si falta, aplica las migraciones y crea los roles base y el usuario dueño.",
+            "Puede tardar varios segundos.",
+            "Si termina bien, la tienda queda activa; si vuelve a fallar, queda con error y se muestra el motivo.",
+            "Solo afecta a esta tienda."
+          ]
+        }
+      },
+      "detail": {
+        "back": "Volver a Tiendas",
+        "loading": "Cargando la tienda...",
+        "notFound": "No existe una tienda con ese identificador.",
+        "loadFailed": "No se pudo cargar la tienda",
+        "actionsTitle": "Acciones",
+        "provisioningNoActions": "La tienda se está creando: no hay acciones disponibles hasta que termine.",
+        "supportPending": "El panel no permite entrar a la cuenta del dueño ni actuar en su nombre. Las herramientas de soporte asistido (por ejemplo, ayudar al dueño a recuperar el acceso) están pendientes.",
+        "generalTitle": "Datos generales",
+        "owner": "Dueño",
+        "updatedAt": "Última modificación",
+        "slug": "Identificador",
+        "id": "ID interno",
+        "domain": "Dominio propio",
+        "domainVerified": "verificado",
+        "domainUnverified": "sin verificar",
+        "noDomain": "Sin dominio propio",
+        "schemaVersion": "Versión de la base de datos",
+        "provisionError": "Error de creación",
+        "subscriptionTitle": "Suscripción y cobros",
+        "connectAccount": "Cuenta de cobros de Stripe conectada",
+        "chargesEnabled": "Puede cobrar a sus clientes",
+        "platformFee": "Comisión de la plataforma",
+        "subscriptionLink": "Ver en Planes y suscripciones",
+        "integrationsTitle": "Integraciones",
+        "noIntegrations": "Sin integraciones configuradas.",
+        "integrationDecart": "Probador virtual (Decart)",
+        "integrationWebPush": "Notificaciones push",
+        "configuredAt": "Configurada el {date}",
+        "branchesPending": "Las sucursales de la tienda todavía no se pueden consultar desde la plataforma.",
+        "branchesLink": "Ver las sucursales de esta tienda",
+        "backupsTitle": "Respaldos de esta tienda",
+        "noBackups": "Sin datos: todavía no hay respaldos de esta tienda.",
+        "backupsHint": "Para generar, descargar o restaurar respaldos usa la sección Respaldos.",
+        "yes": "Sí",
+        "no": "No",
+        "branchesText": "Supervisión de solo lectura de las sucursales de esta tienda."
+      }
+    },
+    "branches": {
+      "subtitle": "Sucursales de todas las tiendas, para supervisión.",
+      "reload": "Actualizar sucursales",
+      "readOnly": "Vista de solo lectura. Crear, editar o eliminar sucursales, el inventario y los empleados se gestionan en el panel de cada tienda.",
+      "searchPlaceholder": "Buscar por sucursal, dirección o tienda",
+      "storeFilter": "Filtrar por tienda",
+      "allStores": "Todas las tiendas",
+      "statusFilter": "Filtrar por estado de la sucursal",
+      "allStatuses": "Todos los estados",
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "loadFailed": "No se pudieron cargar las sucursales",
+      "loading": "Consultando las sucursales de cada tienda...",
+      "summary": "{branches, plural, one {# sucursal} other {# sucursales}} en {stores, plural, one {# tienda consultada} other {# tiendas consultadas}}",
+      "summaryMissing": "{count, plural, one {# tienda sin datos disponibles} other {# tiendas sin datos disponibles}}",
+      "missingTitle": "Tiendas sin datos disponibles",
+      "notProvisioned": "La tienda no terminó de crearse: todavía no tiene sucursales que consultar.",
+      "unavailable": "No se pudieron consultar sus sucursales. No significa que tenga 0.",
+      "storeUnavailable": "Los datos de esta tienda no están disponibles.",
+      "noStores": "No hay tiendas cuyas sucursales se puedan consultar.",
+      "storeHasNone": "{name} no tiene sucursales registradas.",
+      "noneAnywhere": "Ninguna de las tiendas consultadas tiene sucursales registradas.",
+      "noResults": "Ninguna sucursal coincide con los filtros.",
+      "columns": {
+        "store": "Tienda",
+        "branch": "Sucursal",
+        "status": "Estado",
+        "address": "Dirección",
+        "created": "Creada"
+      },
+      "noAddress": "Sin dirección",
+      "storesWithoutBranches": "Sin sucursales registradas: {names}.",
+      "cityNote": "Las sucursales no tienen un campo de ciudad: se muestra la dirección tal como la cargó la tienda."
+    },
+    "plans": {
+      "subtitle": "Suscripciones de las tiendas al SaaS, con los datos que Stripe informa por webhook.",
+      "loading": "Cargando suscripciones...",
+      "loadFailed": "No se pudieron cargar las suscripciones",
+      "missingApiTitle": "Función no disponible en la API en ejecución",
+      "missingApiText": "El servidor todavía no tiene esta función. Hace falta aplicar la migración de la base de datos y reiniciar la API.",
+      "summaryTitle": "Resumen",
+      "groups": {
+        "active": "Activas",
+        "trialing": "En prueba",
+        "payment": "Problemas de pago",
+        "cancelScheduled": "Cancelación programada",
+        "ended": "Terminadas",
+        "none": "Sin suscripción",
+        "unsynced": "Sin sincronizar"
+      },
+      "unsyncedNotice": "{count, plural, one {# suscripción todavía no tiene} other {# suscripciones todavía no tienen}} detalle sincronizado (intervalo, renovación o cancelación). Se completa con el próximo evento de Stripe o con «Leer de Stripe».",
+      "noSubscriptionsYet": "Sin datos: ninguna tienda tiene una suscripción de Stripe vinculada.",
+      "attentionEmpty": "Ninguna suscripción con problemas de pago ni con precios ajenos a este proyecto.",
+      "attention": {
+        "payment": "Suscripción: {status}",
+        "foreignPrice": "Su precio en Stripe no es uno de los planes de este proyecto: el plan no se actualiza solo."
+      },
+      "searchPlaceholder": "Buscar tienda por nombre o identificador",
+      "statusFilter": "Filtrar por estado de la suscripción",
+      "columns": {
+        "billing": "Facturación",
+        "period": "Renovación / fin",
+        "synced": "Sincronizado"
+      },
+      "interval": {
+        "monthly": "Mensual",
+        "annual": "Anual"
+      },
+      "foreignPrice": "Precio ajeno a este proyecto",
+      "endedOn": "Finalizó el {date}",
+      "cancelsOn": "Se cancela el {date}",
+      "cancelScheduled": "Cancelación programada",
+      "renewsOn": "Renueva el {date}",
+      "periodEnds": "Período hasta el {date}",
+      "catalogTitle": "Planes de este proyecto",
+      "catalogText": "Precios leídos de Stripe solo para los precios configurados en este proyecto (STRIPE_PRICE_*). Otros productos de la cuenta de Stripe no se usan.",
+      "catalogUnavailable": "No disponible: no se pudo leer el catálogo.",
+      "priceNotConfigured": "no configurado",
+      "sync": {
+        "button": "Leer de Stripe",
+        "title": "Leer de Stripe la suscripción de «{name}»",
+        "confirm": "Leer de Stripe",
+        "done": "Suscripción de «{name}» sincronizada con Stripe.",
+        "effects": [
+          "Consulta en Stripe la suscripción ya vinculada a esta tienda y actualiza su estado, plan, intervalo y fechas.",
+          "No crea, modifica ni cancela nada en Stripe.",
+          "Aplica las mismas reglas que un webhook: si Stripe informa una suscripción impaga, cancelada o pausada, la tienda se suspende.",
+          "Solo afecta a esta tienda."
+        ]
+      }
+    },
+    "admins": {
+      "subtitle": "Administradores de la plataforma y registro de las acciones importantes.",
+      "title": "Administradores de la plataforma",
+      "scopeNote": "Solo cuentas de administración del SaaS. Los dueños, administradores y empleados de cada tienda no aparecen aquí.",
+      "loading": "Cargando administradores...",
+      "loadFailed": "No se pudieron cargar los administradores.",
+      "columns": {
+        "admin": "Administrador",
+        "status": "Estado",
+        "lastLogin": "Último ingreso",
+        "created": "Alta"
+      },
+      "status": {
+        "active": "Activo",
+        "locked": "Bloqueado temporalmente",
+        "inactive": "Desactivado"
+      },
+      "lockedUntil": "Hasta el {date}",
+      "neverLoggedIn": "Nunca ingresó",
+      "managePending": "Crear o desactivar administradores todavía se hace por consola (npm run platform:admin); el panel solo los consulta."
+    },
+    "audit": {
+      "title": "Auditoría",
+      "loading": "Cargando registro...",
+      "loadFailed": "No se pudo cargar la auditoría",
+      "since": "Registro disponible desde el {date}.",
+      "sinceUnknown": "No se encontró la marca de inicio de la auditoría.",
+      "noHistoryBefore": "No hay historial anterior: antes de esa fecha solo los respaldos guardan quién los pidió (sección Respaldos).",
+      "unavailableTitle": "Auditoría no disponible",
+      "unavailableText": "El servidor todavía no tiene la tabla de auditoría: hace falta aplicar la migración de la base de datos. Mientras tanto las acciones funcionan, pero no quedan registradas.",
+      "empty": "Todavía no hay acciones registradas.",
+      "noResults": "Ninguna acción coincide con los filtros.",
+      "loadMore": "Cargar más",
+      "domainRemoved": "dominio quitado",
+      "jobUnknown": "Resultado no disponible: la operación ya no figura en Respaldos (por ejemplo, se eliminó).",
+      "columns": {
+        "date": "Fecha",
+        "actor": "Quién",
+        "action": "Acción",
+        "store": "Tienda afectada",
+        "result": "Resultado"
+      },
+      "results": {
+        "SUCCESS": "Correcto",
+        "FAILURE": "Falló",
+        "REQUESTED": "Solicitado"
+      },
+      "actors": {
+        "system": "Sistema (facturación)",
+        "key": "Llave de scripts",
+        "anonymous": "Intento anónimo",
+        "anonymousWith": "Intento con {email}"
+      },
+      "filters": {
+        "action": "Filtrar por acción",
+        "allActions": "Todas las acciones",
+        "store": "Filtrar por tienda",
+        "allStores": "Todas las tiendas",
+        "admin": "Filtrar por administrador",
+        "allAdmins": "Todos los administradores",
+        "result": "Filtrar por resultado",
+        "allResults": "Todos los resultados",
+        "from": "Desde",
+        "to": "Hasta"
+      },
+      "actions": {
+        "AUDIT_STARTED": "Inicio de la auditoría",
+        "PLATFORM_LOGIN": "Inicio de sesión",
+        "TENANT_CREATED": "Alta de tienda",
+        "TENANT_SUSPENDED": "Suspensión de tienda",
+        "TENANT_REACTIVATED": "Reactivación de tienda",
+        "TENANT_SUSPENDED_BY_BILLING": "Suspensión por facturación",
+        "TENANT_REACTIVATED_BY_BILLING": "Reactivación por facturación",
+        "TENANT_PROVISION_RETRIED": "Reintento de creación",
+        "TENANT_DOMAIN_CHANGED": "Cambio de dominio",
+        "TENANT_INTEGRATION_CHANGED": "Cambio de integración",
+        "SUBSCRIPTION_SYNCED": "Lectura de suscripción en Stripe",
+        "SIGNUP_RETRIED": "Reintento de alta pagada",
+        "BACKUP_CREATED": "Respaldo generado",
+        "BACKUP_UPLOADED": "Copia subida",
+        "BACKUP_DOWNLOADED": "Copia descargada",
+        "BACKUP_RESTORE_STARTED": "Restauración",
+        "BACKUP_DELETED": "Copia eliminada"
+      }
+    },
+    "system": {
+      "subtitle": "Comprobaciones reales hechas por la API al consultar esta página.",
+      "recheck": "Volver a comprobar",
+      "loading": "Comprobando...",
+      "loadFailed": "No se pudo obtener el estado del sistema",
+      "missingApiTitle": "Función no disponible en la API en ejecución",
+      "missingApiText": "El servidor todavía no tiene esta función: hace falta actualizar y reiniciar la API.",
+      "honestNote": "Cada tarjeta muestra la hora de su comprobación. Lo que no se puede comprobar desde aquí se indica como «No disponible»; no hay indicadores supuestos.",
+      "checkedAt": "Comprobado: {date}",
+      "configured": "Configurado",
+      "notConfigured": "No configurado",
+      "none": "Ninguno",
+      "status": {
+        "ok": "Correcto",
+        "warning": "Revisar",
+        "error": "Problema",
+        "unavailable": "No disponible"
+      },
+      "duration": {
+        "days": "{d} d {h} h",
+        "hours": "{h} h {m} min",
+        "minutes": "{m} min {s} s"
+      },
+      "api": {
+        "title": "API",
+        "okLabel": "Responde",
+        "responding": "Responde",
+        "yes": "Sí (esta consulta)",
+        "uptime": "En marcha desde hace",
+        "startedAt": "Inicio del proceso"
+      },
+      "database": {
+        "title": "Base de datos",
+        "okLabel": "Responde",
+        "query": "Consulta de prueba",
+        "answered": "Respondida",
+        "latency": "Latencia"
+      },
+      "migrations": {
+        "title": "Migraciones",
+        "okLabel": "Al día",
+        "controlApplied": "Plataforma: aplicadas",
+        "controlPending": "Plataforma: pendientes",
+        "controlFailed": "Plataforma: con error",
+        "storesOutdated": "Tiendas desactualizadas",
+        "storesOutdatedValue": "{outdated} de {total}",
+        "unknownVersion": "versión desconocida"
+      },
+      "backups": {
+        "title": "Respaldos",
+        "okLabel": "Sin fallos recientes",
+        "key": "Clave de cifrado",
+        "active": "En curso",
+        "stuck": "Detenidas (más de 2 h)",
+        "last7": "Últimos 7 días",
+        "last7Value": "{ok} correctas · {failed} con error",
+        "lastSuccess": "Último respaldo correcto",
+        "lastPlatform": "Último respaldo completo",
+        "lastFailure": "Último error"
+      },
+      "sync": {
+        "title": "Sincronización con servicios externos",
+        "okLabel": "Sin problemas registrados",
+        "pending": "Eventos pendientes",
+        "unresolved": "Sin tienda resoluble",
+        "dead": "Agotaron los reintentos",
+        "processed24h": "Procesados (24 h)",
+        "lastProcessed": "Último evento procesado",
+        "oldestOpen": "Pendiente más antiguo",
+        "attempts": "{count, plural, one {# intento} other {# intentos}}",
+        "eventStatus": {
+          "PENDING": "Pendiente",
+          "UNRESOLVED": "Sin resolver",
+          "DEAD": "Agotado",
+          "PROCESSED": "Procesado"
+        },
+        "note": "Bandeja de webhooks de Stripe (pagos, suscripciones y cuentas conectadas). No muestra el contenido de los eventos."
+      },
+      "signups": {
+        "title": "Altas de tiendas",
+        "okLabel": "Sin problemas",
+        "failed": "Altas pagadas con error",
+        "stuck": "Creándose hace más de 15 min"
+      },
+      "config": {
+        "title": "Configuración de servicios",
+        "okLabel": "Revisada",
+        "stripe": "Stripe",
+        "stripeConnection": "Conexión con Stripe",
+        "email": "Correo",
+        "emailSmtp": "Servidor SMTP configurado",
+        "emailConsole": "Modo consola (no se envían correos)",
+        "emailConnection": "Conexión con el servidor de correo"
+      }
+    }
   },
   "AdminPayments": {
     "title": "Gestión de pagos",
@@ -2256,7 +2729,8 @@
       "store": "Tienda",
       "status": "Estado",
       "size": "Tamaño",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "scope": "Alcance"
     },
     "kind": {
       "BACKUP": "Respaldo",
@@ -2343,7 +2817,27 @@
       "typeToConfirm": "Escribe {phrase} para confirmar",
       "cancel": "Cancelar",
       "confirm": "Restaurar ahora",
-      "starting": "Iniciando…"
+      "starting": "Iniciando…",
+      "titlePlatform": "Restaurar TODA la plataforma",
+      "titleTenant": "Restaurar la tienda «{name}»",
+      "scopePlatformTitle": "Restauración de toda la plataforma",
+      "scopePlatformText": "Reemplaza el plano de control y {count, plural, one {la # tienda incluida} other {las # tiendas incluidas}} en la copia. Afecta a todas las cuentas y paneles de esas tiendas.",
+      "scopeTenantTitle": "Restauración de una sola tienda: {name}",
+      "scopeTenantText": "Solo se reemplazan los datos de esta tienda. Las demás tiendas y la plataforma no se modifican."
+    },
+    "scopeBadge": {
+      "platform": "Toda la plataforma",
+      "tenant": "Tienda"
+    },
+    "originalDate": "Copia generada el {date}",
+    "filter": {
+      "label": "Filtrar historial por alcance",
+      "all": "Todo el historial",
+      "platform": "Solo toda la plataforma",
+      "tenants": "Solo tiendas",
+      "oneTenant": "Tienda: {name}",
+      "count": "{shown} de {total} operaciones",
+      "noResults": "Ninguna operación coincide con el filtro."
     }
   }
 }

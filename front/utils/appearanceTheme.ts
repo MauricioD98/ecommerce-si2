@@ -24,6 +24,8 @@ export function backgroundImageCss(image: string | null, version?: string | null
 export function appearanceCssVars(appearance: StoreAppearance, backgroundImage: string): React.CSSProperties {
     return {
         "--color-primary": appearance.primaryColor,
+        // Texto legible (negro o blanco) sobre el color primario: botones y encabezados rellenos (POS)
+        "--color-primary-text": readableTextOn(appearance.primaryColor),
         "--color-secondary": appearance.secondaryColor,
         "--navbar-bg": appearance.navbarBackgroundColor,
         "--navbar-text": appearance.navbarTextColor,

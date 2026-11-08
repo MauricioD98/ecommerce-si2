@@ -10,14 +10,19 @@ import { SubscriptionsService } from './subscriptions.service';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import { InternalKeyGuard } from './guards/internal-key.guard';
+import { PlatformBranchesController } from './platform-branches.controller';
+import { PlatformBranchesService } from './platform-branches.service';
+import { PlatformAuditController } from './audit/platform-audit.controller';
+import { PlatformSystemController } from './system/platform-system.controller';
+import { PlatformSystemService } from './system/platform-system.service';
 
 // ControlPrismaService y TenantProvisioningService vienen de TenancyModule (@Global); MailService
 // de MailModule (@Global). SubscriptionsService se exporta para el webhook de Stripe (PaymentsModule).
 // JwtModule sin config: PlatformAuthService pasa secret y audience en cada sign/verify.
 @Module({
   imports: [JwtModule.register({}), AuthModule],
-  controllers: [PlatformController, PlatformAuthController, SubscriptionsController, TenantSubscriptionController, ContactController],
-  providers: [PlatformAuthService, PlatformAdminGuard, InternalKeyGuard, SubscriptionsService],
+  controllers: [PlatformController, PlatformAuthController, SubscriptionsController, TenantSubscriptionController, ContactController, PlatformBranchesController, PlatformAuditController, PlatformSystemController],
+  providers: [PlatformAuthService, PlatformAdminGuard, InternalKeyGuard, SubscriptionsService, PlatformBranchesService, PlatformSystemService],
   exports: [SubscriptionsService],
 })
 export class PlatformModule {}

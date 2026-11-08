@@ -60,6 +60,18 @@ model Tenant {
   stripeSubscriptionId String? @unique @map("stripe_subscription_id")
   // Estado de Stripe tal cual (active, past_due, unpaid, canceled…)
   subscriptionStatus   String? @map("subscription_status")
+  // Copia de lo que dice Stripe de esa suscripción, guardada por SubscriptionsService.syncTenant (webhooks
+  // customer.subscription.*, vínculo tras el Checkout y la sincronización manual de la plataforma). Sirve
+  // para que el panel de plataforma supervise sin consultar Stripe por cada tienda. NULL = todavía no
+  // se sincronizó desde que existen estas columnas.
+  stripePriceId        String?   @map("stripe_price_id")
+  // monthly | annual (del Price real); NULL si el intervalo no es uno de los dos
+  billingInterval      String?   @map("billing_interval")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+  cancelAtPeriodEnd    Boolean   @default(false) @map("cancel_at_period_end")
+  cancelAt             DateTime? @map("subscription_cancel_at")
+  subscriptionEndedAt  DateTime? @map("subscription_ended_at")
+  subscriptionSyncedAt DateTime? @map("subscription_synced_at")
 
   credentials  TenantCredential[]
   integrations TenantIntegration[]
@@ -301,4 +313,27 @@ model BackupJob {
 
   @@index([scope, tenantId, createdAt])
   @@map("backup_jobs")
+}
+
+// Auditoría del panel de plataforma (PlatformAuditService). Se escribe y se lee con SQL parametrizado;
+// el modelo documenta la tabla. Sin contraseñas, tokens, claves ni contenido de respaldos.
+model PlatformAuditLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actorType   String   @map("actor_type")
+  actorId     String?  @map("actor_id") @db.Uuid
+  actorEmail  String?  @map("actor_email")
+  action      String
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  tenantSlug  String?  @map("tenant_slug")
+  tenantName  String?  @map("tenant_name")
+  targetId    String?  @map("target_id")
+  result      String
+  errorCode   String?  @map("error_code")
+  details     Json?
+
+  @@index([createdAt(sort: Desc)])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+  @@map("platform_audit_log")
 }

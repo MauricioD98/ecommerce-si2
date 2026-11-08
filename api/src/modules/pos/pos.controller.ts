@@ -29,13 +29,15 @@ export class PosController {
       '`branchId` para operar la caja de otra sucursal.',
   })
   @ApiQuery({ name: 'branchId', required: false, description: 'Solo tiene efecto con permiso ALL_BRANCHES' })
-  @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'search', required: false, description: 'Nombre, descripción o código (SKU)' })
+  @ApiQuery({ name: 'category', required: false, description: 'Id de la categoría (filtros del POS)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'Productos con stock disponible en la sucursal' })
   async getCatalog(
     @Query('branchId') branchId: string | undefined,
     @Query('search') search: string | undefined,
+    @Query('category') category: string | undefined,
     @Query('page') page: string | undefined,
     @Query('limit') limit: string | undefined,
     @GetUser() cashier: AuthUser,
@@ -43,6 +45,7 @@ export class PosController {
     return await this.posService.getCatalog(cashier, {
       branchId,
       search,
+      category: category?.trim() || undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });
