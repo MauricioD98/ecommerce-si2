@@ -111,5 +111,8 @@
   "OFFLINE_SYNC_CHANGE_REUSED": "This change belongs to another account or another item.",
   "FORECAST_ALREADY_RUNNING": "A forecast training is already running for this store. Wait for it to finish.",
   "FORECAST_STORE_WIDE_REQUIRED": "Training or deleting the forecast requires access to all branches.",
-  "FORECAST_UNAVAILABLE": "The forecast module (Python) is not installed on this server."
+  "FORECAST_UNAVAILABLE": "The forecast module (Python) is not installed on this server.",
+  "SEGMENTATION_ALREADY_RUNNING": "A customer segmentation training is already running for this store. Wait for it to finish.",
+  "SEGMENTATION_STORE_WIDE_REQUIRED": "Customer segmentation summarizes the whole store: it requires access to all branches.",
+  "SEGMENTATION_UNAVAILABLE": "The customer segmentation module (Python) is not installed on this server."
 }

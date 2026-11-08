@@ -808,6 +808,7 @@
     },
     "openDashboard": "Dashboard interactivo",
     "tabForecast": "Pronóstico de ventas",
+    "tabSegments": "Segmentación de clientes",
     "forecast": {
       "title": "Pronóstico de ventas de la próxima semana",
       "subtitle": "Modelo supervisado (bosque aleatorio) entrenado solo con el historial de esta tienda, con división cronológica 80 % entrenamiento / 20 % prueba.",
@@ -883,6 +884,116 @@
       "aboutText": "Esta estimación se basa en las ventas anteriores. Los resultados pueden variar según la disponibilidad de productos. Las devoluciones no se descuentan de las ventas.",
       "howTitle": "¿Cómo se calcula?",
       "howText": "El modelo analiza las ventas pagadas por semana, sucursal, producto y talla. Por ahora, no incluye el historial de precios, promociones ni disponibilidad."
+    },
+    "segments": {
+      "title": "Segmentación de clientes",
+      "subtitle": "Grupos de clientes con hábitos de compra parecidos, descubiertos con K-Means a partir de recencia, frecuencia y monto (RFM) de esta tienda.",
+      "planLocked": "La segmentación de clientes está disponible en el Plan Pro.",
+      "sourceLabel": "Origen de los datos",
+      "sourceReal": "Compras reales",
+      "sourceDemo": "Datos de demostración",
+      "simulatedBanner": "Datos de demostración: clientes y compras ficticios. Los grupos solo muestran cómo funciona el análisis; no describen a tus clientes.",
+      "realBanner": "Compras reales de esta tienda (pedidos pagados del periodo; sin pendientes ni cancelados).",
+      "train": "Analizar compras reales",
+      "trainDemo": "Generar demo y analizar",
+      "retrain": "Volver a analizar",
+      "refresh": "Actualizar",
+      "deleteDemo": "Eliminar demo",
+      "deleteDemoConfirm": "¿Eliminar los datos de demostración de esta tienda? Las compras reales no se tocan.",
+      "loading": "Cargando…",
+      "loadFailed": "No se pudo cargar la segmentación.",
+      "status": {
+        "sin_entrenar": "Sin analizar",
+        "entrenando": "Analizando…",
+        "listo": "Listo",
+        "datos_insuficientes": "Datos insuficientes",
+        "error": "Error"
+      },
+      "hint": {
+        "sin_entrenar": "Todavía no hay un análisis. Pulsa el botón para crearlo: consultar esta página nunca lo recalcula.",
+        "entrenando": "Analizando clientes… la vista se actualiza sola."
+      },
+      "errors": {
+        "python_no_disponible": "El módulo de análisis (Python) no está disponible en el servidor.",
+        "interrumpido": "El análisis se interrumpió (la API se reinició). Vuelve a ejecutarlo.",
+        "entrada_invalida": "Los datos no tienen un formato válido (por ejemplo, montos en monedas distintas).",
+        "fallo_entrenamiento": "El análisis falló. Revisa los registros de la API."
+      },
+      "insufficientTitle": "Datos insuficientes",
+      "insufficient": {
+        "pocos_clientes": "Hay {eligible} clientes con compras en el periodo; este análisis necesita al menos {min}.",
+        "poca_diversidad": "Los clientes son demasiado parecidos entre sí ({points} combinaciones distintas; se necesitan {minPoints}).",
+        "sin_k_valido": "Ninguna cantidad de grupos produjo grupos distintos con estos datos."
+      },
+      "period": "Periodo analizado",
+      "periodHint": "{days} días · zona horaria {tz}",
+      "customers": "Clientes analizados",
+      "customersHint": "{total} clientes en total · {noValid} sin compras válidas · {noPeriod} sin compras en el periodo",
+      "origin": "Origen",
+      "originDemo": "Datos de demostración",
+      "originReal": "Compras reales",
+      "cutoff": "Corte: {date}",
+      "trainedAt": "Analizado el",
+      "modelVersion": "Versión",
+      "noAutoUpdate": "no se actualiza solo",
+      "groupsTitle": "{k} grupos encontrados",
+      "groupsHelp": "Cada grupo reúne clientes con hábitos parecidos. La numeración la asigna cada análisis y puede cambiar al repetirlo.",
+      "group": "Grupo {n}",
+      "groupCount": "{count} clientes ({pct} %)",
+      "compare": {
+        "recencia_dias": {
+          "menor": "Compraron más recientemente que la mayoría",
+          "similar": "Última compra en un plazo similar al de la mayoría",
+          "mayor": "Llevan más tiempo sin comprar"
+        },
+        "frecuencia": {
+          "menor": "Compran con menos frecuencia",
+          "similar": "Frecuencia de compra similar a la mayoría",
+          "mayor": "Compran con más frecuencia"
+        },
+        "monto": {
+          "menor": "Gastan menos",
+          "similar": "Gasto similar a la mayoría",
+          "mayor": "Gastan más"
+        }
+      },
+      "variable": {
+        "recencia_dias": "Última compra",
+        "frecuencia": "Pedidos",
+        "monto": "Monto"
+      },
+      "daysValue": "{n, plural, one {hace # día} other {hace # días}}",
+      "ordersValue": "{n, plural, one {# pedido} other {# pedidos}}",
+      "medianHelp": "Valores típicos del grupo: mediana y, entre paréntesis, el rango del 50 % central. \"La mayoría\" = mediana de toda la tienda.",
+      "evaluationTitle": "Entrenamiento y evaluación (80/20)",
+      "split": "{total} clientes: {train} para entrenar (80 %) y {test} para evaluar (20 %), elegidos al azar con semilla {seed}. Se eligieron {k} grupos usando solo el entrenamiento.",
+      "colSet": "Conjunto",
+      "colCustomers": "Clientes",
+      "colGroups": "Grupos con clientes",
+      "colInertia": "Inercia media",
+      "setTrain": "Entrenamiento (80 %)",
+      "setTest": "Evaluación (20 %)",
+      "notAvailable": "No disponible",
+      "metricsHelp": "Silhouette (de -1 a 1, mayor es mejor) y Davies-Bouldin (menor es mejor) miden qué tan compactos y separados están los grupos. Son orientativas: no son un porcentaje de precisión ni garantizan comportamientos futuros.",
+      "warnings": {
+        "corte_anterior_extraccion": "El corte es anterior a la extracción: se usó el estado actual de los pedidos.",
+        "k_maximo": "Se eligieron {k} grupos, el máximo probado: otra configuración podría dar otra cantidad.",
+        "separacion_debil": "Separación débil entre grupos (silhouette menor a {threshold}).",
+        "evaluacion_un_grupo": "En la evaluación todos los clientes quedaron en un solo grupo.",
+        "grupos_vacios": "{n} grupo(s) quedaron sin clientes."
+      },
+      "aboutTitle": "Qué muestra esta sección",
+      "aboutText": "Describe grupos observados en el historial de compras. No predice si un cliente dejará de comprar ni envía mensajes, descuentos o campañas.",
+      "howTitle": "¿Cómo se calcula?",
+      "how": {
+        "rfm": "Por cliente: días desde su última compra válida hasta el corte (recencia), pedidos válidos del periodo (frecuencia) y suma de sus importes (monto). Se combinan las compras de todas las sucursales.",
+        "valid": "Cuentan los pedidos pagados (en proceso, enviados o entregados). Pendientes y cancelados no cuentan. Las ventas de caja sin cliente registrado no se atribuyen a nadie.",
+        "amount": "El monto es el total bruto del pedido (incluye envío y descuentos). Las devoluciones se informan aparte y no se restan.",
+        "split": "Los clientes se dividen 80 % / 20 % antes de ajustar nada; la transformación, el escalado y K-Means se ajustan solo con el 80 % y luego se aplican al 20 %.",
+        "model": "Antes de agrupar se aplica log(1 + x) y un escalado estándar, para que días, pedidos y dinero pesen parecido y los montos extremos no dominen.",
+        "limits": "No se usan nombres, correos, teléfonos ni datos de pago. Sin historial de estados de pedido, se usa el estado actual.",
+        "dataQuality": "Calidad de datos: {rows} filas de pedidos leídas, {duplicates} duplicadas descartadas, {excluded} excluidas por datos inválidos, {pending} pendientes, {cancelled} cancelados; {returns} pedidos con devoluciones."
+      }
     }
   },
   "AdminErrors": {

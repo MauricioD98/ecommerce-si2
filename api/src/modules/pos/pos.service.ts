@@ -23,7 +23,8 @@ import { PosCheckoutResponseDto } from './dto/pos-receipt.dto';
 import { compareVariants, withTxRetry } from '../../common/checkout/tx.util';
 
 // Cliente placeholder para ventas de caja sin cuenta registrada. Se crea una sola vez (lazy) y se reutiliza.
-const WALK_IN_CUSTOMER_EMAIL = 'consumidor-final@pos.stellafemme.internal';
+// Exportado: la segmentación de clientes excluye a este cliente genérico (no es una persona)
+export const WALK_IN_CUSTOMER_EMAIL = 'consumidor-final@pos.stellafemme.internal';
 
 @Injectable()
 export class PosService {

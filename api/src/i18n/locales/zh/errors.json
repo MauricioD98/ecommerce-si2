@@ -107,5 +107,8 @@
   "OFFLINE_SYNC_CHANGE_REUSED": "此更改属于另一个账户或另一项数据。",
   "FORECAST_ALREADY_RUNNING": "该店铺已有一个预测训练正在进行，请等待其完成。",
   "FORECAST_STORE_WIDE_REQUIRED": "训练或删除预测需要拥有所有门店的权限。",
-  "FORECAST_UNAVAILABLE": "此服务器未安装预测模块（Python）。"
+  "FORECAST_UNAVAILABLE": "此服务器未安装预测模块（Python）。",
+  "SEGMENTATION_ALREADY_RUNNING": "该店铺已有一个客户分群训练正在进行，请等待其完成。",
+  "SEGMENTATION_STORE_WIDE_REQUIRED": "客户分群汇总整个店铺的数据：需要拥有所有门店的权限。",
+  "SEGMENTATION_UNAVAILABLE": "此服务器未安装客户分群模块（Python）。"
 }

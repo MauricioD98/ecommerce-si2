@@ -8,10 +8,11 @@ import styles from './admin-table.module.scss';
 import GeneralMetrics from './GeneralMetrics';
 import DynamicReportPanel from './DynamicReportPanel';
 import SalesForecastPanel from './SalesForecastPanel';
+import CustomerSegmentationPanel from './CustomerSegmentationPanel';
 import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 
-type Tab = 'metrics' | 'ai' | 'forecast';
+type Tab = 'metrics' | 'ai' | 'forecast' | 'segments';
 
 export default function ReportsClient() {
     const [tab, setTab] = useState<Tab>('metrics');
@@ -70,10 +71,33 @@ export default function ReportsClient() {
                         </span>
                     )}
                 </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'segments'}
+                    className={`${styles.tab} ${tab === 'segments' ? styles.tabActive : ''}`}
+                    onClick={() => setTab('segments')}
+                >
+                    {t('tabSegments')}
+                    {!features.aiReports && (
+                        <span className={`${styles.badge} ${styles.badgeMuted}`} style={{ marginLeft: '0.5rem' }}>
+                            Plan Pro
+                        </span>
+                    )}
+                </button>
             </div>
 
             {tab === 'metrics' ? (
                 <GeneralMetrics />
+            ) : tab === 'segments' ? (
+                features.aiReports ? (
+                    <CustomerSegmentationPanel />
+                ) : (
+                    <div className={`${styles.tableCard} ${styles.emptyState}`}>
+                        <Lock size={22} style={{ margin: '0 auto 0.5rem', opacity: 0.7 }} />
+                        <p>{t('segments.planLocked')}</p>
+                    </div>
+                )
             ) : tab === 'forecast' ? (
                 features.aiReports ? (
                     <SalesForecastPanel />
