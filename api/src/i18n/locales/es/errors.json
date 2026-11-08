@@ -108,5 +108,8 @@
   "OFFLINE_CONFLICT": "Este dato cambió en el servidor mientras estabas sin conexión. Revisa los cambios antes de guardarlos.",
   "OFFLINE_SYNC_EXPECTED_MISSING": "Falta el valor anterior de: {fields}. No se puede sincronizar sin comprobar que no cambió.",
   "OFFLINE_ACTION_REQUIRES_CONNECTION": "Esta acción requiere conexión: {fields}.",
-  "OFFLINE_SYNC_CHANGE_REUSED": "Este cambio pertenece a otra cuenta o a otro dato."
+  "OFFLINE_SYNC_CHANGE_REUSED": "Este cambio pertenece a otra cuenta o a otro dato.",
+  "FORECAST_ALREADY_RUNNING": "Ya hay un entrenamiento del pronóstico en curso para esta tienda. Espera a que termine.",
+  "FORECAST_STORE_WIDE_REQUIRED": "Entrenar o borrar el pronóstico requiere alcance sobre todas las sucursales.",
+  "FORECAST_UNAVAILABLE": "El módulo de pronóstico (Python) no está instalado en este servidor."
 }

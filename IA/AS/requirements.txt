@@ -1,0 +1,9 @@
+# Versiones probadas con Python 3.13.16 en Windows 11 (2026-11-07)
+pandas==3.1.1
+numpy==2.5.4
+scikit-learn==1.9.1
+scipy==1.18.1
+joblib==1.6.0
+threadpoolctl==3.8.0
+python-dateutil==4.0.0
+tzdata==2026.6

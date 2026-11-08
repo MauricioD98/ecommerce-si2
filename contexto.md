@@ -81,7 +81,7 @@ ecommerce-si2/
 ├── api/                    ← NestJS 12 + Prisma 7 (proyecto autónomo, usa npm; package-lock.json)
 ├── app_movil/              ← Expo ~58 / React Native 0.88 (cliente móvil independiente de la misma API)
 ├── docs/checkout-resiliente.md ← operación y políticas del checkout resistente a fallos (§4.10)
-└── IA/                     ← carpeta vacía
+└── IA/                     ← AS/ = pronóstico de ventas supervisado (Python, §4.20) · ANS/ = reservado (no supervisado)
 ```
 
 ### 2.1 Avisos importantes por carpeta (archivos `AGENTS.md` reales del repo)
@@ -405,7 +405,7 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 - **platform** (sin tienda): `POST /platform/auth/login`, **`POST /platform/auth/tenant-login`** (login en la tienda elegida, `tenantId` obligatorio, §4.1), `GET /platform/auth/me` (Bearer de plataforma); **`GET /platform/tenants/public`** (directorio público de tiendas activas: id, slug, nombre, plan, `mobileApp`); `POST /platform/contact`; `POST /platform/subscriptions/checkout`, `GET /platform/subscriptions/checkout/:sessionId/status`; `GET /platform/tenants/resolve/:slug` (ahora acepta **UUID, slug o nombre** de la tienda; con `x-client-platform: mobile` responde 403 si el plan no incluye app móvil); `GET /platform/tenants/by-domain` (`x-internal-key`; 404 si el plan no incluye dominio propio); con sesión de administrador de plataforma o `x-platform-key`: `GET|POST /platform/tenants`, `GET /platform/tenants/metrics`, `PATCH /platform/tenants/:id/status|domain`, `POST /platform/tenants/:id/retry`, `PUT /platform/tenants/:id/integrations/decart|web-push`, `POST .../web-push/generate`, `DELETE .../integrations/:provider`, `POST /platform/subscriptions/signups/:id/retry`
 - **pos:** `GET /pos/products`, `POST /pos/checkout` · **returns:** `GET /returns/search-order`, `POST /returns/process`, `GET /returns`, `GET /returns/:id`
 - **notifications:** `GET /notifications/vapid-public-key`, `POST /notifications/subscribe` · **chatbot:** `GET /chatbot/products`
-- **marketing:** `POST /marketing/send-campaign` · **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic`
+- **marketing:** `POST /marketing/send-campaign` · **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic`, pronóstico `GET /reports/forecast`, `POST /reports/forecast/train`, `DELETE /reports/forecast/demo` (§4.20)
 
 ### 4.16 Internacionalización (es, en, fr, zh)
 - **API:** `nestjs-i18n`; el idioma sale de `?lang=` → header `x-lang` → `Accept-Language` → español. Las excepciones llevan una **clave** (`i18nMessage('errors.PRODUCT_NOT_FOUND', args)`) que `I18nExceptionFilter` traduce; los mensajes libres viejos pasan tal cual. Diccionarios en `api/src/i18n/locales/<idioma>/{errors,validation}.json` (`nest-cli.json` los copia a `dist`).
@@ -470,6 +470,13 @@ Reemplaza al bloqueo que dependía solo de `x-client-platform: mobile`. Código:
 **Compatibilidad de dispositivos:** sin acceso al canal móvil (y con el aviso `mobileAccess.deviceUnsupported`, que sugiere la tienda web) quedan: simuladores iOS y equipos sin App Attest (`isSupported = false`), extensiones de app, Android sin Google Play Services o sin Play Store (Huawei sin GMS, GrapheneOS sin Play, AOSP), dispositivos rooteados/desbloqueados o con ROM que no cumplan `MEETS_DEVICE_INTEGRITY` (bajar a `MEETS_BASIC_INTEGRITY` amplía la cobertura a costa de seguridad), emuladores Android y apps instaladas fuera de Play (si `PLAY_INTEGRITY_REQUIRE_LICENSED=true`). Reinstalar o restaurar el iPhone invalida la clave de App Attest: la app genera otra sola. Una alternativa para Android sin Google sería la atestación de clave por hardware (`generateHardwareAttestedKeyAsync` de `@expo/app-integrity`), **no implementada**.
 
 **Límites que permanecen (no es invulnerable):** la API web es pública y la tienda web vale en todos los planes. Un cliente propio que use los endpoints web (catálogo, `/auth/login`, carrito, pedidos) hace exactamente lo que haría un navegador: eso no se puede impedir sin romper la web, y no es "la app móvil" en términos del servidor. Lo que sí garantiza el cambio: la **app oficial** solo obtiene sesión en tiendas Pro/Legacy y solo en dispositivos íntegros, ningún header/User-Agent/secreto embebido habilita el canal móvil, y una sesión móvil cae al bajar de plan. Un atacante con un dispositivo íntegro real podría automatizar la app oficial (la integridad prueba app + dispositivo, no a la persona). Las funciones exclusivas de la app que se agreguen en el futuro deben exigir `req.user.channel === 'mobile'` para quedar protegidas por este canal.
+
+### 4.20 Pronóstico de ventas supervisado (IA/AS, rama `oscar_2`, 2026-11-07)
+- **Python** en `IA/AS/pronostico_ventas` (pandas + scikit-learn, `requirements.txt` fijado, entorno en `IA/AS/.venv`). Guía completa y comandos de PowerShell probados: `IA/AS/README.md`. `IA/ANS` queda reservado para no supervisado.
+- Pronostica unidades de la **próxima semana completa** (lunes–domingo UTC) por sucursal × producto × talla, un modelo por tienda. `Pipeline` (OneHotEncoder + RandomForest), línea base = promedio 4 semanas, MAE. División **cronológica 80/20 por semanas**. Ventas válidas = `PAID_STATUSES`; devoluciones informadas aparte, no restadas.
+- **API** `src/modules/sales-forecast/` (feature `aiReports`, `VIEW_REPORTS`; entrenar/borrar demo exige `ALL_BRANCHES`): `GET /reports/forecast?source=real|demo`, `POST /reports/forecast/train` (202; 409 si ya corre uno en esa tienda), `DELETE /reports/forecast/demo`. La tienda sale del tenant del request; las rutas `IA/AS/salidas/web/<real|demo>/<tenantId>/` se derivan de él. La API ejecuta Python como proceso hijo (sin shell, sin heredar secretos). Variables opcionales `FORECAST_DIR`, `FORECAST_PYTHON`. Prueba: `test/acceptance/sales-forecast.spec.ts`.
+- **Front:** pestaña "Pronóstico de ventas" en `/admin/reports` (`SalesForecastPanel.tsx`), demo simulada marcada como tal, 4 idiomas (`Reports.forecast`).
+- `IA/AS/datos_demo/`, `IA/AS/salidas/` y `.venv/` están ignorados por git.
 
 ---
 

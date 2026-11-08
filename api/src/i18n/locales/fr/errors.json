@@ -108,5 +108,8 @@
   "OFFLINE_CONFLICT": "Cette donnée a été modifiée sur le serveur pendant que vous étiez hors ligne. Vérifiez les modifications avant de les enregistrer.",
   "OFFLINE_SYNC_EXPECTED_MISSING": "La valeur précédente de {fields} est manquante : impossible de synchroniser sans vérifier qu'elle n'a pas changé.",
   "OFFLINE_ACTION_REQUIRES_CONNECTION": "Cette action nécessite une connexion : {fields}.",
-  "OFFLINE_SYNC_CHANGE_REUSED": "Cette modification appartient à un autre compte ou à un autre élément."
+  "OFFLINE_SYNC_CHANGE_REUSED": "Cette modification appartient à un autre compte ou à un autre élément.",
+  "FORECAST_ALREADY_RUNNING": "Un entraînement de la prévision est déjà en cours pour cette boutique. Attendez qu'il se termine.",
+  "FORECAST_STORE_WIDE_REQUIRED": "Entraîner ou supprimer la prévision nécessite un accès à toutes les succursales.",
+  "FORECAST_UNAVAILABLE": "Le module de prévision (Python) n'est pas installé sur ce serveur."
 }

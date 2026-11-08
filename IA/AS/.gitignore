@@ -1,0 +1,7 @@
+# Entorno, datos y modelos generados: nunca van al repositorio
+.venv/
+__pycache__/
+*.pyc
+datos_demo/
+salidas/
+*.joblib
