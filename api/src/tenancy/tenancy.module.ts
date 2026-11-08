@@ -23,6 +23,8 @@ import { EncryptionService } from '../common/encryption/encryption.service';
     ControlPrismaService,
     TenantPrismaService,
     TenantProvisioningService,
+    // Restauración de plataforma: migra el schema de una tienda que está en la copia pero no en la base
+    TenantMigrationService,
     EncryptionService,
     TenantSecretsService,
     TenantResolutionCache,

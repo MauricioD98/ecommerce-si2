@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import tableStyles from '@/components/modules/admin/admin-table.module.scss';
 import styles from './platform-admin.module.scss';
 import LanguageSwitcher from '@/components/modules/i18n/LanguageSwitcher';
+import PlatformBackupsSection from '@/components/modules/backups/PlatformBackupsSection';
 import { intlLocale } from '@/i18n/config';
 import {
     PlatformApiError,
@@ -471,6 +472,8 @@ export default function PlatformAdminClient() {
                     )}
                 </div>
                 <p className={tableStyles.cellSub}>{t('mrrNote')}</p>
+
+                <PlatformBackupsSection token={token} tenants={tenants} />
             </main>
         </div>
     );

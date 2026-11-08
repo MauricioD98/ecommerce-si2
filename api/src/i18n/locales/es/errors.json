@@ -114,5 +114,20 @@
   "FORECAST_UNAVAILABLE": "El módulo de pronóstico (Python) no está instalado en este servidor.",
   "SEGMENTATION_ALREADY_RUNNING": "Ya hay un entrenamiento de la segmentación en curso para esta tienda. Espera a que termine.",
   "SEGMENTATION_STORE_WIDE_REQUIRED": "La segmentación de clientes resume toda la tienda: requiere alcance sobre todas las sucursales.",
-  "SEGMENTATION_UNAVAILABLE": "El módulo de segmentación de clientes (Python) no está instalado en este servidor."
+  "SEGMENTATION_UNAVAILABLE": "El módulo de segmentación de clientes (Python) no está instalado en este servidor.",
+  "BACKUP_KEY_MISSING": "Las copias de seguridad no están configuradas en este servidor (falta BACKUP_ENCRYPTION_KEYS).",
+  "BACKUP_ALREADY_RUNNING": "Ya hay una operación de respaldo o restauración en curso para esta tienda o para la plataforma. Espera a que termine.",
+  "BACKUP_NOT_FOUND": "No se encontró la copia de seguridad.",
+  "BACKUP_NOT_AVAILABLE": "Esta copia no está disponible para esta operación.",
+  "BACKUP_FILE_MISSING": "El archivo de la copia ya no está en el servidor.",
+  "BACKUP_OWNER_ONLY": "Solo el Super Admin (dueño) de la tienda puede gestionar copias de seguridad.",
+  "BACKUP_WRONG_TENANT": "La copia pertenece a otra tienda o a otro alcance y no se puede usar aquí.",
+  "BACKUP_INTEGRITY_FAILED": "La copia fue alterada, está dañada o no se generó con la clave de este servidor.",
+  "BACKUP_NOT_A_BACKUP": "El archivo no es una copia de seguridad válida.",
+  "BACKUP_UNSUPPORTED_VERSION": "La versión del formato de la copia no es compatible.",
+  "BACKUP_KEY_UNKNOWN": "La copia se cifró con una versión de clave que no está configurada en este servidor.",
+  "BACKUP_CONFIRMATION_MISMATCH": "La confirmación no coincide. Escribe exactamente el texto indicado y marca la casilla.",
+  "BACKUP_FILE_REQUIRED": "Selecciona un archivo de copia (.sfbk).",
+  "BACKUP_FILE_TOO_LARGE": "El archivo supera el tamaño máximo permitido.",
+  "BACKUP_TENANT_NOT_FOUND": "La tienda no existe."
 }

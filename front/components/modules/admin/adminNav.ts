@@ -1,4 +1,4 @@
-import { Bell, Boxes, Building2, ChartColumn, ClipboardList, CreditCard, Landmark, Layers, LucideIcon, Palette, RotateCcw, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
+import { Bell, Boxes, Building2, ChartColumn, ClipboardList, CreditCard, DatabaseBackup, Landmark, Layers, LucideIcon, Palette, RotateCcw, ShieldCheck, Shirt, ShoppingCart, Tags, Users } from "lucide-react";
 import type { Messages } from "next-intl";
 import { Permission, PermissionValue } from "@/utils/permissions";
 import type { PlanFeatures } from "@/providers/StoreInfoProvider";
@@ -46,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
     { href: "/admin/notifications", icon: Bell, permission: Permission.SEND_MARKETING, label: "notifications", planFeature: "campaigns", requiredPlanName: "Pro" },
     { href: "/admin/roles", icon: ShieldCheck, permission: Permission.MANAGE_ROLES, label: "roles" },
     { href: "/admin/suscripcion", icon: CreditCard, permission: Permission.MANAGE_ROLES, label: "subscription", superAdminOnly: true },
+    { href: "/admin/backups", icon: DatabaseBackup, permission: Permission.MANAGE_ROLES, label: "backups", superAdminOnly: true },
     { href: "/admin/settings/payments", icon: Landmark, permission: Permission.MANAGE_PAYMENTS, label: "payments" },
     { href: "/admin/settings/appearance", icon: Palette, permission: Permission.MANAGE_APPEARANCE, label: "appearance", highlight: true },
 ];

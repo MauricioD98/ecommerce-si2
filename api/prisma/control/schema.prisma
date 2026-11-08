@@ -249,3 +249,56 @@ model MobileAppAttestKey {
 
   @@map("mobile_app_attest_keys")
 }
+
+enum BackupJobKind {
+  BACKUP
+  RESTORE
+}
+
+enum BackupScope {
+  TENANT // datos de negocio de una sola tienda (su schema)
+  PLATFORM // plano de control + todas las tiendas
+}
+
+enum BackupJobStatus {
+  PREPARING // generando el respaldo
+  AVAILABLE // respaldo cifrado listo para descargar o restaurar
+  VALIDATING // restauración: verificando y cargando la copia en un schema temporal
+  RESTORING // restauración: aplicando en una única transacción
+  COMPLETED // restauración aplicada
+  FAILED
+}
+
+// Copias de seguridad y restauraciones (src/modules/backups). El archivo cifrado vive en BACKUP_DIR,
+// fuera de la base y del repo; acá van los metadatos. No se respalda ni se reemplaza al restaurar.
+// Índice parcial en la migración: una sola operación activa por lock_key ("tenant:<id>" / "platform").
+model BackupJob {
+  id               String          @id @db.Uuid
+  kind             BackupJobKind
+  scope            BackupScope
+  tenantId         String?         @map("tenant_id") @db.Uuid
+  status           BackupJobStatus
+  // GENERATED | UPLOADED (respaldos)
+  origin           String?
+  // Restauraciones: respaldo que se aplicó
+  sourceBackupId   String?         @map("source_backup_id") @db.Uuid
+  fileName         String?         @map("file_name")
+  sizeBytes        BigInt?         @map("size_bytes")
+  // SHA-256 del archivo cifrado completo
+  sha256           String?
+  backupCreatedAt  DateTime?       @map("backup_created_at")
+  summary          Json?
+  result           Json?
+  errorCode        String?         @map("error_code")
+  errorDetail      String?         @map("error_detail")
+  requestedByType  String          @map("requested_by_type")
+  requestedById    String?         @map("requested_by_id")
+  requestedByEmail String?         @map("requested_by_email")
+  lockKey          String?         @map("lock_key")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  startedAt        DateTime?       @map("started_at")
+  finishedAt       DateTime?       @map("finished_at")
+
+  @@index([scope, tenantId, createdAt])
+  @@map("backup_jobs")
+}

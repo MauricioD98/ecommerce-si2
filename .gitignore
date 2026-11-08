@@ -54,3 +54,7 @@ expo-env.d.ts
 
 # Native
 .kotlin/
+
+# Copias de seguridad (contienen datos privados cifrados): nunca al repo. Ver docs/backups.md
+*.sfbk
+*.sfbk.tmp

@@ -114,5 +114,20 @@
   "FORECAST_UNAVAILABLE": "Le module de prévision (Python) n'est pas installé sur ce serveur.",
   "SEGMENTATION_ALREADY_RUNNING": "Un entraînement de la segmentation est déjà en cours pour cette boutique. Attendez qu'il se termine.",
   "SEGMENTATION_STORE_WIDE_REQUIRED": "La segmentation des clients résume toute la boutique : elle nécessite un accès à toutes les succursales.",
-  "SEGMENTATION_UNAVAILABLE": "Le module de segmentation des clients (Python) n'est pas installé sur ce serveur."
+  "SEGMENTATION_UNAVAILABLE": "Le module de segmentation des clients (Python) n'est pas installé sur ce serveur.",
+  "BACKUP_KEY_MISSING": "Les sauvegardes ne sont pas configurées sur ce serveur (BACKUP_ENCRYPTION_KEYS manquante).",
+  "BACKUP_ALREADY_RUNNING": "Une sauvegarde ou une restauration est déjà en cours pour cette boutique ou pour la plateforme. Attendez qu'elle se termine.",
+  "BACKUP_NOT_FOUND": "Sauvegarde introuvable.",
+  "BACKUP_NOT_AVAILABLE": "Cette sauvegarde n'est pas disponible pour cette opération.",
+  "BACKUP_FILE_MISSING": "Le fichier de la sauvegarde n'est plus sur le serveur.",
+  "BACKUP_OWNER_ONLY": "Seul le Super Admin (propriétaire) de la boutique peut gérer les sauvegardes.",
+  "BACKUP_WRONG_TENANT": "La sauvegarde appartient à une autre boutique ou à une autre portée et ne peut pas être utilisée ici.",
+  "BACKUP_INTEGRITY_FAILED": "La sauvegarde a été modifiée, est endommagée ou n'a pas été créée avec la clé de ce serveur.",
+  "BACKUP_NOT_A_BACKUP": "Le fichier n'est pas une sauvegarde valide.",
+  "BACKUP_UNSUPPORTED_VERSION": "La version du format de la sauvegarde n'est pas prise en charge.",
+  "BACKUP_KEY_UNKNOWN": "La sauvegarde a été chiffrée avec une version de clé qui n'est pas configurée sur ce serveur.",
+  "BACKUP_CONFIRMATION_MISMATCH": "La confirmation ne correspond pas. Saisissez exactement le texte indiqué et cochez la case.",
+  "BACKUP_FILE_REQUIRED": "Sélectionnez un fichier de sauvegarde (.sfbk).",
+  "BACKUP_FILE_TOO_LARGE": "Le fichier dépasse la taille maximale autorisée.",
+  "BACKUP_TENANT_NOT_FOUND": "La boutique n'existe pas."
 }

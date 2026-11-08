@@ -51,5 +51,10 @@ export const ACCEPTANCE_ENV: Record<string, string> = {
   APP_ATTEST_APP_ID: '',
   APP_ATTEST_ROOT_CA_PEM: '',
   APP_ATTEST_ALLOW_DEVELOPMENT: 'false',
+  // Respaldos: clave fija SOLO de pruebas y carpeta temporal propia de la corrida (nunca la de la demo)
+  BACKUP_ENCRYPTION_KEYS: `1:${Buffer.alloc(32, 7).toString('base64')}`,
+  BACKUP_ACTIVE_KEY_VERSION: '',
+  BACKUP_DIR: require('node:path').join(require('node:os').tmpdir(), `stella-acceptance-backups-${process.pid}`),
+  BACKUP_MAX_BYTES: '',
 };
 for (const [key, value] of Object.entries(ACCEPTANCE_ENV)) process.env[key] = value;

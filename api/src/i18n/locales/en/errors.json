@@ -114,5 +114,20 @@
   "FORECAST_UNAVAILABLE": "The forecast module (Python) is not installed on this server.",
   "SEGMENTATION_ALREADY_RUNNING": "A customer segmentation training is already running for this store. Wait for it to finish.",
   "SEGMENTATION_STORE_WIDE_REQUIRED": "Customer segmentation summarizes the whole store: it requires access to all branches.",
-  "SEGMENTATION_UNAVAILABLE": "The customer segmentation module (Python) is not installed on this server."
+  "SEGMENTATION_UNAVAILABLE": "The customer segmentation module (Python) is not installed on this server.",
+  "BACKUP_KEY_MISSING": "Backups are not configured on this server (BACKUP_ENCRYPTION_KEYS is missing).",
+  "BACKUP_ALREADY_RUNNING": "A backup or restore operation is already running for this store or for the platform. Wait for it to finish.",
+  "BACKUP_NOT_FOUND": "Backup not found.",
+  "BACKUP_NOT_AVAILABLE": "This backup is not available for this operation.",
+  "BACKUP_FILE_MISSING": "The backup file is no longer on the server.",
+  "BACKUP_OWNER_ONLY": "Only the store Super Admin (owner) can manage backups.",
+  "BACKUP_WRONG_TENANT": "The backup belongs to another store or scope and cannot be used here.",
+  "BACKUP_INTEGRITY_FAILED": "The backup was modified, is damaged or was not created with this server's key.",
+  "BACKUP_NOT_A_BACKUP": "The file is not a valid backup.",
+  "BACKUP_UNSUPPORTED_VERSION": "The backup format version is not supported.",
+  "BACKUP_KEY_UNKNOWN": "The backup was encrypted with a key version that is not configured on this server.",
+  "BACKUP_CONFIRMATION_MISMATCH": "The confirmation does not match. Type exactly the text shown and tick the checkbox.",
+  "BACKUP_FILE_REQUIRED": "Select a backup file (.sfbk).",
+  "BACKUP_FILE_TOO_LARGE": "The file exceeds the maximum allowed size.",
+  "BACKUP_TENANT_NOT_FOUND": "The store does not exist."
 }

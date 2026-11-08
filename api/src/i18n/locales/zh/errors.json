@@ -110,5 +110,20 @@
   "FORECAST_UNAVAILABLE": "此服务器未安装预测模块（Python）。",
   "SEGMENTATION_ALREADY_RUNNING": "该店铺已有一个客户分群训练正在进行，请等待其完成。",
   "SEGMENTATION_STORE_WIDE_REQUIRED": "客户分群汇总整个店铺的数据：需要拥有所有门店的权限。",
-  "SEGMENTATION_UNAVAILABLE": "此服务器未安装客户分群模块（Python）。"
+  "SEGMENTATION_UNAVAILABLE": "此服务器未安装客户分群模块（Python）。",
+  "BACKUP_KEY_MISSING": "此服务器未配置备份（缺少 BACKUP_ENCRYPTION_KEYS）。",
+  "BACKUP_ALREADY_RUNNING": "该店铺或平台已有备份或恢复操作正在进行，请等待其完成。",
+  "BACKUP_NOT_FOUND": "未找到备份。",
+  "BACKUP_NOT_AVAILABLE": "此备份不可用于该操作。",
+  "BACKUP_FILE_MISSING": "备份文件已不在服务器上。",
+  "BACKUP_OWNER_ONLY": "只有店铺的超级管理员（店主）可以管理备份。",
+  "BACKUP_WRONG_TENANT": "该备份属于其他店铺或范围，不能在此使用。",
+  "BACKUP_INTEGRITY_FAILED": "备份已被修改、已损坏，或不是用此服务器的密钥生成的。",
+  "BACKUP_NOT_A_BACKUP": "该文件不是有效的备份。",
+  "BACKUP_UNSUPPORTED_VERSION": "不支持该备份的格式版本。",
+  "BACKUP_KEY_UNKNOWN": "备份使用的密钥版本未在此服务器上配置。",
+  "BACKUP_CONFIRMATION_MISMATCH": "确认内容不匹配。请准确输入所示文字并勾选复选框。",
+  "BACKUP_FILE_REQUIRED": "请选择一个备份文件（.sfbk）。",
+  "BACKUP_FILE_TOO_LARGE": "文件超过允许的最大大小。",
+  "BACKUP_TENANT_NOT_FOUND": "店铺不存在。"
 }

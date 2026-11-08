@@ -31,6 +31,11 @@ export class TenantResolutionCache {
         this.entries.set(key, { ctx, at: Date.now() });
     }
 
+    /** Olvida todo (restauración de plataforma: pudieron cambiar estado, plan o dominio de cualquier tienda). */
+    clear(): void {
+        this.entries.clear();
+    }
+
     /** Olvida todo lo resuelto para esa tienda (por id y por slug). */
     invalidate(tenantId: string, slug?: string): void {
         this.entries.delete(`id:${tenantId}`);
