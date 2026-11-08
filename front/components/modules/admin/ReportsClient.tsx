@@ -7,10 +7,11 @@ import { useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import GeneralMetrics from './GeneralMetrics';
 import DynamicReportPanel from './DynamicReportPanel';
+import SalesForecastPanel from './SalesForecastPanel';
 import { useStorePlan } from '@/providers/StoreInfoProvider';
 import { useAdminRole } from '@/hooks/useAdminAccess';
 
-type Tab = 'metrics' | 'ai';
+type Tab = 'metrics' | 'ai' | 'forecast';
 
 export default function ReportsClient() {
     const [tab, setTab] = useState<Tab>('metrics');
@@ -55,10 +56,33 @@ export default function ReportsClient() {
                         </span>
                     )}
                 </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === 'forecast'}
+                    className={`${styles.tab} ${tab === 'forecast' ? styles.tabActive : ''}`}
+                    onClick={() => setTab('forecast')}
+                >
+                    {t('tabForecast')}
+                    {!features.aiReports && (
+                        <span className={`${styles.badge} ${styles.badgeMuted}`} style={{ marginLeft: '0.5rem' }}>
+                            Plan Pro
+                        </span>
+                    )}
+                </button>
             </div>
 
             {tab === 'metrics' ? (
                 <GeneralMetrics />
+            ) : tab === 'forecast' ? (
+                features.aiReports ? (
+                    <SalesForecastPanel />
+                ) : (
+                    <div className={`${styles.tableCard} ${styles.emptyState}`}>
+                        <Lock size={22} style={{ margin: '0 auto 0.5rem', opacity: 0.7 }} />
+                        <p>{t('forecast.planLocked')}</p>
+                    </div>
+                )
             ) : features.aiReports ? (
                 <DynamicReportPanel />
             ) : (

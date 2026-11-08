@@ -20,6 +20,7 @@ import { CollectionsModule } from './modules/collections/collections.module';
 import { ProductsModule } from './modules/products/products.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { OfflineSyncModule } from './modules/offline-sync/offline-sync.module';
+import { SalesForecastModule } from './modules/sales-forecast/sales-forecast.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -62,7 +63,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     }),
     // Habilita @Cron(...) en toda la app (usado por CartCleanupService para liberar carritos abandonados)
     ScheduleModule.forRoot(),
-    TenancyModule, PlatformModule, PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule, ChatbotModule, TryOnModule, StoreModule, AppearanceModule, AnalyticsModule, OfflineSyncModule],
+    TenancyModule, PlatformModule, PrismaModule, AuthModule, UsersModule, CategoryModule, CollectionsModule, ProductsModule, OrdersModule, PaymentsModule, CartModule, BranchesModule, RolesModule, MailModule, MarketingModule, ReportsModule, NotificationsModule, PosModule, ReturnsModule, ChatbotModule, TryOnModule, StoreModule, AppearanceModule, AnalyticsModule, OfflineSyncModule, SalesForecastModule],
   controllers: [AppController],
   providers: [AppService, { provide: APP_FILTER, useClass: I18nExceptionFilter }],
 })

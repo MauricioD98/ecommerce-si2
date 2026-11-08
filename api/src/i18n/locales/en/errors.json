@@ -108,5 +108,8 @@
   "OFFLINE_CONFLICT": "This data changed on the server while you were offline. Review the changes before saving them.",
   "OFFLINE_SYNC_EXPECTED_MISSING": "The previous value of {fields} is missing: it cannot be synced without checking that it did not change.",
   "OFFLINE_ACTION_REQUIRES_CONNECTION": "This action requires a connection: {fields}.",
-  "OFFLINE_SYNC_CHANGE_REUSED": "This change belongs to another account or another item."
+  "OFFLINE_SYNC_CHANGE_REUSED": "This change belongs to another account or another item.",
+  "FORECAST_ALREADY_RUNNING": "A forecast training is already running for this store. Wait for it to finish.",
+  "FORECAST_STORE_WIDE_REQUIRED": "Training or deleting the forecast requires access to all branches.",
+  "FORECAST_UNAVAILABLE": "The forecast module (Python) is not installed on this server."
 }
