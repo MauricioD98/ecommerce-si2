@@ -799,6 +799,7 @@
     },
     "openDashboard": "交互式仪表板",
     "tabForecast": "销售预测",
+    "tabSegments": "客户分群",
     "forecast": {
       "title": "下周销售预测",
       "subtitle": "监督学习模型（随机森林），仅使用本店历史数据训练，按时间顺序划分 80% 训练 / 20% 测试。",
@@ -874,6 +875,116 @@
       "aboutText": "此估计基于过往销售。结果可能因商品库存情况而有所不同。退货不会从销量中扣除。",
       "howTitle": "如何计算？",
       "howText": "模型按周、门店、商品和尺码分析已付款的销售。目前不包括价格、促销或库存的历史记录。"
+    },
+    "segments": {
+      "title": "客户分群",
+      "subtitle": "根据本店的最近购买时间、购买频率和消费金额（RFM），用 K-Means 发现购买习惯相似的客户群体。",
+      "planLocked": "客户分群功能包含在 Pro 套餐中。",
+      "sourceLabel": "数据来源",
+      "sourceReal": "真实购买",
+      "sourceDemo": "演示数据",
+      "simulatedBanner": "演示数据：虚构的客户和购买记录。这些群体只用于展示分析流程，并不代表你的客户。",
+      "realBanner": "本店的真实购买（期间内已付款的订单，不含待处理和已取消订单）。",
+      "train": "分析真实购买",
+      "trainDemo": "生成演示并分析",
+      "retrain": "重新分析",
+      "refresh": "刷新",
+      "deleteDemo": "删除演示",
+      "deleteDemoConfirm": "删除本店的演示数据吗？真实购买数据不会受影响。",
+      "loading": "加载中…",
+      "loadFailed": "无法加载客户分群。",
+      "status": {
+        "sin_entrenar": "未分析",
+        "entrenando": "分析中…",
+        "listo": "已完成",
+        "datos_insuficientes": "数据不足",
+        "error": "错误"
+      },
+      "hint": {
+        "sin_entrenar": "尚无分析结果。点击按钮创建：查看此页面不会重新计算。",
+        "entrenando": "正在分析客户… 页面会自动刷新。"
+      },
+      "errors": {
+        "python_no_disponible": "服务器上没有可用的分析模块（Python）。",
+        "interrumpido": "分析被中断（API 已重启）。请重新运行。",
+        "entrada_invalida": "数据格式无效（例如金额使用了不同币种）。",
+        "fallo_entrenamiento": "分析失败。请查看 API 日志。"
+      },
+      "insufficientTitle": "数据不足",
+      "insufficient": {
+        "pocos_clientes": "期间内有购买的客户为 {eligible} 位；此分析至少需要 {min} 位。",
+        "poca_diversidad": "客户之间过于相似（{points} 种不同组合；至少需要 {minPoints} 种）。",
+        "sin_k_valido": "在这些数据上，任何群组数量都无法得到不同的群组。"
+      },
+      "period": "分析期间",
+      "periodHint": "{days} 天 · 时区 {tz}",
+      "customers": "已分析客户",
+      "customersHint": "共 {total} 位客户 · {noValid} 位无有效购买 · {noPeriod} 位在期间内无购买",
+      "origin": "来源",
+      "originDemo": "演示数据",
+      "originReal": "真实购买",
+      "cutoff": "截止时间：{date}",
+      "trainedAt": "分析时间",
+      "modelVersion": "版本",
+      "noAutoUpdate": "不会自动更新",
+      "groupsTitle": "找到 {k} 个群组",
+      "groupsHelp": "每个群组包含习惯相似的客户。编号由每次分析分配，重新分析时可能改变。",
+      "group": "群组 {n}",
+      "groupCount": "{count} 位客户（{pct} %）",
+      "compare": {
+        "recencia_dias": {
+          "menor": "比大多数客户最近购买",
+          "similar": "最近一次购买时间与大多数相近",
+          "mayor": "较长时间没有购买"
+        },
+        "frecuencia": {
+          "menor": "购买频率较低",
+          "similar": "购买频率与大多数相近",
+          "mayor": "购买频率较高"
+        },
+        "monto": {
+          "menor": "消费较少",
+          "similar": "消费与大多数相近",
+          "mayor": "消费较多"
+        }
+      },
+      "variable": {
+        "recencia_dias": "最近购买",
+        "frecuencia": "订单数",
+        "monto": "金额"
+      },
+      "daysValue": "{n} 天前",
+      "ordersValue": "{n} 个订单",
+      "medianHelp": "群组的典型值：中位数，括号内为中间 50 % 的范围。“大多数”= 全店的中位数。",
+      "evaluationTitle": "训练与评估（80/20）",
+      "split": "{total} 位客户：{train} 位用于训练（80 %），{test} 位用于评估（20 %），按种子 {seed} 随机划分。仅使用训练集选定了 {k} 个群组。",
+      "colSet": "数据集",
+      "colCustomers": "客户",
+      "colGroups": "有客户的群组",
+      "colInertia": "平均惯性",
+      "setTrain": "训练（80 %）",
+      "setTest": "评估（20 %）",
+      "notAvailable": "不可用",
+      "metricsHelp": "轮廓系数（-1 到 1，越高越好）和 Davies-Bouldin 指数（越低越好）衡量群组的紧凑和分离程度。它们仅供参考：不是准确率，也不保证未来行为。",
+      "warnings": {
+        "corte_anterior_extraccion": "截止时间早于数据提取时间：使用的是订单的当前状态。",
+        "k_maximo": "选定了 {k} 个群组，即测试的最大值：其他设置可能得到不同数量。",
+        "separacion_debil": "群组之间的分离较弱（轮廓系数低于 {threshold}）。",
+        "evaluacion_un_grupo": "评估时所有客户都落入同一个群组。",
+        "grupos_vacios": "{n} 个群组没有客户。"
+      },
+      "aboutTitle": "本部分展示的内容",
+      "aboutText": "它描述购买历史中观察到的群组。它不预测客户是否会停止购买，也不会发送消息、折扣或营销活动。",
+      "howTitle": "如何计算？",
+      "how": {
+        "rfm": "每位客户：从最后一次有效购买到截止时间的天数（最近度）、期间内的有效订单数（频率）及其金额总和（金额）。合并所有门店的购买。",
+        "valid": "计入已付款订单（处理中、已发货或已送达）。待处理和已取消的订单不计入。没有注册客户的收银台销售不归属于任何人。",
+        "amount": "金额为订单总额（含运费和折扣）。退货单独列出，不予扣除。",
+        "split": "在任何拟合之前将客户按 80 % / 20 % 划分；变换、标准化和 K-Means 只用 80 % 拟合，然后应用到 20 %。",
+        "model": "分组前先做 log(1 + x) 变换和标准化，使天数、订单数和金额的权重相近，极端金额不会主导结果。",
+        "limits": "不使用姓名、邮箱、电话或支付数据。由于没有订单状态历史，使用的是当前状态。",
+        "dataQuality": "数据质量：读取 {rows} 行订单，丢弃 {duplicates} 行重复，{excluded} 行因数据无效被排除，{pending} 个待处理，{cancelled} 个已取消；{returns} 个订单有退货。"
+      }
     }
   },
   "AdminErrors": {

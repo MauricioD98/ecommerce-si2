@@ -81,7 +81,7 @@ ecommerce-si2/
 ├── api/                    ← NestJS 12 + Prisma 7 (proyecto autónomo, usa npm; package-lock.json)
 ├── app_movil/              ← Expo ~58 / React Native 0.88 (cliente móvil independiente de la misma API)
 ├── docs/checkout-resiliente.md ← operación y políticas del checkout resistente a fallos (§4.10)
-└── IA/                     ← AS/ = pronóstico de ventas supervisado (Python, §4.20) · ANS/ = reservado (no supervisado)
+└── IA/                     ← AS/ = pronóstico de ventas supervisado (Python, §4.20) · ANS/ = segmentación de clientes no supervisada (Python, §4.21)
 ```
 
 ### 2.1 Avisos importantes por carpeta (archivos `AGENTS.md` reales del repo)
@@ -405,7 +405,7 @@ Modelo `DashboardLayout` (tabla `dashboard_layouts`, uno por usuario, `widgetsCo
 - **platform** (sin tienda): `POST /platform/auth/login`, **`POST /platform/auth/tenant-login`** (login en la tienda elegida, `tenantId` obligatorio, §4.1), `GET /platform/auth/me` (Bearer de plataforma); **`GET /platform/tenants/public`** (directorio público de tiendas activas: id, slug, nombre, plan, `mobileApp`); `POST /platform/contact`; `POST /platform/subscriptions/checkout`, `GET /platform/subscriptions/checkout/:sessionId/status`; `GET /platform/tenants/resolve/:slug` (ahora acepta **UUID, slug o nombre** de la tienda; con `x-client-platform: mobile` responde 403 si el plan no incluye app móvil); `GET /platform/tenants/by-domain` (`x-internal-key`; 404 si el plan no incluye dominio propio); con sesión de administrador de plataforma o `x-platform-key`: `GET|POST /platform/tenants`, `GET /platform/tenants/metrics`, `PATCH /platform/tenants/:id/status|domain`, `POST /platform/tenants/:id/retry`, `PUT /platform/tenants/:id/integrations/decart|web-push`, `POST .../web-push/generate`, `DELETE .../integrations/:provider`, `POST /platform/subscriptions/signups/:id/retry`
 - **pos:** `GET /pos/products`, `POST /pos/checkout` · **returns:** `GET /returns/search-order`, `POST /returns/process`, `GET /returns`, `GET /returns/:id`
 - **notifications:** `GET /notifications/vapid-public-key`, `POST /notifications/subscribe` · **chatbot:** `GET /chatbot/products`
-- **marketing:** `POST /marketing/send-campaign` · **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic`, pronóstico `GET /reports/forecast`, `POST /reports/forecast/train`, `DELETE /reports/forecast/demo` (§4.20)
+- **marketing:** `POST /marketing/send-campaign` · **reports:** `GET /reports/sales-overview|top-products`, `POST /reports/dynamic`, pronóstico `GET /reports/forecast`, `POST /reports/forecast/train`, `DELETE /reports/forecast/demo` (§4.20), segmentación `GET /reports/segments`, `POST /reports/segments/train`, `DELETE /reports/segments/demo` (§4.21)
 
 ### 4.16 Internacionalización (es, en, fr, zh)
 - **API:** `nestjs-i18n`; el idioma sale de `?lang=` → header `x-lang` → `Accept-Language` → español. Las excepciones llevan una **clave** (`i18nMessage('errors.PRODUCT_NOT_FOUND', args)`) que `I18nExceptionFilter` traduce; los mensajes libres viejos pasan tal cual. Diccionarios en `api/src/i18n/locales/<idioma>/{errors,validation}.json` (`nest-cli.json` los copia a `dist`).
@@ -477,6 +477,13 @@ Reemplaza al bloqueo que dependía solo de `x-client-platform: mobile`. Código:
 - **API** `src/modules/sales-forecast/` (feature `aiReports`, `VIEW_REPORTS`; entrenar/borrar demo exige `ALL_BRANCHES`): `GET /reports/forecast?source=real|demo`, `POST /reports/forecast/train` (202; 409 si ya corre uno en esa tienda), `DELETE /reports/forecast/demo`. La tienda sale del tenant del request; las rutas `IA/AS/salidas/web/<real|demo>/<tenantId>/` se derivan de él. La API ejecuta Python como proceso hijo (sin shell, sin heredar secretos). Variables opcionales `FORECAST_DIR`, `FORECAST_PYTHON`. Prueba: `test/acceptance/sales-forecast.spec.ts`.
 - **Front:** pestaña "Pronóstico de ventas" en `/admin/reports` (`SalesForecastPanel.tsx`), demo simulada marcada como tal, 4 idiomas (`Reports.forecast`).
 - `IA/AS/datos_demo/`, `IA/AS/salidas/` y `.venv/` están ignorados por git.
+
+### 4.21 Segmentación de clientes no supervisada (IA/ANS, rama `oscar_2`, 2026-11-07)
+- **Python** en `IA/ANS/segmentacion_clientes` (mismas versiones que IA/AS, entorno propio `IA/ANS/.venv`). Guía y comandos de PowerShell probados: `IA/ANS/README.md`.
+- RFM por cliente y tienda (recencia, frecuencia, monto bruto `orders.totalAmount` en la moneda de cobro), periodo `[corte − 365 d, corte)` UTC, compras válidas = `PAID_STATUSES`; `Pipeline` log1p + `StandardScaler` + `KMeans`, k elegido por silhouette solo con el 80 %. **División 80/20 por cliente** (`floor(n*8/10)`), métricas silhouette/Davies-Bouldin/inercia por conjunto. Mínimo de esta implementación: 30 clientes elegibles.
+- **API** `src/modules/customer-segmentation/` (feature `aiReports`, `VIEW_REPORTS` **+ `ALL_BRANCHES` también para consultar**, porque agrega todas las sucursales): rutas `IA/ANS/salidas/web/<real|demo>/<tenantId>/` derivadas del tenant; extracción de solo lectura con ids seudónimos (SHA-256), sin datos personales y sin el cliente genérico del POS (`WALK_IN_CUSTOMER_EMAIL`, ahora exportado de `pos.service.ts`). Variables opcionales `SEGMENTATION_DIR`, `SEGMENTATION_PYTHON`. Prueba: `test/acceptance/customer-segmentation.spec.ts`.
+- **Front:** pestaña "Segmentación de clientes" en `/admin/reports` (`CustomerSegmentationPanel.tsx`), demo con leyenda "Datos de demostración", 4 idiomas (`Reports.segments`).
+- `IA/ANS/datos_demo/`, `IA/ANS/salidas/` y `.venv/` están ignorados por git (`IA/ANS/.gitignore`).
 
 ---
 

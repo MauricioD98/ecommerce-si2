@@ -799,6 +799,7 @@
     },
     "openDashboard": "Tableau de bord interactif",
     "tabForecast": "Prévision des ventes",
+    "tabSegments": "Segmentation des clients",
     "forecast": {
       "title": "Prévision des ventes de la semaine prochaine",
       "subtitle": "Modèle supervisé (forêt aléatoire) entraîné uniquement sur l’historique de cette boutique, avec un découpage chronologique 80 % entraînement / 20 % test.",
@@ -874,6 +875,116 @@
       "aboutText": "Cette estimation repose sur les ventes passées. Les résultats peuvent varier selon la disponibilité des produits. Les retours ne sont pas déduits des ventes.",
       "howTitle": "Comment est-elle calculée ?",
       "howText": "Le modèle analyse les ventes payées par semaine, succursale, produit et taille. Pour l’instant, il n’inclut pas l’historique des prix, des promotions ni de la disponibilité."
+    },
+    "segments": {
+      "title": "Segmentation des clients",
+      "subtitle": "Groupes de clients aux habitudes d'achat similaires, découverts avec K-Means à partir de la récence, de la fréquence et du montant (RFM) de cette boutique.",
+      "planLocked": "La segmentation des clients est disponible avec le plan Pro.",
+      "sourceLabel": "Source des données",
+      "sourceReal": "Achats réels",
+      "sourceDemo": "Données de démonstration",
+      "simulatedBanner": "Données de démonstration : clients et achats fictifs. Les groupes montrent seulement le fonctionnement de l'analyse ; ils ne décrivent pas vos clients.",
+      "realBanner": "Achats réels de cette boutique (commandes payées de la période ; sans commandes en attente ni annulées).",
+      "train": "Analyser les achats réels",
+      "trainDemo": "Générer la démo et analyser",
+      "retrain": "Analyser à nouveau",
+      "refresh": "Actualiser",
+      "deleteDemo": "Supprimer la démo",
+      "deleteDemoConfirm": "Supprimer les données de démonstration de cette boutique ? Les achats réels ne sont pas touchés.",
+      "loading": "Chargement…",
+      "loadFailed": "Impossible de charger la segmentation.",
+      "status": {
+        "sin_entrenar": "Non analysé",
+        "entrenando": "Analyse en cours…",
+        "listo": "Prêt",
+        "datos_insuficientes": "Données insuffisantes",
+        "error": "Erreur"
+      },
+      "hint": {
+        "sin_entrenar": "Il n'y a pas encore d'analyse. Appuyez sur le bouton pour la créer : consulter cette page ne la recalcule jamais.",
+        "entrenando": "Analyse des clients… l'affichage se met à jour tout seul."
+      },
+      "errors": {
+        "python_no_disponible": "Le module d'analyse (Python) n'est pas disponible sur le serveur.",
+        "interrumpido": "L'analyse a été interrompue (l'API a redémarré). Relancez-la.",
+        "entrada_invalida": "Les données n'ont pas un format valide (par exemple, des montants dans des devises différentes).",
+        "fallo_entrenamiento": "L'analyse a échoué. Consultez les journaux de l'API."
+      },
+      "insufficientTitle": "Données insuffisantes",
+      "insufficient": {
+        "pocos_clientes": "Il y a {eligible} clients avec des achats sur la période ; cette analyse en nécessite au moins {min}.",
+        "poca_diversidad": "Les clients se ressemblent trop ({points} combinaisons distinctes ; {minPoints} sont nécessaires).",
+        "sin_k_valido": "Aucun nombre de groupes n'a produit des groupes distincts avec ces données."
+      },
+      "period": "Période analysée",
+      "periodHint": "{days} jours · fuseau horaire {tz}",
+      "customers": "Clients analysés",
+      "customersHint": "{total} clients au total · {noValid} sans achat valide · {noPeriod} sans achat sur la période",
+      "origin": "Source",
+      "originDemo": "Données de démonstration",
+      "originReal": "Achats réels",
+      "cutoff": "Date limite : {date}",
+      "trainedAt": "Analysé le",
+      "modelVersion": "Version",
+      "noAutoUpdate": "pas de mise à jour automatique",
+      "groupsTitle": "{k} groupes trouvés",
+      "groupsHelp": "Chaque groupe réunit des clients aux habitudes similaires. La numérotation est attribuée par chaque analyse et peut changer en la répétant.",
+      "group": "Groupe {n}",
+      "groupCount": "{count} clients ({pct} %)",
+      "compare": {
+        "recencia_dias": {
+          "menor": "Ont acheté plus récemment que la plupart",
+          "similar": "Dernier achat à une date semblable à la plupart",
+          "mayor": "N'ont pas acheté depuis plus longtemps"
+        },
+        "frecuencia": {
+          "menor": "Achètent moins souvent",
+          "similar": "Achètent aussi souvent que la plupart",
+          "mayor": "Achètent plus souvent"
+        },
+        "monto": {
+          "menor": "Dépensent moins",
+          "similar": "Dépensent autant que la plupart",
+          "mayor": "Dépensent plus"
+        }
+      },
+      "variable": {
+        "recencia_dias": "Dernier achat",
+        "frecuencia": "Commandes",
+        "monto": "Montant"
+      },
+      "daysValue": "{n, plural, one {il y a # jour} other {il y a # jours}}",
+      "ordersValue": "{n, plural, one {# commande} other {# commandes}}",
+      "medianHelp": "Valeurs typiques du groupe : médiane et, entre parenthèses, la plage des 50 % centraux. « La plupart » = médiane de toute la boutique.",
+      "evaluationTitle": "Entraînement et évaluation (80/20)",
+      "split": "{total} clients : {train} pour l'entraînement (80 %) et {test} pour l'évaluation (20 %), choisis au hasard avec la graine {seed}. {k} groupes ont été choisis avec l'entraînement uniquement.",
+      "colSet": "Ensemble",
+      "colCustomers": "Clients",
+      "colGroups": "Groupes avec clients",
+      "colInertia": "Inertie moyenne",
+      "setTrain": "Entraînement (80 %)",
+      "setTest": "Évaluation (20 %)",
+      "notAvailable": "Non disponible",
+      "metricsHelp": "Silhouette (de -1 à 1, plus haut est mieux) et Davies-Bouldin (plus bas est mieux) mesurent la compacité et la séparation des groupes. Elles sont indicatives : ce ne sont pas un pourcentage de précision et elles ne garantissent pas les comportements futurs.",
+      "warnings": {
+        "corte_anterior_extraccion": "La date limite est antérieure à l'extraction : l'état actuel des commandes a été utilisé.",
+        "k_maximo": "{k} groupes ont été choisis, le maximum testé : un autre réglage pourrait donner un nombre différent.",
+        "separacion_debil": "Séparation faible entre les groupes (silhouette inférieure à {threshold}).",
+        "evaluacion_un_grupo": "Lors de l'évaluation, tous les clients sont tombés dans un seul groupe.",
+        "grupos_vacios": "{n} groupe(s) sans clients."
+      },
+      "aboutTitle": "Ce que montre cette section",
+      "aboutText": "Elle décrit des groupes observés dans l'historique d'achats. Elle ne prédit pas si un client cessera d'acheter et n'envoie ni messages, ni remises, ni campagnes.",
+      "howTitle": "Comment est-ce calculé ?",
+      "how": {
+        "rfm": "Par client : jours entre son dernier achat valide et la date limite (récence), commandes valides de la période (fréquence) et somme de leurs montants (montant). Les achats de toutes les succursales sont regroupés.",
+        "valid": "Les commandes payées comptent (en traitement, expédiées ou livrées). Celles en attente ou annulées ne comptent pas. Les ventes en caisse sans client enregistré ne sont attribuées à personne.",
+        "amount": "Le montant est le total brut de la commande (livraison et remises incluses). Les retours sont indiqués à part et ne sont pas soustraits.",
+        "split": "Les clients sont répartis 80 % / 20 % avant tout ajustement ; la transformation, la normalisation et K-Means sont ajustés uniquement sur les 80 % puis appliqués aux 20 %.",
+        "model": "Avant le regroupement, on applique log(1 + x) et une normalisation standard pour que jours, commandes et argent pèsent de façon comparable et que les montants extrêmes ne dominent pas.",
+        "limits": "Aucun nom, e-mail, téléphone ni donnée de paiement n'est utilisé. Sans historique des états de commande, l'état actuel est utilisé.",
+        "dataQuality": "Qualité des données : {rows} lignes de commandes lues, {duplicates} doublons écartés, {excluded} exclues pour données invalides, {pending} en attente, {cancelled} annulées ; {returns} commandes avec retours."
+      }
     }
   },
   "AdminErrors": {

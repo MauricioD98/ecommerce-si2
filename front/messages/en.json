@@ -808,6 +808,7 @@
     },
     "openDashboard": "Interactive dashboard",
     "tabForecast": "Sales forecast",
+    "tabSegments": "Customer segmentation",
     "forecast": {
       "title": "Next week sales forecast",
       "subtitle": "Supervised model (random forest) trained only on this store’s history, with a chronological 80% training / 20% test split.",
@@ -883,6 +884,116 @@
       "aboutText": "This estimate is based on past sales. Results may vary depending on product availability. Returns are not deducted from sales.",
       "howTitle": "How is it calculated?",
       "howText": "The model analyzes paid sales by week, branch, product and size. For now, it does not include price, promotion or availability history."
+    },
+    "segments": {
+      "title": "Customer segmentation",
+      "subtitle": "Groups of customers with similar buying habits, discovered with K-Means from this store's recency, frequency and monetary value (RFM).",
+      "planLocked": "Customer segmentation is available on the Pro plan.",
+      "sourceLabel": "Data source",
+      "sourceReal": "Real purchases",
+      "sourceDemo": "Demo data",
+      "simulatedBanner": "Demo data: fictitious customers and purchases. The groups only show how the analysis works; they do not describe your customers.",
+      "realBanner": "This store's real purchases (paid orders in the period; no pending or cancelled orders).",
+      "train": "Analyze real purchases",
+      "trainDemo": "Generate demo and analyze",
+      "retrain": "Analyze again",
+      "refresh": "Refresh",
+      "deleteDemo": "Delete demo",
+      "deleteDemoConfirm": "Delete this store's demo data? Real purchases are not touched.",
+      "loading": "Loading…",
+      "loadFailed": "Could not load the segmentation.",
+      "status": {
+        "sin_entrenar": "Not analyzed",
+        "entrenando": "Analyzing…",
+        "listo": "Ready",
+        "datos_insuficientes": "Insufficient data",
+        "error": "Error"
+      },
+      "hint": {
+        "sin_entrenar": "There is no analysis yet. Press the button to create one: viewing this page never recalculates it.",
+        "entrenando": "Analyzing customers… this view refreshes by itself."
+      },
+      "errors": {
+        "python_no_disponible": "The analysis module (Python) is not available on the server.",
+        "interrumpido": "The analysis was interrupted (the API restarted). Run it again.",
+        "entrada_invalida": "The data has an invalid format (for example, amounts in different currencies).",
+        "fallo_entrenamiento": "The analysis failed. Check the API logs."
+      },
+      "insufficientTitle": "Insufficient data",
+      "insufficient": {
+        "pocos_clientes": "There are {eligible} customers with purchases in the period; this analysis needs at least {min}.",
+        "poca_diversidad": "Customers are too similar to each other ({points} distinct combinations; {minPoints} are needed).",
+        "sin_k_valido": "No number of groups produced distinct groups with this data."
+      },
+      "period": "Analyzed period",
+      "periodHint": "{days} days · time zone {tz}",
+      "customers": "Customers analyzed",
+      "customersHint": "{total} customers in total · {noValid} without valid purchases · {noPeriod} without purchases in the period",
+      "origin": "Source",
+      "originDemo": "Demo data",
+      "originReal": "Real purchases",
+      "cutoff": "Cutoff: {date}",
+      "trainedAt": "Analyzed on",
+      "modelVersion": "Version",
+      "noAutoUpdate": "does not update automatically",
+      "groupsTitle": "{k} groups found",
+      "groupsHelp": "Each group gathers customers with similar habits. Each analysis assigns the numbering, which may change when it is repeated.",
+      "group": "Group {n}",
+      "groupCount": "{count} customers ({pct} %)",
+      "compare": {
+        "recencia_dias": {
+          "menor": "Bought more recently than most",
+          "similar": "Last purchase at a similar time to most",
+          "mayor": "Have gone longer without buying"
+        },
+        "frecuencia": {
+          "menor": "Buy less often",
+          "similar": "Buy about as often as most",
+          "mayor": "Buy more often"
+        },
+        "monto": {
+          "menor": "Spend less",
+          "similar": "Spend about as much as most",
+          "mayor": "Spend more"
+        }
+      },
+      "variable": {
+        "recencia_dias": "Last purchase",
+        "frecuencia": "Orders",
+        "monto": "Amount"
+      },
+      "daysValue": "{n, plural, one {# day ago} other {# days ago}}",
+      "ordersValue": "{n, plural, one {# order} other {# orders}}",
+      "medianHelp": "Typical values of the group: median and, in parentheses, the middle 50 % range. \"Most\" = median of the whole store.",
+      "evaluationTitle": "Training and evaluation (80/20)",
+      "split": "{total} customers: {train} for training (80 %) and {test} for evaluation (20 %), picked at random with seed {seed}. {k} groups were chosen using only the training set.",
+      "colSet": "Set",
+      "colCustomers": "Customers",
+      "colGroups": "Groups with customers",
+      "colInertia": "Mean inertia",
+      "setTrain": "Training (80 %)",
+      "setTest": "Evaluation (20 %)",
+      "notAvailable": "Not available",
+      "metricsHelp": "Silhouette (from -1 to 1, higher is better) and Davies-Bouldin (lower is better) measure how compact and separated the groups are. They are indicative: they are not an accuracy percentage and do not guarantee future behavior.",
+      "warnings": {
+        "corte_anterior_extraccion": "The cutoff is earlier than the extraction: the current order statuses were used.",
+        "k_maximo": "{k} groups were chosen, the maximum tried: another setting could give a different number.",
+        "separacion_debil": "Weak separation between groups (silhouette below {threshold}).",
+        "evaluacion_un_grupo": "In the evaluation all customers fell into a single group.",
+        "grupos_vacios": "{n} group(s) ended up without customers."
+      },
+      "aboutTitle": "What this section shows",
+      "aboutText": "It describes groups observed in the purchase history. It does not predict whether a customer will stop buying, nor does it send messages, discounts or campaigns.",
+      "howTitle": "How is it calculated?",
+      "how": {
+        "rfm": "Per customer: days from their last valid purchase to the cutoff (recency), valid orders in the period (frequency) and the sum of their totals (monetary). Purchases from all branches are combined.",
+        "valid": "Paid orders count (processing, shipped or delivered). Pending and cancelled orders do not. Register sales without a registered customer are not attributed to anyone.",
+        "amount": "The amount is the gross order total (includes shipping and discounts). Returns are reported separately and not subtracted.",
+        "split": "Customers are split 80 % / 20 % before fitting anything; the transformation, scaling and K-Means are fitted only on the 80 % and then applied to the 20 %.",
+        "model": "Before grouping, log(1 + x) and standard scaling are applied so that days, orders and money weigh similarly and extreme amounts do not dominate.",
+        "limits": "No names, emails, phone numbers or payment data are used. Without an order status history, the current status is used.",
+        "dataQuality": "Data quality: {rows} order rows read, {duplicates} duplicates discarded, {excluded} excluded for invalid data, {pending} pending, {cancelled} cancelled; {returns} orders with returns."
+      }
     }
   },
   "AdminErrors": {
