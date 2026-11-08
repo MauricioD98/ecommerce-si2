@@ -63,7 +63,12 @@
     "billingLabel": "Billing period",
     "monthly": "Monthly",
     "annual": "Annual",
-    "soon": "Coming soon"
+    "soon": "Coming soon",
+    "perYear": "/year",
+    "annualBadge": "2 months free",
+    "annualEquivalent": "Equals {price}/month",
+    "annualSaving": "you save {amount} a year",
+    "unavailable": "Not available right now"
   },
   "Plans": {
     "starter": {
@@ -1627,7 +1632,24 @@
     "noRenew": "Cancelled: it won’t renew",
     "perMonth": " /month",
     "redirecting": "Redirecting...",
-    "choose": "Choose {plan}"
+    "choose": "Choose {plan}",
+    "perYear": " /year",
+    "billingLabel": "Billing period",
+    "monthly": "Monthly",
+    "annual": "Annual",
+    "annualBadge": "2 months free",
+    "annualEquivalent": "Equals {price}/month",
+    "unavailable": "Not available right now",
+    "billedMonthly": "Billed monthly",
+    "billedAnnually": "Billed annually",
+    "changeHint": "To change plan or switch from monthly to annual, use \"Manage subscription\".",
+    "currentPlan": "Current plan",
+    "yourPlan": "Your plan",
+    "recommended": "Recommended",
+    "chooseHint": "Choose a plan to activate your subscription.",
+    "changeTo": "Switch to {plan}",
+    "currentButton": "Your current plan",
+    "plansLabel": "Available plans"
   },
   "Landing": {
     "nav": {
@@ -1785,7 +1807,14 @@
     "suspended": "\"{name}\" was suspended.",
     "reactivated": "\"{name}\" was reactivated.",
     "retried": "\"{name}\" was provisioned again.",
-    "mrrNote": "MRR estimated from each plan’s list price in Stripe, for active or past-due subscriptions. Coupons aren’t deducted."
+    "mrrNote": "MRR estimated from each plan’s list price in Stripe, for active or past-due subscriptions. Coupons aren’t deducted.",
+    "restricted": "Restricted access",
+    "signInTitle": "Sign in",
+    "emailPlaceholder": "admin@platform.com",
+    "showPassword": "Show",
+    "hidePassword": "Hide",
+    "showPasswordLabel": "Show password",
+    "hidePasswordLabel": "Hide password"
   },
   "AdminPayments": {
     "title": "Payment settings",
@@ -1859,6 +1888,28 @@
       "invalidAddress": "The address isn’t valid for the {network} network.",
       "warning": "Double-check the network and address: funds sent to the wrong network or address can’t be recovered.",
       "enable": "Offer USDT payment at checkout"
+    },
+    "notReadyTitle": "Your customers cannot pay yet.",
+    "notReadyText": "Turn on at least one method so it shows up at checkout.",
+    "locked": {
+      "planBadge": "{plan} plan",
+      "title": "Available from the {plan} plan",
+      "text": "This payment method is included from the <b>{plan} plan</b>. With your <b>{current} plan</b> you can charge with {unlocked}.",
+      "upgrade": "Upgrade to {plan}",
+      "withoutQr": "card and USDT",
+      "withoutWallet": "card, bank QR and USDT"
+    },
+    "wallet": {
+      "title": "Digital wallets (Airtm, Takenos, Wallbit)",
+      "description": "Let your customers pay by transferring with Airtm, Takenos or Wallbit and reporting their receipt number or TxID for your review.",
+      "provider": "Accepted wallets",
+      "providerPlaceholder": "E.g. Airtm, Takenos, Wallbit",
+      "account": "Payout user, email or cashtag",
+      "accountPlaceholder": "E.g. @mystore or payments@mystore.com",
+      "instructions": "Instructions for the customer",
+      "instructionsPlaceholder": "E.g. Transfer the amount and write your order number in the note…",
+      "enable": "Offer digital wallet payment at checkout",
+      "enableHint": "Enter the accepted wallet and the payout account to turn it on."
     }
   },
   "AdminAppearance": {
@@ -2077,5 +2128,33 @@
     "homeTitle": "Offline panel",
     "sectionRequiresConnection": "This section requires a connection",
     "homeDescription": "Offline you can use these sections with the data saved on this device. Deleting, cancelling orders, the point of sale, payments, staff, roles and settings require a connection."
+  },
+  "AdminHome": {
+    "groups": {
+      "sales": "Sales",
+      "catalog": "Catalog",
+      "business": "Business",
+      "store": "Store"
+    },
+    "descriptions": {
+      "pos": "Ring up in-store sales at the counter.",
+      "returns": "Find the original sale and process the return.",
+      "orders": "Every order from every branch.",
+      "ordersBranch": "Orders from your branch.",
+      "products": "The store’s main catalog.",
+      "categories": "Organize the catalog.",
+      "collections": "Group your products into collections.",
+      "inventory": "Stock and offers for each branch.",
+      "inventoryBranch": "Stock and offers for your branch.",
+      "branches": "Create and edit physical branches.",
+      "staff": "Assign role, branch and discount.",
+      "staffBranch": "The staff of your branch.",
+      "roles": "What each role can do in the panel.",
+      "reports": "Sales metrics and natural-language queries.",
+      "notifications": "Send promotional emails and alerts.",
+      "subscription": "Your store’s plan on the platform.",
+      "payments": "Card, bank QR and USDT.",
+      "appearance": "Logo, colors and copy of your store."
+    }
   }
 }

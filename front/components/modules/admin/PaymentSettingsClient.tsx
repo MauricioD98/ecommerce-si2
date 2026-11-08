@@ -3,10 +3,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Coins, CreditCard, Lock, QrCode, RefreshCw, Trash2, Unlink, Upload, Wallet as WalletIcon } from 'lucide-react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    CheckCircle2,
+    Coins,
+    CreditCard,
+    Info,
+    Lock,
+    QrCode,
+    RefreshCw,
+    Trash2,
+    Unlink,
+    Upload,
+    Wallet as WalletIcon,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import styles from './admin-table.module.scss';
-import cards from './payment-settings.module.scss';
+import ui from './billing.module.scss';
 import { getApiErrorMessage } from '@/service/api/error.utils';
 import { PaymentSettings, USDT_NETWORKS, UsdtNetwork, paymentSettingsService } from '@/service/api/paymentSettings.service';
 import { useStorePlan } from '@/providers/StoreInfoProvider';
@@ -18,6 +31,7 @@ const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 type Feedback = { type: 'success' | 'error'; text: string } | null;
 
 // Medios de cobro de la tienda: tarjeta (Stripe Connect), QR bancario propio, USDT y Billeteras Digitales.
+// Cada tarjeta guarda por separado; el plan decide qué medios se pueden activar (lo exige también la API).
 export default function PaymentSettingsClient() {
     const t = useTranslations('AdminPayments');
     const returnState = useSearchParams().get('connect');
@@ -46,31 +60,62 @@ export default function PaymentSettingsClient() {
         load();
     }, [load]);
 
+    // Ningún medio activo: el checkout no puede ofrecer cómo pagar
+    const nothingActive =
+        settings &&
+        !settings.stripe.chargesEnabled &&
+        !settings.qr.enabled &&
+        !settings.usdt.enabled &&
+        !settings.wallet?.enabled;
+
     return (
-        <div className={styles.page}>
-            <div className={styles.pageHeader}>
+        <div className={ui.page}>
+            <header className={ui.header}>
                 <div>
                     <h1>{t('title')}</h1>
                     <p>{t('subtitle')}</p>
                 </div>
-                <button type="button" className={styles.buttonSecondary} onClick={load} disabled={isLoading}>
-                    <RefreshCw size={16} />
+                <button type="button" className={`${ui.btn} ${ui.btnLine}`} onClick={load} disabled={isLoading}>
+                    <RefreshCw size={18} aria-hidden />
                     {t('refresh')}
                 </button>
-            </div>
+            </header>
 
-            {loadError && <div className={styles.errorMessage}>{loadError}</div>}
+            {loadError && (
+                <div role="alert" className={`${ui.banner} ${ui.bannerError}`}>
+                    <AlertCircle size={20} aria-hidden />
+                    <span>{loadError}</span>
+                </div>
+            )}
+
+            {nothingActive && (
+                <div role="status" className={`${ui.banner} ${ui.bannerWarn}`}>
+                    <Info size={20} aria-hidden />
+                    <span>
+                        <strong>{t('notReadyTitle')}</strong> {t('notReadyText')}
+                    </span>
+                </div>
+            )}
 
             {isLoading && !settings ? (
-                <div className={styles.loadingState}>{t('loading')}</div>
+                <div role="status" className={`${ui.banner} ${ui.bannerInfo}`}>
+                    <RefreshCw size={20} aria-hidden />
+                    <span>{t('loading')}</span>
+                </div>
             ) : (
                 settings && (
-                    <div className={cards.grid}>
-                        <StripeCard settings={settings} returnState={returnState} onChange={setSettings} />
-                        <QrCard settings={settings} onChange={setSettings} />
-                        <UsdtCard settings={settings} onChange={setSettings} />
+                    <>
+                        <div className={ui.columns}>
+                            <div className={ui.column}>
+                                <StripeCard settings={settings} returnState={returnState} onChange={setSettings} />
+                                <UsdtCard settings={settings} onChange={setSettings} />
+                            </div>
+                            <div className={ui.column}>
+                                <QrCard settings={settings} onChange={setSettings} />
+                            </div>
+                        </div>
                         <WalletCard settings={settings} onChange={setSettings} />
-                    </div>
+                    </>
                 )
             )}
         </div>
@@ -79,7 +124,74 @@ export default function PaymentSettingsClient() {
 
 function FeedbackMessage({ feedback }: { feedback: Feedback }) {
     if (!feedback) return null;
-    return <div className={feedback.type === 'success' ? styles.successMessage : styles.errorMessage}>{feedback.text}</div>;
+    const ok = feedback.type === 'success';
+    return (
+        <div role={ok ? 'status' : 'alert'} className={`${ui.banner} ${ok ? ui.bannerOk : ui.bannerError}`}>
+            {ok ? <CheckCircle2 size={18} aria-hidden /> : <AlertCircle size={18} aria-hidden />}
+            <span>{feedback.text}</span>
+        </div>
+    );
+}
+
+function StatusPill({ active }: { active: boolean }) {
+    const t = useTranslations('AdminPayments');
+    return <span className={`${ui.pill} ${active ? ui.pillGreen : ''}`}>{active ? t('active') : t('inactive')}</span>;
+}
+
+// Medio no incluido en el plan: franja con candado y enlace a Suscripción (solo el dueño puede pagar)
+function LockedMethod({
+    id,
+    icon,
+    title,
+    description,
+    plan,
+    unlocked,
+}: {
+    id: string;
+    icon: React.ReactNode;
+    title: string;
+    description: string;
+    plan: string;
+    unlocked: string;
+}) {
+    const t = useTranslations('AdminPayments');
+    const { features } = useStorePlan();
+    const { isSuperAdmin } = useAdminRole();
+    return (
+        <section className={ui.wide} aria-labelledby={id}>
+            <div className={ui.wideInfo}>
+                <div className={ui.cardHead}>
+                    <div className={ui.tile}>{icon}</div>
+                    <h2 id={id}>{title}</h2>
+                </div>
+                <div>
+                    <span className={`${ui.pill} ${ui.pillAmber}`}>{t('locked.planBadge', { plan })}</span>
+                </div>
+                <p className={ui.text}>{description}</p>
+            </div>
+            <div className={ui.locked}>
+                <div className={ui.lockedTitle}>
+                    <Lock size={20} aria-hidden />
+                    {t('locked.title', { plan })}
+                </div>
+                <p className={ui.hint}>
+                    {t.rich('locked.text', {
+                        plan,
+                        current: features.planName,
+                        unlocked,
+                        b: (chunks) => <strong>{chunks}</strong>,
+                    })}
+                </p>
+                {isSuperAdmin && (
+                    <div>
+                        <Link href="/admin/suscripcion" className={`${ui.btn} ${ui.btnLine}`}>
+                            {t('locked.upgrade', { plan })}
+                        </Link>
+                    </div>
+                )}
+            </div>
+        </section>
+    );
 }
 
 function StripeCard({
@@ -97,7 +209,7 @@ function StripeCard({
     const [feedback, setFeedback] = useState<Feedback>(null);
 
     const state = stripe.chargesEnabled ? 'enabled' : stripe.connected ? 'pending' : 'none';
-    const badge = state === 'enabled' ? styles.badgeSuccess : state === 'pending' ? styles.badgeWarning : styles.badgeMuted;
+    const pill = state === 'enabled' ? ui.pillGreen : state === 'pending' ? ui.pillAmber : '';
 
     const startOnboarding = async () => {
         setBusy(true);
@@ -125,42 +237,45 @@ function StripeCard({
     };
 
     return (
-        <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-stripe">
-            <div className={cards.cardHeader}>
-                <h2 id="pay-stripe"><CreditCard size={18} />{t('stripe.title')}</h2>
-                <span className={`${styles.badge} ${badge}`}>{t(`states.${state}`)}</span>
+        <section className={ui.card} aria-labelledby="pay-stripe">
+            <div className={ui.cardHead}>
+                <div className={ui.tile}>
+                    <CreditCard size={22} aria-hidden />
+                </div>
+                <h2 id="pay-stripe">{t('stripe.title')}</h2>
+                <span className={`${ui.pill} ${pill}`}>{t(`states.${state}`)}</span>
             </div>
 
-            {returnState === 'refresh' && <div className={styles.errorMessage}>{t('linkExpired')}</div>}
-            {returnState === 'return' && state === 'enabled' && <div className={styles.successMessage}>{t('enabledNow')}</div>}
+            {returnState === 'refresh' && <FeedbackMessage feedback={{ type: 'error', text: t('linkExpired') }} />}
+            {returnState === 'return' && state === 'enabled' && <FeedbackMessage feedback={{ type: 'success', text: t('enabledNow') }} />}
             <FeedbackMessage feedback={feedback} />
 
-            <p className={styles.cellSub}>{t(`descriptions.${state}`)}</p>
+            <p className={ui.text}>{t(`descriptions.${state}`)}</p>
             {state === 'pending' && stripe.pendingRequirements > 0 && (
-                <p className={styles.cellSub}>{t('pendingRequirements', { count: stripe.pendingRequirements })}</p>
+                <p className={ui.hint}>{t('pendingRequirements', { count: stripe.pendingRequirements })}</p>
             )}
             {stripe.accountId && (
-                <div className={styles.cellMain}>
-                    <span className={styles.statLabel}>{t('stripe.accountId')}</span>
-                    <span className={cards.accountId}>{stripe.accountId}</span>
+                <div className={ui.account}>
+                    <span>{t('stripe.accountId')}</span>
+                    <span className={ui.mono}>{stripe.accountId}</span>
                 </div>
             )}
 
-            <div className={cards.buttonRow}>
+            <div className={ui.buttonRow}>
                 {state !== 'enabled' && (
-                    <button type="button" className={styles.button} onClick={startOnboarding} disabled={busy}>
-                        <CreditCard size={16} />
+                    <button type="button" className={`${ui.btn} ${ui.btnDark} ${ui.btnTall}`} onClick={startOnboarding} disabled={busy}>
+                        <CreditCard size={18} aria-hidden />
                         {busy ? t('redirecting') : state === 'pending' ? t('continue') : t('setup')}
                     </button>
                 )}
                 {stripe.connected && (
-                    <button type="button" className={styles.buttonDanger} onClick={disconnect} disabled={busy}>
-                        <Unlink size={16} />
+                    <button type="button" className={`${ui.btn} ${ui.btnDanger}`} onClick={disconnect} disabled={busy}>
+                        <Unlink size={18} aria-hidden />
                         {t('stripe.disconnect')}
                     </button>
                 )}
             </div>
-            <small className={styles.cellSub}>{t('note')}</small>
+            {state !== 'enabled' && <p className={ui.note}>{t('note')}</p>}
         </section>
     );
 }
@@ -168,7 +283,6 @@ function StripeCard({
 function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (s: PaymentSettings) => void }) {
     const t = useTranslations('AdminPayments');
     const { features } = useStorePlan();
-    const { isSuperAdmin } = useAdminRole();
     const [enabled, setEnabled] = useState(settings.qr.enabled);
     const [instructions, setInstructions] = useState(settings.qr.instructions);
     const [preview, setPreview] = useState<string | null>(null);
@@ -200,40 +314,14 @@ function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (
 
     if (!qrAllowed) {
         return (
-            <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-qr">
-                <div className={cards.cardHeader}>
-                    <h2 id="pay-qr"><QrCode size={18} />{t('qr.title')}</h2>
-                    <span className={`${styles.badge} ${styles.badgeMuted}`}>Plan Pro</span>
-                </div>
-                <p className={styles.cellSub}>{t('qr.description')}</p>
-                <div
-                    style={{
-                        padding: '1rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid var(--border)',
-                        background: '#fafafa',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem',
-                    }}
-                >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>
-                        <Lock size={16} />
-                        Disponible en el Plan Pro
-                    </span>
-                    <p className={styles.cellSub} style={{ margin: 0 }}>
-                        Los cobros mediante QR bancario están incluidos en el <strong>Plan Pro</strong>. Con tu{' '}
-                        <strong>Plan {features.planName}</strong> puedes cobrar con Tarjeta (Stripe), Billeteras Digitales y USDT.
-                    </p>
-                    {isSuperAdmin && (
-                        <div>
-                            <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
-                                Mejorar a Plan Pro
-                            </Link>
-                        </div>
-                    )}
-                </div>
-            </section>
+            <LockedMethod
+                id="pay-qr"
+                icon={<QrCode size={22} aria-hidden />}
+                title={t('qr.title')}
+                description={t('qr.description')}
+                plan="Pro"
+                unlocked={t('locked.withoutQr')}
+            />
         );
     }
 
@@ -276,49 +364,57 @@ function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (
         }, t('saved'));
 
     return (
-        <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-qr">
-            <div className={cards.cardHeader}>
-                <h2 id="pay-qr"><QrCode size={18} />{t('qr.title')}</h2>
-                <span className={`${styles.badge} ${settings.qr.enabled ? styles.badgeSuccess : styles.badgeMuted}`}>
-                    {settings.qr.enabled ? t('active') : t('inactive')}
-                </span>
+        <section className={ui.card} aria-labelledby="pay-qr" style={{ flex: 1 }}>
+            <div className={ui.cardHead}>
+                <div className={ui.tile}>
+                    <QrCode size={22} aria-hidden />
+                </div>
+                <h2 id="pay-qr">{t('qr.title')}</h2>
+                <StatusPill active={settings.qr.enabled} />
             </div>
-            <p className={styles.cellSub}>{t('qr.description')}</p>
+            <p className={ui.text}>{t('qr.description')}</p>
             <FeedbackMessage feedback={feedback} />
 
-            {hasImage && preview ? (
-                // eslint-disable-next-line @next/next/no-img-element -- object URL local, no pasa por next/image
-                <img src={preview} alt={t('qr.previewAlt')} className={cards.qrPreview} />
-            ) : (
-                <div className={cards.qrEmpty}>{t('qr.noImage')}</div>
-            )}
-
-            <div className={cards.buttonRow}>
-                <input
-                    ref={fileInput}
-                    type="file"
-                    accept={IMAGE_TYPES.join(',')}
-                    hidden
-                    onChange={(e) => upload(e.target.files?.[0])}
-                />
-                <button type="button" className={styles.buttonSecondary} onClick={() => fileInput.current?.click()} disabled={busy}>
-                    <Upload size={16} />
-                    {hasImage ? t('qr.replaceImage') : t('qr.uploadImage')}
-                </button>
-                {hasImage && (
-                    <button type="button" className={styles.buttonDanger} onClick={removeImage} disabled={busy}>
-                        <Trash2 size={16} />
-                        {t('qr.removeImage')}
-                    </button>
+            <div className={ui.qrRow}>
+                {hasImage && preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- object URL local, no pasa por next/image
+                    <img src={preview} alt={t('qr.previewAlt')} className={ui.qrImage} />
+                ) : (
+                    <div className={ui.qrBox}>
+                        <QrCode size={32} aria-hidden />
+                        {t('qr.noImage')}
+                    </div>
                 )}
+                <div className={ui.qrActions}>
+                    <input
+                        ref={fileInput}
+                        type="file"
+                        accept={IMAGE_TYPES.join(',')}
+                        hidden
+                        onChange={(e) => upload(e.target.files?.[0])}
+                    />
+                    <div className={ui.buttonRow}>
+                        <button type="button" className={`${ui.btn} ${ui.btnLine}`} onClick={() => fileInput.current?.click()} disabled={busy}>
+                            <Upload size={18} aria-hidden />
+                            {hasImage ? t('qr.replaceImage') : t('qr.uploadImage')}
+                        </button>
+                        {hasImage && (
+                            <button type="button" className={`${ui.btn} ${ui.btnDanger}`} onClick={removeImage} disabled={busy}>
+                                <Trash2 size={18} aria-hidden />
+                                {t('qr.removeImage')}
+                            </button>
+                        )}
+                    </div>
+                    <p className={ui.hint}>{t('qr.imageHint')}</p>
+                </div>
             </div>
-            <small className={styles.cellSub}>{t('qr.imageHint')}</small>
 
-            <div className={styles.field}>
-                <label htmlFor="qr-instructions">{t('qr.instructions')}</label>
+            <div>
+                <label className={ui.label} htmlFor="qr-instructions">{t('qr.instructions')}</label>
                 <textarea
                     id="qr-instructions"
-                    className={`${styles.input} ${styles.textareaSmall}`}
+                    className={ui.field}
+                    rows={4}
                     value={instructions}
                     maxLength={1000}
                     placeholder={t('qr.instructionsPlaceholder')}
@@ -326,14 +422,27 @@ function QrCard({ settings, onChange }: { settings: PaymentSettings; onChange: (
                 />
             </div>
 
-            <label className={styles.inlineCheckbox}>
-                <input type="checkbox" checked={enabled} disabled={!hasImage} onChange={(e) => setEnabled(e.target.checked)} />
-                {t('qr.enable')}
-            </label>
-            {!hasImage && <small className={styles.cellSub}>{t('qr.enableHint')}</small>}
-
             <div>
-                <button type="button" className={styles.button} onClick={save} disabled={busy}>
+                <label className={ui.switch}>
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        checked={enabled}
+                        disabled={!hasImage}
+                        aria-describedby={!hasImage ? 'qr-enable-hint' : undefined}
+                        onChange={(e) => setEnabled(e.target.checked)}
+                    />
+                    {t('qr.enable')}
+                </label>
+                {!hasImage && (
+                    <p id="qr-enable-hint" className={ui.switchHint}>
+                        {t('qr.enableHint')}
+                    </p>
+                )}
+            </div>
+
+            <div style={{ marginTop: 'auto' }}>
+                <button type="button" className={`${ui.btn} ${ui.btnDark} ${ui.btnTall}`} onClick={save} disabled={busy}>
                     {busy ? t('saving') : t('save')}
                 </button>
             </div>
@@ -377,21 +486,22 @@ function UsdtCard({ settings, onChange }: { settings: PaymentSettings; onChange:
     };
 
     return (
-        <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-usdt">
-            <div className={cards.cardHeader}>
-                <h2 id="pay-usdt"><Coins size={18} />{t('usdt.title')}</h2>
-                <span className={`${styles.badge} ${settings.usdt.enabled ? styles.badgeSuccess : styles.badgeMuted}`}>
-                    {settings.usdt.enabled ? t('active') : t('inactive')}
-                </span>
+        <section className={ui.card} aria-labelledby="pay-usdt">
+            <div className={ui.cardHead}>
+                <div className={ui.tile}>
+                    <Coins size={22} aria-hidden />
+                </div>
+                <h2 id="pay-usdt">{t('usdt.title')}</h2>
+                <StatusPill active={settings.usdt.enabled} />
             </div>
-            <p className={styles.cellSub}>{t('usdt.description')}</p>
+            <p className={ui.text}>{t('usdt.description')}</p>
             <FeedbackMessage feedback={feedback} />
 
-            <div className={styles.field}>
-                <label htmlFor="usdt-network">{t('usdt.network')}</label>
+            <div>
+                <label className={ui.label} htmlFor="usdt-network">{t('usdt.network')}</label>
                 <select
                     id="usdt-network"
-                    className={styles.input}
+                    className={ui.field}
                     value={network}
                     onChange={(e) => setNetwork(e.target.value as UsdtNetwork | '')}
                 >
@@ -402,30 +512,39 @@ function UsdtCard({ settings, onChange }: { settings: PaymentSettings; onChange:
                 </select>
             </div>
 
-            <div className={styles.field}>
-                <label htmlFor="usdt-address">{t('usdt.address')}</label>
+            <div>
+                <label className={ui.label} htmlFor="usdt-address">{t('usdt.address')}</label>
                 <input
                     id="usdt-address"
-                    className={`${styles.input} ${cards.mono}`}
+                    className={`${ui.field} ${ui.mono}`}
                     value={address}
                     maxLength={100}
                     spellCheck={false}
                     autoComplete="off"
                     placeholder={network === 'TRC20' ? 'T…' : '0x…'}
                     aria-invalid={invalidAddress}
+                    aria-describedby={invalidAddress ? 'usdt-address-error' : undefined}
                     onChange={(e) => setAddress(e.target.value)}
                 />
-                {invalidAddress && network && <span className={styles.rowError}>{t('usdt.invalidAddress', { network })}</span>}
+                {invalidAddress && network && (
+                    <span id="usdt-address-error" className={ui.fieldError}>
+                        {t('usdt.invalidAddress', { network })}
+                    </span>
+                )}
             </div>
-            <small className={styles.cellSub}>{t('usdt.warning')}</small>
 
-            <label className={styles.inlineCheckbox}>
-                <input type="checkbox" checked={enabled} disabled={!complete} onChange={(e) => setEnabled(e.target.checked)} />
+            <div className={ui.warnBox}>
+                <AlertTriangle size={18} aria-hidden />
+                <span>{t('usdt.warning')}</span>
+            </div>
+
+            <label className={ui.switch}>
+                <input type="checkbox" role="switch" checked={enabled} disabled={!complete} onChange={(e) => setEnabled(e.target.checked)} />
                 {t('usdt.enable')}
             </label>
 
             <div>
-                <button type="button" className={styles.button} onClick={save} disabled={busy || invalidAddress}>
+                <button type="button" className={`${ui.btn} ${ui.btnDark} ${ui.btnTall}`} onClick={save} disabled={busy || invalidAddress}>
                     {busy ? t('saving') : t('save')}
                 </button>
             </div>
@@ -436,7 +555,6 @@ function UsdtCard({ settings, onChange }: { settings: PaymentSettings; onChange:
 function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChange: (s: PaymentSettings) => void }) {
     const t = useTranslations('AdminPayments');
     const { features } = useStorePlan();
-    const { isSuperAdmin } = useAdminRole();
     const [enabled, setEnabled] = useState(settings.wallet?.enabled ?? false);
     const [provider, setProvider] = useState(settings.wallet?.provider ?? '');
     const [account, setAccount] = useState(settings.wallet?.account ?? '');
@@ -445,6 +563,8 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
     const [feedback, setFeedback] = useState<Feedback>(null);
 
     useEffect(() => {
+        // Sincroniza el formulario cuando el servidor devuelve datos nuevos (guardar / actualizar)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEnabled(settings.wallet?.enabled ?? false);
         setProvider(settings.wallet?.provider ?? '');
         setAccount(settings.wallet?.account ?? '');
@@ -455,42 +575,14 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
 
     if (!walletAllowed) {
         return (
-            <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-wallet">
-                <div className={cards.cardHeader}>
-                    <h2 id="pay-wallet"><WalletIcon size={18} /> Billeteras Digitales (Airtm, Takenos, Wallbit)</h2>
-                    <span className={`${styles.badge} ${styles.badgeMuted}`}>Plan Growth</span>
-                </div>
-                <p className={styles.cellSub}>
-                    Permite a tus clientes pagar transfiriendo con Airtm, Takenos o Wallbit e informando su número de comprobante o TxID para tu revisión.
-                </p>
-                <div
-                    style={{
-                        padding: '1rem',
-                        borderRadius: '0.5rem',
-                        border: '1px solid var(--border)',
-                        background: '#fafafa',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.75rem',
-                    }}
-                >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem' }}>
-                        <Lock size={16} />
-                        Disponible desde el Plan Growth
-                    </span>
-                    <p className={styles.cellSub} style={{ margin: 0 }}>
-                        Los cobros mediante billeteras digitales (Airtm, Takenos, Wallbit) están incluidos a partir del <strong>Plan Growth</strong>. Con tu{' '}
-                        <strong>Plan {features.planName}</strong> puedes cobrar con Tarjeta y QR bancario.
-                    </p>
-                    {isSuperAdmin && (
-                        <div>
-                            <Link href="/admin/suscripcion" className={styles.buttonSecondary}>
-                                Mejorar a Plan Growth
-                            </Link>
-                        </div>
-                    )}
-                </div>
-            </section>
+            <LockedMethod
+                id="pay-wallet"
+                icon={<WalletIcon size={22} aria-hidden />}
+                title={t('wallet.title')}
+                description={t('wallet.description')}
+                plan="Growth"
+                unlocked={t('locked.withoutWallet')}
+            />
         );
     }
 
@@ -518,60 +610,81 @@ function WalletCard({ settings, onChange }: { settings: PaymentSettings; onChang
     };
 
     return (
-        <section className={`${styles.tableCard} ${styles.form} ${styles.formCard}`} aria-labelledby="pay-wallet">
-            <div className={cards.cardHeader}>
-                <h2 id="pay-wallet"><WalletIcon size={18} /> Billeteras Digitales (Airtm, Takenos, Wallbit)</h2>
-                <span className={`${styles.badge} ${settings.wallet?.enabled ? styles.badgeSuccess : styles.badgeMuted}`}>
-                    {settings.wallet?.enabled ? t('active') : t('inactive')}
-                </span>
+        <section className={ui.card} aria-labelledby="pay-wallet">
+            <div className={ui.cardHead}>
+                <div className={ui.tile}>
+                    <WalletIcon size={22} aria-hidden />
+                </div>
+                <h2 id="pay-wallet">{t('wallet.title')}</h2>
+                <StatusPill active={Boolean(settings.wallet?.enabled)} />
             </div>
-            <p className={styles.cellSub}>
-                Permite a tus clientes pagar transfiriendo con Airtm, Takenos o Wallbit e informando su número de comprobante o TxID para tu revisión.
-            </p>
+            <p className={ui.text}>{t('wallet.description')}</p>
             <FeedbackMessage feedback={feedback} />
 
-            <div className={styles.field}>
-                <label htmlFor="wallet-provider">Billeteras / Proveedores aceptados</label>
-                <input
-                    id="wallet-provider"
-                    className={styles.input}
-                    value={provider}
-                    placeholder="Ej. Airtm, Takenos, Wallbit"
-                    onChange={(e) => setProvider(e.target.value)}
-                />
+            <div className={ui.columns}>
+                <div className={ui.column}>
+                    <div>
+                        <label className={ui.label} htmlFor="wallet-provider">{t('wallet.provider')}</label>
+                        <input
+                            id="wallet-provider"
+                            className={ui.field}
+                            value={provider}
+                            placeholder={t('wallet.providerPlaceholder')}
+                            onChange={(e) => setProvider(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className={ui.label} htmlFor="wallet-account">{t('wallet.account')}</label>
+                        <input
+                            id="wallet-account"
+                            className={ui.field}
+                            value={account}
+                            placeholder={t('wallet.accountPlaceholder')}
+                            onChange={(e) => setAccount(e.target.value)}
+                        />
+                    </div>
+                </div>
+                <div className={ui.column}>
+                    <div>
+                        <label className={ui.label} htmlFor="wallet-instructions">{t('wallet.instructions')}</label>
+                        <textarea
+                            id="wallet-instructions"
+                            className={ui.field}
+                            rows={4}
+                            value={instructions}
+                            placeholder={t('wallet.instructionsPlaceholder')}
+                            onChange={(e) => setInstructions(e.target.value)}
+                        />
+                    </div>
+                </div>
             </div>
-
-            <div className={styles.field}>
-                <label htmlFor="wallet-account">Usuario, Correo o Cashtag de cobro</label>
-                <input
-                    id="wallet-account"
-                    className={styles.input}
-                    value={account}
-                    placeholder="Ej. @mitienda o pagos@mitienda.com"
-                    onChange={(e) => setAccount(e.target.value)}
-                />
-            </div>
-
-            <div className={styles.field}>
-                <label htmlFor="wallet-instructions">Instrucciones para el cliente</label>
-                <textarea
-                    id="wallet-instructions"
-                    className={styles.textarea}
-                    rows={3}
-                    value={instructions}
-                    placeholder="Ej. Transfiere el monto a nuestra cuenta indicando tu número de orden en la nota..."
-                    onChange={(e) => setInstructions(e.target.value)}
-                />
-            </div>
-
-            <label className={styles.inlineCheckbox}>
-                <input type="checkbox" checked={enabled} disabled={!complete} onChange={(e) => setEnabled(e.target.checked)} />
-                Habilitar pagos con Billeteras Digitales
-            </label>
-            {!complete && <small className={styles.cellSub}>Ingresa la billetera aceptada y la cuenta o usuario de cobro para poder habilitar este medio.</small>}
 
             <div>
-                <button type="button" className={styles.button} onClick={save} disabled={busy || (!complete && enabled)}>
+                <label className={ui.switch}>
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        checked={enabled}
+                        disabled={!complete}
+                        aria-describedby={!complete ? 'wallet-enable-hint' : undefined}
+                        onChange={(e) => setEnabled(e.target.checked)}
+                    />
+                    {t('wallet.enable')}
+                </label>
+                {!complete && (
+                    <p id="wallet-enable-hint" className={ui.switchHint}>
+                        {t('wallet.enableHint')}
+                    </p>
+                )}
+            </div>
+
+            <div>
+                <button
+                    type="button"
+                    className={`${ui.btn} ${ui.btnDark} ${ui.btnTall}`}
+                    onClick={save}
+                    disabled={busy || (!complete && enabled)}
+                >
                     {busy ? t('saving') : t('save')}
                 </button>
             </div>

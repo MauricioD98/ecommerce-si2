@@ -35,7 +35,7 @@ export class TenantSubscriptionController {
   @ApiOperation({ summary: 'Suscribir la tienda a un plan (devuelve la URL de Stripe Checkout)' })
   async checkout(@GetUser() user: AuthUser, @Body() dto: TenantCheckoutDto) {
     this.assertOwner(user);
-    const data = await this.subscriptions.createTenantCheckout(user.tenantId, user.email, dto.plan);
+    const data = await this.subscriptions.createTenantCheckout(user.tenantId, user.email, dto.plan, dto.interval ?? 'monthly');
     return { success: true, data, message: 'Redirigiendo al pago' };
   }
 

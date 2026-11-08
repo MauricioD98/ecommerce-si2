@@ -11,6 +11,16 @@ import { SubscriptionsService } from './subscriptions.service';
 export class SubscriptionsController {
   constructor(private readonly subscriptions: SubscriptionsService) {}
 
+  // Público: precios reales (Stripe) de cada plan, mensual y anual, y si se pueden contratar
+  @Get('plans')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Catálogo de planes: precio mensual y anual y disponibilidad' })
+  async plans() {
+    const data = await this.subscriptions.planPrices();
+    return { success: true, data, message: 'Planes' };
+  }
+
   // Público (es la landing de ventas). Cada llamada crea una fila y una sesión de Stripe, así que
   // se limita por IP para que no se pueda inundar la tabla ni la cuenta de Stripe.
   @Post('checkout')

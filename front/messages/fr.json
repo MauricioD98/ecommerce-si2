@@ -63,7 +63,12 @@
     "billingLabel": "Période de facturation",
     "monthly": "Mensuel",
     "annual": "Annuel",
-    "soon": "Bientôt"
+    "soon": "Bientôt",
+    "perYear": "/an",
+    "annualBadge": "2 mois offerts",
+    "annualEquivalent": "Soit {price}/mois",
+    "annualSaving": "vous économisez {amount} par an",
+    "unavailable": "Indisponible pour le moment"
   },
   "Plans": {
     "starter": {
@@ -1617,7 +1622,24 @@
     "noRenew": "Annulé : il ne sera pas renouvelé",
     "perMonth": " /mois",
     "redirecting": "Redirection...",
-    "choose": "Choisir {plan}"
+    "choose": "Choisir {plan}",
+    "perYear": " /an",
+    "billingLabel": "Périodicité de facturation",
+    "monthly": "Mensuel",
+    "annual": "Annuel",
+    "annualBadge": "2 mois offerts",
+    "annualEquivalent": "Soit {price}/mois",
+    "unavailable": "Indisponible pour le moment",
+    "billedMonthly": "Facturation mensuelle",
+    "billedAnnually": "Facturation annuelle",
+    "changeHint": "Pour changer d'offre ou passer du mensuel à l'annuel, utilisez « Gérer l'abonnement ».",
+    "currentPlan": "Offre actuelle",
+    "yourPlan": "Votre offre",
+    "recommended": "Recommandé",
+    "chooseHint": "Choisissez une offre pour activer votre abonnement.",
+    "changeTo": "Passer à {plan}",
+    "currentButton": "Votre offre actuelle",
+    "plansLabel": "Offres disponibles"
   },
   "Landing": {
     "nav": {
@@ -1775,7 +1797,14 @@
     "suspended": "« {name} » a été suspendue.",
     "reactivated": "« {name} » a été réactivée.",
     "retried": "« {name} » a été provisionnée à nouveau.",
-    "mrrNote": "MRR estimé à partir du prix catalogue de chaque offre dans Stripe, pour les abonnements actifs ou en retard de paiement. Les coupons ne sont pas déduits."
+    "mrrNote": "MRR estimé à partir du prix catalogue de chaque offre dans Stripe, pour les abonnements actifs ou en retard de paiement. Les coupons ne sont pas déduits.",
+    "restricted": "Accès restreint",
+    "signInTitle": "Se connecter",
+    "emailPlaceholder": "admin@plateforme.com",
+    "showPassword": "Afficher",
+    "hidePassword": "Masquer",
+    "showPasswordLabel": "Afficher le mot de passe",
+    "hidePasswordLabel": "Masquer le mot de passe"
   },
   "AdminPayments": {
     "title": "Gestion des paiements",
@@ -1849,6 +1878,28 @@
       "invalidAddress": "L’adresse n’est pas valide pour le réseau {network}.",
       "warning": "Vérifiez bien le réseau et l’adresse : des fonds envoyés sur le mauvais réseau ou à la mauvaise adresse sont irrécupérables.",
       "enable": "Proposer le paiement en USDT"
+    },
+    "notReadyTitle": "Vos clients ne peuvent pas encore payer.",
+    "notReadyText": "Activez au moins un moyen pour qu’il apparaisse au paiement.",
+    "locked": {
+      "planBadge": "Offre {plan}",
+      "title": "Disponible à partir de l’offre {plan}",
+      "text": "Ce moyen de paiement est inclus à partir de l’<b>offre {plan}</b>. Avec votre <b>offre {current}</b>, vous pouvez encaisser par {unlocked}.",
+      "upgrade": "Passer à l’offre {plan}",
+      "withoutQr": "carte et USDT",
+      "withoutWallet": "carte, QR bancaire et USDT"
+    },
+    "wallet": {
+      "title": "Portefeuilles numériques (Airtm, Takenos, Wallbit)",
+      "description": "Permettez à vos clients de payer par virement avec Airtm, Takenos ou Wallbit en indiquant leur numéro de reçu ou TxID pour votre vérification.",
+      "provider": "Portefeuilles acceptés",
+      "providerPlaceholder": "Ex. Airtm, Takenos, Wallbit",
+      "account": "Utilisateur, e-mail ou cashtag d’encaissement",
+      "accountPlaceholder": "Ex. @maboutique ou paiements@maboutique.com",
+      "instructions": "Instructions pour le client",
+      "instructionsPlaceholder": "Ex. Virez le montant en indiquant votre numéro de commande dans la note…",
+      "enable": "Proposer le paiement par portefeuille numérique",
+      "enableHint": "Indiquez le portefeuille accepté et le compte d’encaissement pour l’activer."
     }
   },
   "AdminAppearance": {
@@ -2067,5 +2118,33 @@
     "homeTitle": "Panneau hors ligne",
     "sectionRequiresConnection": "Cette section nécessite une connexion",
     "homeDescription": "Hors ligne, vous pouvez utiliser ces sections avec les données enregistrées sur cet appareil. Supprimer, annuler des commandes, la caisse, les paiements, le personnel, les rôles et les réglages nécessitent une connexion."
+  },
+  "AdminHome": {
+    "groups": {
+      "sales": "Ventes",
+      "catalog": "Catalogue",
+      "business": "Entreprise",
+      "store": "Boutique"
+    },
+    "descriptions": {
+      "pos": "Encaissez les ventes en magasin.",
+      "returns": "Retrouvez la vente d’origine et traitez le retour.",
+      "orders": "Toutes les commandes de toutes les succursales.",
+      "ordersBranch": "Les commandes de votre succursale.",
+      "products": "Le catalogue général de la boutique.",
+      "categories": "Organisez le catalogue.",
+      "collections": "Regroupez vos produits en collections.",
+      "inventory": "Stock et offres de chaque succursale.",
+      "inventoryBranch": "Stock et offres de votre succursale.",
+      "branches": "Créez et modifiez les succursales physiques.",
+      "staff": "Attribuez rôle, succursale et remise.",
+      "staffBranch": "Le personnel de votre succursale.",
+      "roles": "Ce que chaque rôle peut faire dans le panneau.",
+      "reports": "Indicateurs de ventes et requêtes en langage naturel.",
+      "notifications": "Envoyez des e-mails et alertes promotionnels.",
+      "subscription": "L’offre de votre boutique sur la plateforme.",
+      "payments": "Carte, QR bancaire et USDT.",
+      "appearance": "Logo, couleurs et textes de votre boutique."
+    }
   }
 }

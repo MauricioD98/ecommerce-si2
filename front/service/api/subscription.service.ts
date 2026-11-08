@@ -1,5 +1,5 @@
 import { apiClient } from "./axios.config";
-import type { PlanKey } from "@/components/modules/platform/plans";
+import type { BillingInterval, PlanKey } from "@/components/modules/platform/plans";
 
 // Suscripción al SaaS de la tienda actual (/api/v1/subscription). Va con x-tenant-id y JWT: la tienda
 // la decide el backend desde el token, y solo el Super Admin puede usarlo. El precio nunca sale de acá.
@@ -13,6 +13,10 @@ export interface TenantSubscription {
     canManage: boolean;
     cancelAtPeriodEnd: boolean;
     currentPeriodEnd: string | null;
+    // Del Price real de la suscripción (null sin suscripción)
+    interval: BillingInterval | null;
+    amount: number | null;
+    currency: string | null;
 }
 
 export const subscriptionService = {
@@ -24,8 +28,8 @@ export const subscriptionService = {
     },
 
     // Devuelve la URL de Stripe Checkout a la que hay que redirigir
-    createCheckout: async (plan: PlanKey): Promise<string> => {
-        const { data } = await apiClient.post<{ data: { url: string } }>("/subscription/checkout", { plan });
+    createCheckout: async (plan: PlanKey, interval: BillingInterval): Promise<string> => {
+        const { data } = await apiClient.post<{ data: { url: string } }>("/subscription/checkout", { plan, interval });
         return data.data.url;
     },
 

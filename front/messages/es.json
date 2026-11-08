@@ -63,7 +63,12 @@
     "billingLabel": "Periodo de facturación",
     "monthly": "Mensual",
     "annual": "Anual",
-    "soon": "Próximamente"
+    "soon": "Próximamente",
+    "perYear": "/año",
+    "annualBadge": "2 meses gratis",
+    "annualEquivalent": "Equivale a {price}/mes",
+    "annualSaving": "ahorras {amount} al año",
+    "unavailable": "No disponible por ahora"
   },
   "Plans": {
     "starter": {
@@ -1627,7 +1632,24 @@
     "noRenew": "Cancelada: no se renovará",
     "perMonth": " /mes",
     "redirecting": "Redirigiendo...",
-    "choose": "Elegir {plan}"
+    "choose": "Elegir {plan}",
+    "perYear": " /año",
+    "billingLabel": "Periodo de facturación",
+    "monthly": "Mensual",
+    "annual": "Anual",
+    "annualBadge": "2 meses gratis",
+    "annualEquivalent": "Equivale a {price}/mes",
+    "unavailable": "No disponible por ahora",
+    "billedMonthly": "Facturación mensual",
+    "billedAnnually": "Facturación anual",
+    "changeHint": "Para cambiar de plan o pasar de mensual a anual, usa \"Gestionar suscripción\".",
+    "currentPlan": "Plan actual",
+    "yourPlan": "Tu plan",
+    "recommended": "Recomendado",
+    "chooseHint": "Elige un plan para activar tu suscripción.",
+    "changeTo": "Cambiar a {plan}",
+    "currentButton": "Tu plan actual",
+    "plansLabel": "Planes disponibles"
   },
   "Landing": {
     "nav": {
@@ -1785,7 +1807,14 @@
     "suspended": "\"{name}\" quedó suspendida.",
     "reactivated": "\"{name}\" quedó reactivada.",
     "retried": "\"{name}\" se volvió a aprovisionar.",
-    "mrrNote": "MRR estimado con el precio de lista de cada plan en Stripe, para suscripciones activas o con pago pendiente. No descuenta cupones."
+    "mrrNote": "MRR estimado con el precio de lista de cada plan en Stripe, para suscripciones activas o con pago pendiente. No descuenta cupones.",
+    "restricted": "Acceso restringido",
+    "signInTitle": "Iniciar sesión",
+    "emailPlaceholder": "admin@plataforma.com",
+    "showPassword": "Mostrar",
+    "hidePassword": "Ocultar",
+    "showPasswordLabel": "Mostrar contraseña",
+    "hidePasswordLabel": "Ocultar contraseña"
   },
   "AdminPayments": {
     "title": "Gestión de pagos",
@@ -1859,6 +1888,28 @@
       "invalidAddress": "La dirección no es válida para la red {network}.",
       "warning": "Revisa bien la red y la dirección: un envío a una red o dirección equivocada no se puede recuperar.",
       "enable": "Ofrecer pago con USDT en el checkout"
+    },
+    "notReadyTitle": "Tus clientes todavía no pueden pagar.",
+    "notReadyText": "Activa al menos un método para que aparezca en el checkout.",
+    "locked": {
+      "planBadge": "Plan {plan}",
+      "title": "Disponible desde el Plan {plan}",
+      "text": "Este medio de cobro está incluido a partir del <b>Plan {plan}</b>. Con tu <b>Plan {current}</b> puedes cobrar con {unlocked}.",
+      "upgrade": "Mejorar a Plan {plan}",
+      "withoutQr": "tarjeta y USDT",
+      "withoutWallet": "tarjeta, QR bancario y USDT"
+    },
+    "wallet": {
+      "title": "Billeteras digitales (Airtm, Takenos, Wallbit)",
+      "description": "Permite a tus clientes pagar transfiriendo con Airtm, Takenos o Wallbit e informando su número de comprobante o TxID para tu revisión.",
+      "provider": "Billeteras aceptadas",
+      "providerPlaceholder": "Ej. Airtm, Takenos, Wallbit",
+      "account": "Usuario, correo o cashtag de cobro",
+      "accountPlaceholder": "Ej. @mitienda o pagos@mitienda.com",
+      "instructions": "Instrucciones para el cliente",
+      "instructionsPlaceholder": "Ej. Transfiere el monto indicando tu número de pedido en la nota…",
+      "enable": "Ofrecer pago con billeteras digitales en el checkout",
+      "enableHint": "Ingresa la billetera aceptada y la cuenta de cobro para poder activarlo."
     }
   },
   "AdminAppearance": {
@@ -2077,5 +2128,33 @@
     "homeTitle": "Panel sin conexión",
     "sectionRequiresConnection": "Esta sección requiere conexión",
     "homeDescription": "Sin conexión puedes usar estas secciones con los datos guardados en este dispositivo. Borrar, cancelar pedidos, el punto de venta, pagos, personal, roles y configuración requieren conexión."
+  },
+  "AdminHome": {
+    "groups": {
+      "sales": "Ventas",
+      "catalog": "Catálogo",
+      "business": "Negocio",
+      "store": "Tienda"
+    },
+    "descriptions": {
+      "pos": "Cobra ventas físicas en mostrador.",
+      "returns": "Busca la venta original y procesa la devolución.",
+      "orders": "Todos los pedidos de todas las sucursales.",
+      "ordersBranch": "Los pedidos de tu sucursal.",
+      "products": "Catálogo general de la tienda.",
+      "categories": "Organiza el catálogo.",
+      "collections": "Agrupa tus productos en colecciones.",
+      "inventory": "Stock y ofertas de cada sucursal.",
+      "inventoryBranch": "Stock y ofertas de tu sucursal.",
+      "branches": "Crea y edita las sucursales físicas.",
+      "staff": "Asigna rol, sucursal y descuento.",
+      "staffBranch": "El personal de tu sucursal.",
+      "roles": "Qué puede hacer cada rol en el panel.",
+      "reports": "Métricas de ventas y consultas en lenguaje natural.",
+      "notifications": "Envía correos y avisos promocionales.",
+      "subscription": "Plan de tu tienda en la plataforma.",
+      "payments": "Tarjeta, QR bancario y USDT.",
+      "appearance": "Logo, colores y textos de tu tienda."
+    }
   }
 }

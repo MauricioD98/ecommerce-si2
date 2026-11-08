@@ -29,6 +29,7 @@
   "PASSWORD_STRONG": "密码必须至少包含一个大写字母、一个小写字母、一个数字和一个特殊字符",
   "DOMAIN_INVALID": "域名无效（例如 mybrand.com）",
   "PLAN_INVALID": "套餐必须是以下之一：{plans}",
+  "BILLING_INTERVAL_INVALID": "计费周期必须是以下之一：{intervals}",
   "CONTACT_MESSAGE_LENGTH": "留言长度必须在 10 到 5000 个字符之间",
   "SIZES_REQUIRED": "至少需要指定一个尺码",
   "SIZE_INVALID": "每个尺码都必须是有效值（XS、S、M、L、XL、XXL）",

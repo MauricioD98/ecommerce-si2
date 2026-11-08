@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ExternalLink, LogOut, PauseCircle, PlayCircle, RefreshCw, RotateCcw, ShieldCheck } from 'lucide-react';
+import { AlertCircle, ExternalLink, Lock, LogOut, PauseCircle, PlayCircle, RefreshCw, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import tableStyles from '@/components/modules/admin/admin-table.module.scss';
 import styles from './platform-admin.module.scss';
@@ -73,6 +73,7 @@ export default function PlatformAdminClient() {
     const [session, setSession] = useState<StoredSession | null>(null);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [tenants, setTenants] = useState<PlatformTenant[]>([]);
     const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
@@ -83,6 +84,8 @@ export default function PlatformAdminClient() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<TenantStatus | ''>('');
 
+    // sessionStorage solo existe en el navegador: se lee al montar (no durante el render del servidor)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => setSession(readStoredSession()), []);
     const token = session?.token ?? '';
 
@@ -124,6 +127,8 @@ export default function PlatformAdminClient() {
     );
 
     useEffect(() => {
+        // Carga al iniciar sesión: los setState ocurren después del await dentro de load
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (token) load(token);
     }, [token, load]);
 
@@ -202,39 +207,76 @@ export default function PlatformAdminClient() {
     if (!session) {
         return (
             <div className={styles.gate}>
-                <form className={styles.gateCard} onSubmit={handleLogin}>
-                    <ShieldCheck size={28} aria-hidden />
-                    <h1>{t('gateTitle')}</h1>
-                    <p>{t('gateText')}</p>
-                    {error && <div className={tableStyles.errorMessage}>{error}</div>}
-                    <label className={tableStyles.field}>
-                        <span>{t('emailLabel')}</span>
-                        <input
-                            type="email"
-                            className={tableStyles.input}
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            autoComplete="username"
-                            autoFocus
-                            required
-                        />
-                    </label>
-                    <label className={tableStyles.field}>
-                        <span>{t('passwordLabel')}</span>
-                        <input
-                            type="password"
-                            className={tableStyles.input}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete="current-password"
-                            required
-                        />
-                    </label>
-                    <button type="submit" className={tableStyles.button} disabled={isSigningIn || !email.trim() || !password}>
-                        {isSigningIn ? t('signingIn') : t('enter')}
-                    </button>
-                    <small>{t('loginHint')}</small>
-                </form>
+                <section aria-label={t('gateTitle')} className={styles.gateIntro}>
+                    <div className={styles.gateBadge}>
+                        <ShieldCheck size={22} aria-hidden />
+                        {t('restricted')}
+                    </div>
+                    <div>
+                        <h1>{t('gateTitle')}</h1>
+                        <p>{t('gateText')}</p>
+                    </div>
+                    <div className={styles.gateRule} aria-hidden />
+                </section>
+
+                <main className={styles.gateMain}>
+                    <form className={styles.gateForm} onSubmit={handleLogin} noValidate>
+                        <h2>{t('signInTitle')}</h2>
+                        {error && (
+                            <div role="alert" className={styles.gateError}>
+                                <AlertCircle size={18} aria-hidden />
+                                <span>{error}</span>
+                            </div>
+                        )}
+                        <div>
+                            <label className={styles.gateLabel} htmlFor="platform-email">
+                                {t('emailLabel')}
+                            </label>
+                            <input
+                                id="platform-email"
+                                type="email"
+                                className={styles.gateInput}
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder={t('emailPlaceholder')}
+                                autoComplete="username"
+                                autoFocus
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className={styles.gateLabel} htmlFor="platform-password">
+                                {t('passwordLabel')}
+                            </label>
+                            <div className={styles.gatePassword}>
+                                <input
+                                    id="platform-password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    className={styles.gateInput}
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    autoComplete="current-password"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    aria-pressed={showPassword}
+                                    aria-label={showPassword ? t('hidePasswordLabel') : t('showPasswordLabel')}
+                                >
+                                    {showPassword ? t('hidePassword') : t('showPassword')}
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" className={styles.gateSubmit} disabled={isSigningIn || !email.trim() || !password}>
+                            {isSigningIn ? t('signingIn') : t('enter')}
+                        </button>
+                        <div className={styles.gateNote}>
+                            <Lock size={18} aria-hidden />
+                            <span>{t('loginHint')}</span>
+                        </div>
+                    </form>
+                </main>
             </div>
         );
     }

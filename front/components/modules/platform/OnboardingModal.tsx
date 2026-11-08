@@ -5,7 +5,8 @@ import { Eye, EyeOff, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { platformService } from "@/service/api/platform.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
-import type { Plan } from "./plans";
+import { formatPlanPrice, type BillingInterval, type Plan } from "./plans";
+import type { PlanPriceView } from "@/hooks/usePlanPrices";
 import styles from "./platform.module.scss";
 
 interface FormState {
@@ -39,7 +40,17 @@ function validate(form: FormState, allowCustomDomain: boolean): FormError | null
 }
 
 // Modal de alta: datos de la tienda y del dueño → POST /platform/subscriptions/checkout → Stripe Checkout
-export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => void }) {
+export function OnboardingModal({
+    plan,
+    interval,
+    price,
+    onClose,
+}: {
+    plan: Plan;
+    interval: BillingInterval;
+    price: PlanPriceView;
+    onClose: () => void;
+}) {
     const t = useTranslations("Onboarding");
     const tCommon = useTranslations("Common");
     const tPricing = useTranslations("Pricing");
@@ -70,6 +81,7 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
         try {
             const { url } = await platformService.createCheckout({
                 plan: plan.key,
+                interval,
                 tenantName: form.tenantName.trim(),
                 domain: allowCustomDomain ? form.domain.trim() || undefined : undefined,
                 adminEmail: form.adminEmail.trim(),
@@ -90,7 +102,7 @@ export function OnboardingModal({ plan, onClose }: { plan: Plan; onClose: () => 
                     <X size={20} />
                 </button>
                 <h2 id="onboarding-title">
-                    {t("title", { plan: plan.name, price: plan.price, period: tPricing("perMonth") })}
+                    {t("title", { plan: plan.name, price: formatPlanPrice(price.amount, price.currency), period: tPricing(interval === "annual" ? "perYear" : "perMonth") })}
                 </h2>
                 <p className={styles.muted}>{t("intro")}</p>
 

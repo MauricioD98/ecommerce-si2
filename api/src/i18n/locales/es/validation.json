@@ -29,6 +29,7 @@
   "PASSWORD_STRONG": "La contraseña debe contener al menos una letra mayúscula, una letra minúscula, un número y un carácter especial",
   "DOMAIN_INVALID": "Dominio inválido (ej. boutiquemia.com)",
   "PLAN_INVALID": "El plan debe ser uno de: {plans}",
+  "BILLING_INTERVAL_INVALID": "El intervalo de facturación debe ser uno de: {intervals}",
   "CONTACT_MESSAGE_LENGTH": "El mensaje debe tener entre 10 y 5000 caracteres",
   "SIZES_REQUIRED": "Debe indicar al menos una talla",
   "SIZE_INVALID": "Cada talla debe ser un valor válido (XS, S, M, L, XL, XXL)",

@@ -29,6 +29,7 @@
   "PASSWORD_STRONG": "The password must contain at least one uppercase letter, one lowercase letter, one number and one special character",
   "DOMAIN_INVALID": "Invalid domain (e.g. mybrand.com)",
   "PLAN_INVALID": "The plan must be one of: {plans}",
+  "BILLING_INTERVAL_INVALID": "The billing interval must be one of: {intervals}",
   "CONTACT_MESSAGE_LENGTH": "The message must be between 10 and 5000 characters long",
   "SIZES_REQUIRED": "You must specify at least one size",
   "SIZE_INVALID": "Each size must be a valid value (XS, S, M, L, XL, XXL)",

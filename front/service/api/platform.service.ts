@@ -1,11 +1,13 @@
 import { apiClient } from "./axios.config";
-import type { PlanKey } from "@/components/modules/platform/plans";
+import type { BillingInterval, PlanKey } from "@/components/modules/platform/plans";
 
 // Endpoints del plano de control (/api/v1/platform/*): no llevan tienda. El interceptor de Axios
 // los deja salir aunque no haya x-tenant-id (ver isPlatformRequest en axios.config.ts).
 
 export interface SubscriptionCheckoutPayload {
     plan: PlanKey;
+    // Mensual o anual: el backend elige el price_id correspondiente
+    interval: BillingInterval;
     tenantName: string;
     domain?: string;
     adminEmail: string;
@@ -18,6 +20,15 @@ export interface CheckoutStatus {
     status: SignupStatus;
     tenantName: string;
     loginUrl: string | null;
+}
+
+// GET /platform/subscriptions/plans: precio real (Stripe) de cada plan e intervalo
+export interface PlanPrice {
+    plan: PlanKey;
+    interval: BillingInterval;
+    available: boolean;
+    amount: number | null;
+    currency: string | null;
 }
 
 export interface ContactPayload {
@@ -34,6 +45,11 @@ export const platformService = {
             "/platform/subscriptions/checkout",
             payload
         );
+        return data.data;
+    },
+
+    getPlans: async (): Promise<PlanPrice[]> => {
+        const { data } = await apiClient.get<{ data: PlanPrice[] }>("/platform/subscriptions/plans");
         return data.data;
     },
 

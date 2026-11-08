@@ -8,11 +8,35 @@ import { requireTenant } from '../../tenancy/tenant-context';
 //
 // Los montos que muestra la landing (front/components/modules/platform/plans.ts) tienen que
 // coincidir con los Prices configurados en Stripe.
+//
+// Cada plan tiene dos Prices recurrentes: mensual (STRIPE_PRICE_<PLAN>) y anual
+// (STRIPE_PRICE_<PLAN>_ANNUAL). `amounts` (centavos de USD) solo lo usa el script que crea los Prices
+// en el sandbox de Stripe (src/scripts/stripe-sandbox-plans.ts); lo que se cobra es el Price de Stripe.
+// Anual = 10 meses (2 meses gratis).
+export const BILLING_INTERVALS = ['monthly', 'annual'] as const;
+export type BillingInterval = (typeof BILLING_INTERVALS)[number];
+
 export const PLANS = {
-  starter: { name: 'Starter', priceEnv: 'STRIPE_PRICE_STARTER' },
-  growth: { name: 'Growth', priceEnv: 'STRIPE_PRICE_GROWTH' },
-  pro: { name: 'Pro', priceEnv: 'STRIPE_PRICE_PRO' },
+  starter: {
+    name: 'Starter',
+    priceEnv: 'STRIPE_PRICE_STARTER',
+    annualPriceEnv: 'STRIPE_PRICE_STARTER_ANNUAL',
+    amounts: { monthly: 1150, annual: 11500 },
+  },
+  growth: {
+    name: 'Growth',
+    priceEnv: 'STRIPE_PRICE_GROWTH',
+    annualPriceEnv: 'STRIPE_PRICE_GROWTH_ANNUAL',
+    amounts: { monthly: 2150, annual: 21500 },
+  },
+  pro: {
+    name: 'Pro',
+    priceEnv: 'STRIPE_PRICE_PRO',
+    annualPriceEnv: 'STRIPE_PRICE_PRO_ANNUAL',
+    amounts: { monthly: 3600, annual: 36000 },
+  },
 } as const;
+export const PLAN_CURRENCY = 'usd';
 
 export type PlanKey = keyof typeof PLANS;
 
@@ -157,15 +181,33 @@ export function assertPlanFeature(feature: PlanBooleanFeature): void {
   }
 }
 
-export function priceIdFor(plan: PlanKey): string | null {
-  const priceId = process.env[PLANS[plan].priceEnv]?.trim();
+/** Nombre de la variable de entorno con el price_id de un plan e intervalo. */
+export function priceEnvFor(plan: PlanKey, interval: BillingInterval = 'monthly'): string {
+  return interval === 'annual' ? PLANS[plan].annualPriceEnv : PLANS[plan].priceEnv;
+}
+
+export function priceIdFor(plan: PlanKey, interval: BillingInterval = 'monthly'): string | null {
+  const priceId = process.env[priceEnvFor(plan, interval)]?.trim();
   return priceId?.startsWith('price_') ? priceId : null;
 }
 
-// Inverso de priceIdFor: un cambio de plan hecho en el Billing Portal llega como un price_id
+// Inverso de priceIdFor: un cambio de plan (o de mensual a anual) hecho en el Billing Portal llega
+// como un price_id
 export function planForPrice(priceId: string | null | undefined): PlanKey | null {
+  return priceLookup(priceId)?.plan ?? null;
+}
+
+export function priceLookup(priceId: string | null | undefined): { plan: PlanKey; interval: BillingInterval } | null {
   if (!priceId) return null;
-  return PLAN_KEYS.find((plan) => priceIdFor(plan) === priceId) ?? null;
+  for (const plan of PLAN_KEYS) {
+    for (const interval of BILLING_INTERVALS) if (priceIdFor(plan, interval) === priceId) return { plan, interval };
+  }
+  return null;
+}
+
+/** Intervalo de Stripe (month/year) al de la plataforma. */
+export function intervalFromStripe(interval: string | null | undefined): BillingInterval | null {
+  return interval === 'year' ? 'annual' : interval === 'month' ? 'monthly' : null;
 }
 
 /** Al arrancar: avisa qué falta para cobrar suscripciones, sin tumbar la API (el resto funciona). */
@@ -178,7 +220,9 @@ export function missingBillingEnv(): string[] {
     missing.push('STRIPE_WEBHOOK_SECRET (debe empezar con whsec_)');
   }
   for (const plan of PLAN_KEYS) {
-    if (!priceIdFor(plan)) missing.push(`${PLANS[plan].priceEnv} (price_...)`);
+    for (const interval of BILLING_INTERVALS) {
+      if (!priceIdFor(plan, interval)) missing.push(`${priceEnvFor(plan, interval)} (price_...)`);
+    }
   }
   return missing;
 }

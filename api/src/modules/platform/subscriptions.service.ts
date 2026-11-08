@@ -17,7 +17,27 @@ import { withTenantParam } from '../../tenancy/tenant-context';
 import { MailService } from '../mail/mail.service';
 import { i18nMessage } from '../../i18n/i18n-message';
 import { SubscriptionCheckoutDto } from './dto/subscription-checkout.dto';
-import { PLANS, type PlanKey, getPlanFeatures, minimumPlanName, missingBillingEnv, planForPrice, priceIdFor } from './plans';
+import {
+  BILLING_INTERVALS,
+  PLANS,
+  type BillingInterval,
+  type PlanKey,
+  getPlanFeatures,
+  intervalFromStripe,
+  minimumPlanName,
+  missingBillingEnv,
+  planForPrice,
+  priceEnvFor,
+  priceIdFor,
+} from './plans';
+
+export interface PlanPrice {
+  plan: PlanKey;
+  interval: BillingInterval;
+  available: boolean;
+  amount: number | null; // en la moneda, no en centavos
+  currency: string | null;
+}
 
 // metadata.kind distingue estas sesiones de cualquier otro Checkout de la misma cuenta de Stripe
 const SIGNUP_KIND = 'tenant_signup';
@@ -66,11 +86,8 @@ export class SubscriptionsService implements OnModuleInit {
   // ---------------------------------------------------------------------------------------------
 
   async createCheckout(dto: SubscriptionCheckoutDto): Promise<{ url: string; sessionId: string }> {
-    const priceId = priceIdFor(dto.plan);
-    if (!priceId) {
-      this.logger.error(`Falta ${PLANS[dto.plan].priceEnv} (price_...) en el entorno`);
-      throw new ServiceUnavailableException(i18nMessage('errors.PLAN_UNAVAILABLE'));
-    }
+    const interval = dto.interval ?? 'monthly';
+    const priceId = this.requirePrice(dto.plan, interval);
 
     const planFeatures = getPlanFeatures(dto.plan);
     const normalizedDomain = planFeatures.customDomain ? (dto.domain ?? null) : null;
@@ -110,6 +127,7 @@ export class SubscriptionsService implements OnModuleInit {
       kind: SIGNUP_KIND,
       signupId: signup.id,
       plan: dto.plan,
+      interval,
       tenantName: dto.tenantName.slice(0, 100),
       domain: normalizedDomain ?? '',
     };
@@ -204,12 +222,19 @@ export class SubscriptionsService implements OnModuleInit {
 
     let cancelAtPeriodEnd = false;
     let currentPeriodEnd: string | null = null;
+    let interval: BillingInterval | null = null;
+    let amount: number | null = null;
+    let currency: string | null = null;
     if (tenant.stripeSubscriptionId) {
       try {
         const subscription = await this.stripe.subscriptions.retrieve(tenant.stripeSubscriptionId);
         cancelAtPeriodEnd = subscription.cancel_at_period_end;
-        const end = subscription.items.data[0]?.current_period_end;
+        const item = subscription.items.data[0];
+        const end = item?.current_period_end;
         currentPeriodEnd = end ? new Date(end * 1000).toISOString() : null;
+        interval = intervalFromStripe(item?.price.recurring?.interval);
+        amount = item?.price.unit_amount != null ? item.price.unit_amount / 100 : null;
+        currency = item?.price.currency ? item.price.currency.toUpperCase() : null;
         // También sincroniza si el cliente cambió de plan desde el Billing Portal de Stripe
         await this.syncTenant(subscription);
         const refreshed = await this.control.tenant.findUnique({
@@ -233,15 +258,20 @@ export class SubscriptionsService implements OnModuleInit {
       canManage: !!tenant.stripeCustomerId,
       cancelAtPeriodEnd,
       currentPeriodEnd,
+      // Mensual o anual, y lo que se cobra por período (del Price real de la suscripción)
+      interval,
+      amount,
+      currency,
     };
   }
 
-  async createTenantCheckout(tenantId: string, ownerEmail: string, plan: PlanKey): Promise<{ url: string }> {
-    const priceId = priceIdFor(plan);
-    if (!priceId) {
-      this.logger.error(`Falta ${PLANS[plan].priceEnv} (price_...) en el entorno`);
-      throw new ServiceUnavailableException(i18nMessage('errors.PLAN_UNAVAILABLE'));
-    }
+  async createTenantCheckout(
+    tenantId: string,
+    ownerEmail: string,
+    plan: PlanKey,
+    interval: BillingInterval = 'monthly',
+  ): Promise<{ url: string }> {
+    const priceId = this.requirePrice(plan, interval);
 
     const tenant = await this.control.tenant.findUnique({
       where: { id: tenantId },
@@ -251,7 +281,7 @@ export class SubscriptionsService implements OnModuleInit {
     if (this.hasLiveSubscription(tenant)) throw new ConflictException(i18nMessage('errors.SUBSCRIPTION_ALREADY_ACTIVE'));
 
     // La tienda sale del token (tenantId), nunca del body: nadie puede pagar a nombre de otra
-    const metadata = { kind: TENANT_SUBSCRIPTION_KIND, tenantId, plan };
+    const metadata = { kind: TENANT_SUBSCRIPTION_KIND, tenantId, plan, interval };
     const returnUrl = `${this.platformUrl}/admin/suscripcion`;
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -275,11 +305,53 @@ export class SubscriptionsService implements OnModuleInit {
     const tenant = await this.control.tenant.findUnique({ where: { id: tenantId }, select: { stripeCustomerId: true } });
     if (!tenant?.stripeCustomerId) throw new BadRequestException(i18nMessage('errors.NO_BILLING_ACCOUNT'));
 
+    // STRIPE_PORTAL_CONFIGURATION (bpc_...) permite cambiar entre los 3 planes y entre mensual y anual.
+    // Sin ella Stripe usa la configuración por defecto de la cuenta (si existe).
+    const configuration = process.env.STRIPE_PORTAL_CONFIGURATION?.trim();
     const session = await this.stripe.billingPortal.sessions.create({
       customer: tenant.stripeCustomerId,
       return_url: withTenantParam(`${this.platformUrl}/admin/suscripcion`, tenantId),
+      ...(configuration?.startsWith('bpc_') ? { configuration } : {}),
     });
     return { url: session.url };
+  }
+
+  private requirePrice(plan: PlanKey, interval: BillingInterval): string {
+    const priceId = priceIdFor(plan, interval);
+    if (!priceId) {
+      this.logger.error(`Falta ${priceEnvFor(plan, interval)} (price_...) en el entorno: corre npm run stripe:sandbox-plans`);
+      throw new ServiceUnavailableException(i18nMessage('errors.PLAN_UNAVAILABLE'));
+    }
+    return priceId;
+  }
+
+  private planPricesCache: { at: number; prices: PlanPrice[] } | null = null;
+
+  /**
+   * Catálogo público: para cada plan e intervalo, si se puede contratar y su precio real en Stripe
+   * (cache de 10 min). El front lo usa para mostrar los montos y deshabilitar lo que no está configurado.
+   */
+  async planPrices(): Promise<PlanPrice[]> {
+    if (this.planPricesCache && Date.now() - this.planPricesCache.at < 10 * 60_000) return this.planPricesCache.prices;
+    const combos = (Object.keys(PLANS) as PlanKey[]).flatMap((plan) => BILLING_INTERVALS.map((interval) => ({ plan, interval })));
+    const prices = await Promise.all(
+      combos.map(async ({ plan, interval }): Promise<PlanPrice> => {
+        const priceId = priceIdFor(plan, interval);
+        const empty = { plan, interval, available: false, amount: null, currency: null };
+        if (!priceId) return empty;
+        try {
+          const price = await this.stripe.prices.retrieve(priceId);
+          if (!price.active || price.unit_amount == null) return empty;
+          return { plan, interval, available: true, amount: price.unit_amount / 100, currency: price.currency.toUpperCase() };
+        } catch (error) {
+          this.logger.warn(`No se pudo leer el precio ${interval} de ${plan} en Stripe: ${(error as Error).message}`);
+          return empty;
+        }
+      }),
+    );
+    // Si Stripe falló en todo, no se cachea: el próximo intento vuelve a consultar
+    if (prices.some((p) => p.available)) this.planPricesCache = { at: Date.now(), prices };
+    return prices;
   }
 
   // ---------------------------------------------------------------------------------------------

@@ -1,0 +1,702 @@
+// Módulo "Suscripción y pagos" del panel (vistas /admin/suscripcion y /admin/settings/payments).
+// Sigue el diseño del lienzo "Tienda Starter Demo: Suscripción y Pagos": tarjetas blancas de 16px,
+// mosaicos de icono, pills de estado, switches y botones de 44–48px (objetivos táctiles).
+
+$ink: #0a0a0a;
+$muted: #5e5e59;
+$body: #3f3f3b;
+$line: #e6e6e3;
+$field: #cfcfca;
+$soft: #f4f4f2;
+
+.page {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    max-width: 1080px;
+    color: $ink;
+}
+
+.header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px 24px;
+
+    h1 {
+        margin: 0;
+        font-size: 32px;
+        line-height: 1.15;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+    }
+
+    p {
+        margin: 8px 0 0;
+        font-size: 15.5px;
+        line-height: 1.5;
+        color: $muted;
+        max-width: 64ch;
+    }
+}
+
+// ---------- botones ----------
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    font-family: inherit;
+    cursor: pointer;
+    border: 1px solid transparent;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s;
+
+    &:disabled {
+        cursor: not-allowed;
+        background: #e4e4e1;
+        color: #6a6a65;
+        border-color: transparent;
+    }
+
+    &:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+    }
+}
+
+.btnDark {
+    background: $ink;
+    color: #fff;
+
+    &:hover:not(:disabled) {
+        background: #2c2c2c;
+    }
+}
+
+.btnLine {
+    background: #fff;
+    color: $ink;
+    border-color: $field;
+
+    &:hover:not(:disabled) {
+        background: #f1f1ef;
+    }
+}
+
+.btnDanger {
+    background: #fff;
+    color: #b42318;
+    border-color: #f0b9b4;
+
+    &:hover:not(:disabled) {
+        background: #fef3f2;
+    }
+}
+
+.btnTall {
+    min-height: 48px;
+    padding: 0 28px;
+}
+
+.btnBlock {
+    width: 100%;
+    min-height: 48px;
+}
+
+.buttonRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+// ---------- tarjetas ----------
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: #fff;
+    border: 1px solid $line;
+    border-radius: 16px;
+    padding: 28px;
+    min-width: 0;
+
+    @media (max-width: 560px) {
+        padding: 20px;
+    }
+}
+
+.cardHead {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    h2 {
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+}
+
+.tile {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #f1f1ef;
+    color: $ink;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+
+.tileDark {
+    width: 48px;
+    height: 48px;
+    background: $ink;
+    color: #fff;
+}
+
+.text {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: $body;
+}
+
+.hint {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: $muted;
+}
+
+.note {
+    @extend .hint;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: $soft;
+}
+
+// ---------- pills ----------
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #efefec;
+    color: #4a4a46;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pillLarge {
+    padding: 6px 12px;
+    font-size: 13.5px;
+}
+
+.pillDark {
+    background: $ink;
+    color: #fff;
+}
+
+.pillGreen {
+    background: #dcf3d3;
+    color: #1f5a12;
+}
+
+.pillBlue {
+    background: #dff0fb;
+    color: #0b5580;
+}
+
+.pillAmber {
+    background: #fef3c7;
+    color: #7c4a03;
+}
+
+.pillRed {
+    background: #fde8e6;
+    color: #a1271b;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex: none;
+}
+
+// ---------- avisos ----------
+.banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-size: 14.5px;
+    line-height: 1.5;
+
+    svg {
+        flex: none;
+        margin-top: 1px;
+    }
+
+    strong {
+        font-weight: 600;
+    }
+}
+
+.bannerWarn {
+    background: #fff8e6;
+    border: 1px solid #efd98f;
+    color: #5f4300;
+}
+
+.bannerError {
+    background: #fdecea;
+    border: 1px solid #f5c2bd;
+    color: #8f1f14;
+}
+
+.bannerOk {
+    background: #ecf8e8;
+    border: 1px solid #b9e2ab;
+    color: #1f5a12;
+}
+
+.bannerInfo {
+    background: #f4f4f2;
+    border: 1px solid $line;
+    color: $body;
+}
+
+.warnBox {
+    @extend .banner;
+    @extend .bannerWarn;
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: 13.5px;
+}
+
+// ---------- formularios ----------
+.label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.field {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
+    padding: 0 14px;
+    border: 1px solid $field;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 15px;
+    line-height: 1.4;
+    font-family: inherit;
+    color: $ink;
+
+    &::placeholder {
+        color: #74746f;
+    }
+
+    &:hover {
+        border-color: #a8a8a3;
+    }
+
+    &[aria-invalid='true'] {
+        border-color: #d92d20;
+    }
+}
+
+textarea.field {
+    padding: 12px 14px;
+    min-height: 104px;
+    resize: vertical;
+}
+
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+}
+
+.fieldError {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+    color: #b42318;
+}
+
+// Switch accesible: es un checkbox real con role="switch"
+.switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+
+    input {
+        appearance: none;
+        width: 44px;
+        height: 26px;
+        border-radius: 999px;
+        background: #8a8a85;
+        position: relative;
+        margin: 0;
+        flex: none;
+        cursor: pointer;
+        transition: background 0.15s;
+
+        &::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            transition: transform 0.15s;
+        }
+
+        &:checked {
+            background: $ink;
+        }
+
+        &:checked::after {
+            transform: translateX(18px);
+        }
+
+        &:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        &:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+    }
+}
+
+.switchHint {
+    @extend .hint;
+    margin-left: 56px;
+}
+
+// ---------- Gestión de pagos ----------
+.columns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: stretch;
+}
+
+.column {
+    flex: 1 1 420px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.qrRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 20px;
+}
+
+.qrBox {
+    width: 168px;
+    height: 168px;
+    box-sizing: border-box;
+    border: 1.5px dashed #b5b5b0;
+    border-radius: 14px;
+    background: #fafaf8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 16px;
+    text-align: center;
+    color: $muted;
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.qrImage {
+    width: 168px;
+    height: 168px;
+    object-fit: contain;
+    border: 1px solid $line;
+    border-radius: 14px;
+    background: #fff;
+}
+
+.qrActions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.account {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: $muted;
+}
+
+// Franja de un medio bloqueado por plan (o de billeteras)
+.wide {
+    @extend .card;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 24px 40px;
+}
+
+.wideInfo {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.locked {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    border-radius: 12px;
+    background: $soft;
+    border: 1px dashed #b5b5b0;
+
+    strong {
+        font-weight: 600;
+    }
+}
+
+.lockedTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+// ---------- Suscripción ----------
+.current {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px 32px;
+    background: #fff;
+    border: 1px solid $line;
+    border-radius: 16px;
+    padding: 24px 28px;
+}
+
+.currentPlan {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: $muted;
+}
+
+.currentName {
+    margin-top: 2px;
+    font-size: 26px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.currentStatus {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    font-size: 14.5px;
+    color: $muted;
+}
+
+// Selector Mensual / Anual
+.toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid $line;
+    border-radius: 999px;
+    background: #fff;
+
+    button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 40px;
+        padding: 0 18px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: $muted;
+        font-size: 14.5px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+
+        &:hover {
+            color: $ink;
+        }
+
+        &[aria-checked='true'] {
+            background: $ink;
+            color: #fff;
+        }
+
+        &:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+    }
+}
+
+.toggleBadge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #dcf3d3;
+    color: #1f5a12;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+    gap: 20px;
+    align-items: stretch;
+}
+
+.plan {
+    @extend .card;
+    gap: 24px;
+    transition: transform 0.15s, box-shadow 0.15s;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.07);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+
+        &:hover {
+            transform: none;
+        }
+    }
+}
+
+.planFeatured {
+    border-color: $ink;
+    box-shadow: 0 0 0 1px $ink, 0 12px 32px rgba(0, 0, 0, 0.08);
+}
+
+.planHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    h2 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+}
+
+.price {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    b {
+        font-size: 44px;
+        line-height: 1;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        font-variant-numeric: tabular-nums;
+    }
+
+    span {
+        font-size: 15px;
+        color: $muted;
+    }
+}
+
+.priceNote {
+    @extend .hint;
+    margin-top: -14px;
+}
+
+.features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 15px;
+    line-height: 1.4;
+
+    li {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    svg {
+        flex: none;
+        margin-top: 1px;
+    }
+}
+
+.planAction {
+    margin-top: auto;
+}

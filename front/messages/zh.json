@@ -63,7 +63,12 @@
     "billingLabel": "计费周期",
     "monthly": "按月",
     "annual": "按年",
-    "soon": "即将推出"
+    "soon": "即将推出",
+    "perYear": "/年",
+    "annualBadge": "赠送 2 个月",
+    "annualEquivalent": "相当于每月 {price}",
+    "annualSaving": "每年节省 {amount}",
+    "unavailable": "暂不可用"
   },
   "Plans": {
     "starter": {
@@ -1617,7 +1622,24 @@
     "noRenew": "已取消：不会续费",
     "perMonth": " /月",
     "redirecting": "正在跳转...",
-    "choose": "选择 {plan}"
+    "choose": "选择 {plan}",
+    "perYear": " /年",
+    "billingLabel": "计费周期",
+    "monthly": "按月",
+    "annual": "按年",
+    "annualBadge": "赠送 2 个月",
+    "annualEquivalent": "相当于每月 {price}",
+    "unavailable": "暂不可用",
+    "billedMonthly": "按月计费",
+    "billedAnnually": "按年计费",
+    "changeHint": "如需更换套餐或从按月改为按年，请使用“管理订阅”。",
+    "currentPlan": "当前套餐",
+    "yourPlan": "你的套餐",
+    "recommended": "推荐",
+    "chooseHint": "选择一个套餐以激活订阅。",
+    "changeTo": "更换为 {plan}",
+    "currentButton": "你的当前套餐",
+    "plansLabel": "可选套餐"
   },
   "Landing": {
     "nav": {
@@ -1775,7 +1797,14 @@
     "suspended": "“{name}”已暂停。",
     "reactivated": "“{name}”已恢复。",
     "retried": "“{name}”已重新创建。",
-    "mrrNote": "MRR 按各套餐在 Stripe 中的标价估算，统计正常及逾期付款的订阅，未扣除优惠券。"
+    "mrrNote": "MRR 按各套餐在 Stripe 中的标价估算，统计正常及逾期付款的订阅，未扣除优惠券。",
+    "restricted": "受限访问",
+    "signInTitle": "登录",
+    "emailPlaceholder": "admin@platform.com",
+    "showPassword": "显示",
+    "hidePassword": "隐藏",
+    "showPasswordLabel": "显示密码",
+    "hidePasswordLabel": "隐藏密码"
   },
   "AdminPayments": {
     "title": "支付管理",
@@ -1849,6 +1878,28 @@
       "invalidAddress": "该地址对 {network} 网络无效。",
       "warning": "请仔细核对网络和地址：转到错误网络或地址的资金无法找回。",
       "enable": "在结账页面提供 USDT 支付"
+    },
+    "notReadyTitle": "你的客户还无法付款。",
+    "notReadyText": "请至少开启一种方式，让它出现在结账页面。",
+    "locked": {
+      "planBadge": "{plan} 套餐",
+      "title": "{plan} 套餐起可用",
+      "text": "此收款方式包含在 <b>{plan} 套餐</b>及以上。使用你的 <b>{current} 套餐</b>可以通过{unlocked}收款。",
+      "upgrade": "升级到 {plan} 套餐",
+      "withoutQr": "银行卡和 USDT",
+      "withoutWallet": "银行卡、银行二维码和 USDT"
+    },
+    "wallet": {
+      "title": "数字钱包（Airtm、Takenos、Wallbit）",
+      "description": "让客户通过 Airtm、Takenos 或 Wallbit 转账付款，并提交凭证号或 TxID 供你审核。",
+      "provider": "接受的钱包",
+      "providerPlaceholder": "例如 Airtm、Takenos、Wallbit",
+      "account": "收款用户名、邮箱或 cashtag",
+      "accountPlaceholder": "例如 @mystore 或 payments@mystore.com",
+      "instructions": "给客户的说明",
+      "instructionsPlaceholder": "例如：转账时请在备注中写上你的订单号…",
+      "enable": "在结账页面提供数字钱包付款",
+      "enableHint": "填写接受的钱包和收款账户后即可开启。"
     }
   },
   "AdminAppearance": {
@@ -2067,5 +2118,33 @@
     "homeTitle": "离线管理面板",
     "sectionRequiresConnection": "此部分需要网络连接",
     "homeDescription": "离线时，您可以使用此设备上保存的数据访问以下部分。删除、取消订单、收银台、支付、员工、角色和设置需要网络连接。"
+  },
+  "AdminHome": {
+    "groups": {
+      "sales": "销售",
+      "catalog": "商品目录",
+      "business": "经营",
+      "store": "店铺"
+    },
+    "descriptions": {
+      "pos": "在门店柜台收银。",
+      "returns": "查找原始销售并处理退货。",
+      "orders": "所有门店的全部订单。",
+      "ordersBranch": "你所在门店的订单。",
+      "products": "店铺的总商品目录。",
+      "categories": "整理商品目录。",
+      "collections": "将商品分组为系列。",
+      "inventory": "各门店的库存与优惠。",
+      "inventoryBranch": "你所在门店的库存与优惠。",
+      "branches": "创建和编辑实体门店。",
+      "staff": "分配角色、门店和折扣。",
+      "staffBranch": "你所在门店的员工。",
+      "roles": "每个角色在后台能做什么。",
+      "reports": "销售指标和自然语言查询。",
+      "notifications": "发送促销邮件和通知。",
+      "subscription": "你的店铺在平台上的套餐。",
+      "payments": "银行卡、银行二维码和 USDT。",
+      "appearance": "店铺的标志、颜色和文案。"
+    }
   }
 }

@@ -29,6 +29,7 @@
   "PASSWORD_STRONG": "Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial",
   "DOMAIN_INVALID": "Domaine invalide (ex. maboutique.com)",
   "PLAN_INVALID": "L'offre doit être l'une des suivantes : {plans}",
+  "BILLING_INTERVAL_INVALID": "La périodicité de facturation doit être l'une des suivantes : {intervals}",
   "CONTACT_MESSAGE_LENGTH": "Le message doit contenir entre 10 et 5000 caractères",
   "SIZES_REQUIRED": "Vous devez indiquer au moins une taille",
   "SIZE_INVALID": "Chaque taille doit être une valeur valide (XS, S, M, L, XL, XXL)",
