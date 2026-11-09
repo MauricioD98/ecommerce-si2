@@ -7,9 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stellafemme.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "La cámara se usa solo durante el probador virtual en vivo; el video se envía a Decart para transformarlo y no se guarda."
+      }
     },
     "android": {
+      "package": "com.stellafemme.app",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -17,7 +22,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -25,7 +33,14 @@
     "plugins": [
       "expo-font",
       "expo-localization",
-      "expo-status-bar"
+      "expo-status-bar",
+      "@livekit/react-native-expo-plugin",
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "La cámara se usa solo durante el probador virtual en vivo; el video se envía a Decart para transformarlo y no se guarda."
+        }
+      ]
     ]
   }
 }

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Branch, branchesApi } from '../api/branches.api';
+import { useTenant } from './TenantContext';
 import { appStorage } from '../utils/storage';
 
 const STORAGE_SELECTED_BRANCH_KEY = '@selected_branch_id';
@@ -19,8 +20,16 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [isLoadingBranches, setIsLoadingBranches] = useState<boolean>(true);
+  // Sin tienda elegida (login) no hay sucursales que pedir
+  const { tenantId } = useTenant();
 
   const loadBranches = useCallback(async () => {
+    if (!tenantId) {
+      setBranches([]);
+      setSelectedBranchId(null);
+      setIsLoadingBranches(false);
+      return;
+    }
     try {
       setIsLoadingBranches(true);
       const activeBranches = await branchesApi.getActive();
@@ -45,7 +54,7 @@ export const BranchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoadingBranches(false);
     }
-  }, []);
+  }, [tenantId]);
 
   useEffect(() => {
     loadBranches();

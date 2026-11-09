@@ -3,9 +3,14 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@config-plugins/react-native-webrtc": "15.0.2",
+    "@decartai/sdk": "0.2.14",
     "@expo/app-integrity": "^58.0.2",
     "@expo/metro-runtime": "~58.0.16",
     "@expo/vector-icons": "^15.1.1",
+    "@livekit/react-native": "2.11.1",
+    "@livekit/react-native-expo-plugin": "1.0.2",
+    "@livekit/react-native-webrtc": "144.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.19.2",
     "@react-navigation/native": "^7.4.1",
@@ -13,12 +18,14 @@
     "axios": "^1.20.0",
     "expo": "^58.0.0",
     "expo-constants": "~58.0.14",
+    "expo-dev-client": "~58.0.18",
     "expo-font": "~58.0.11",
     "expo-localization": "~58.0.5",
     "expo-network": "~58.0.4",
     "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
     "i18next": "^25.5.2",
+    "livekit-client": "2.20.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-i18next": "^15.7.3",
@@ -41,7 +48,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test:config": "node --test src/config/apiUrl.test.js",
-    "test:offline": "node --test src/offline/offlineCore.test.js"
+    "test:offline": "node --test src/offline/offlineCore.test.js",
+    "test:tryon": "node --test src/tryOn/tryOnCore.test.js",
+    "android:dev-build": "expo run:android",
+    "start:dev-client": "expo start --dev-client",
+    "test:stores": "node --test src/tenant/storeDirectory.test.js"
   },
   "private": true
 }

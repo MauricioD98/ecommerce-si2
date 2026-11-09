@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PublicTenantLogosService } from './public-tenant-logos.service';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { PlatformController } from './platform.controller';
@@ -22,7 +23,7 @@ import { PlatformSystemService } from './system/platform-system.service';
 @Module({
   imports: [JwtModule.register({}), AuthModule],
   controllers: [PlatformController, PlatformAuthController, SubscriptionsController, TenantSubscriptionController, ContactController, PlatformBranchesController, PlatformAuditController, PlatformSystemController],
-  providers: [PlatformAuthService, PlatformAdminGuard, InternalKeyGuard, SubscriptionsService, PlatformBranchesService, PlatformSystemService],
+  providers: [PublicTenantLogosService, PlatformAuthService, PlatformAdminGuard, InternalKeyGuard, SubscriptionsService, PlatformBranchesService, PlatformSystemService],
   exports: [SubscriptionsService],
 })
 export class PlatformModule {}

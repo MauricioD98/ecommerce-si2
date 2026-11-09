@@ -17,9 +17,11 @@ import {
   Put,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { PublicTenantLogosService } from './public-tenant-logos.service';
 import { PlatformAuditService, auditActorFromRequest } from './audit/platform-audit.service';
 import * as webpush from 'web-push';
 import { IntegrationProvider, TenantSecretsService } from '../../tenancy/tenant-secrets.service';
@@ -61,6 +63,7 @@ export class PlatformController {
     private readonly subscriptions: SubscriptionsService,
     private readonly tenantCache: TenantResolutionCache,
     private readonly audit: PlatformAuditService,
+    private readonly logos: PublicTenantLogosService,
   ) {}
 
   /**
@@ -75,20 +78,52 @@ export class PlatformController {
     const tenants = await this.control.tenant.findMany({
       where: { status: 'ACTIVE' },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, slug: true, name: true, plan: true },
+      select: { id: true, slug: true, name: true, plan: true, schemaName: true },
     });
-    const data = tenants.map((t) => {
-      const features = getPlanFeatures(t.plan);
-      return {
-        id: t.id,
-        slug: t.slug,
-        name: t.name,
-        plan: t.plan,
-        planName: features.planName,
-        mobileApp: features.mobileApp,
-      };
-    });
+    const data = await Promise.all(
+      tenants.map(async (t) => {
+        const features = getPlanFeatures(t.plan);
+        return {
+          id: t.id,
+          slug: t.slug,
+          name: t.name,
+          plan: t.plan,
+          planName: features.planName,
+          mobileApp: features.mobileApp,
+          // URL https externa o ruta de esta API (/platform/tenants/:id/logo); null si no tiene logo
+          logoUrl: await this.logos.publicLogoUrl(t),
+        };
+      }),
+    );
     return { success: true, data, message: 'Tiendas disponibles' };
+  }
+
+  /**
+   * Público: logo de una tienda activa subido desde el panel (data URL en su schema), como imagen.
+   * Lo usa el selector de tienda de la app móvil. Si el logo es una URL externa, redirige a ella.
+   */
+  @Get(':id/logo')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Logo público de una tienda activa' })
+  async logo(@Param('id', new ParseUUIDPipe()) id: string, @Res() res: Response) {
+    const tenant = await this.control.tenant.findFirst({ where: { id, status: 'ACTIVE' }, select: { id: true, schemaName: true } });
+    const logo = tenant ? await this.logos.getLogo(tenant) : null;
+    if (!logo) throw new NotFoundException('La tienda no tiene logo');
+    if (logo.kind === 'url') {
+      res.redirect(302, logo.url);
+      return;
+    }
+    res
+      .status(200)
+      .set({
+        'Content-Type': logo.type,
+        'Content-Length': String(logo.bytes.length),
+        'Cache-Control': 'public, max-age=300',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'",
+      })
+      .send(logo.bytes);
   }
 
   /**

@@ -20,6 +20,8 @@ import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { Colors, Shadows } from '../../theme/colors';
 import { getErrorMessage } from '../../api/client';
+import { StoreLogo, StorePicker } from '../../components/StorePicker';
+import { useTranslation } from '../../../node_modules/react-i18next';
 import {
   getApiBaseUrl,
   setCustomApiBaseUrl,
@@ -30,10 +32,19 @@ import {
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
+// Al elegir otra tienda la app se remonta (nada de la tienda anterior queda en memoria) y este formulario
+// se pierde: el correo escrito se conserva aquí, solo en memoria. La contraseña nunca.
+let emailDraft = '';
+
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { login } = useAuth();
-  const { clearTenant, tenantName } = useTenant();
-  const [email, setEmail] = useState<string>('');
+  const { switchTenant, tenantId, tenantName, tenantLogo } = useTenant();
+  const { t } = useTranslation();
+  const [email, setEmailState] = useState<string>(emailDraft);
+  const setEmail = (value: string) => {
+    emailDraft = value;
+    setEmailState(value);
+  };
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -52,6 +63,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleLogin = async () => {
     Keyboard.dismiss();
+    // El inicio de sesión se hace SOLO en la tienda elegida (x-tenant-id): sin tienda no hay a dónde enviarlo
+    if (!tenantId) {
+      setError(t('storePicker.required'));
+      return;
+    }
     if (!email.trim() || !password.trim()) {
       setError('Por favor ingresa tu correo y contraseña');
       return;
@@ -60,6 +76,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setIsLoading(true);
     try {
       await login({ email: email.trim(), password });
+      emailDraft = '';
     } catch (err) {
       const msg = getErrorMessage(err);
       setError(msg);
@@ -100,18 +117,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.topActionsBar}>
-          <TouchableOpacity
-            style={styles.changeStoreBtn}
-            onPress={() => clearTenant()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="storefront-outline" size={16} color={Colors.primary} />
-            <Text style={styles.changeStoreText} numberOfLines={1}>
-              {tenantName ? `Tienda: ${tenantName}` : 'Cambiar Tienda'}
-            </Text>
-          </TouchableOpacity>
-
+        <View style={[styles.topActionsBar, { justifyContent: 'flex-end' }]}>
           <TouchableOpacity
             style={styles.settingsBtn}
             onPress={() => {
@@ -128,9 +134,13 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
         <View style={styles.headerBox}>
           <View style={styles.logoBadge}>
-            <Ionicons name="bag-handle" size={40} color={Colors.primary} />
+            {tenantId ? (
+              <StoreLogo name={tenantName} logoUrl={tenantLogo} size={64} />
+            ) : (
+              <Ionicons name="bag-handle" size={40} color={Colors.primary} />
+            )}
           </View>
-          <Text style={styles.appTitle}>{tenantName || 'Tienda'}</Text>
+          <Text style={styles.appTitle}>{tenantId ? tenantName || t('storePicker.unnamed') : t('storePicker.welcome')}</Text>
           <Text style={styles.subtitle}>Inicia sesión para gestionar tus compras</Text>
         </View>
 
@@ -141,6 +151,15 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.errorMessage}>{error}</Text>
             </View>
           ) : null}
+
+          <StorePicker
+            selected={tenantId ? { id: tenantId, name: tenantName, logoUrl: tenantLogo } : null}
+            disabled={isLoading}
+            onSelect={async (store) => {
+              setError('');
+              await switchTenant({ id: store.id, name: store.name, slug: store.slug, logoUrl: store.logoUrl });
+            }}
+          />
 
           <Input
             label="Correo Electrónico"
@@ -178,7 +197,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
           <View style={styles.registerPrompt}>
             <Text style={styles.registerPromptText}>¿No tienes una cuenta? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <TouchableOpacity
+              onPress={() => (tenantId ? navigation.navigate('Register') : setError(t('storePicker.requiredRegister')))}
+            >
               <Text style={styles.registerLink}>Regístrate aquí</Text>
             </TouchableOpacity>
           </View>

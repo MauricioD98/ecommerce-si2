@@ -59,9 +59,9 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   }
 
   // Sin tienda no se sale a la red: el 401 caería en el refresh y en el auto-logout. /platform/*
-  // es la excepción (el selector de tienda lo usa para resolver el slug).
+  // es la excepción (el selector de tienda del login lista las tiendas desde ahí). "Sin tienda" ya no
+  // es un error de la sesión: es el estado normal del login hasta elegir una, así que no se avisa.
   if (!tenantId && !config.url?.startsWith('/platform/')) {
-    notifyTenantRequired();
     return Promise.reject(tenantRequiredError(config));
   }
   return config;

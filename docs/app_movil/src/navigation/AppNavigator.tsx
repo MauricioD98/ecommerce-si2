@@ -5,6 +5,7 @@ import { RootStackParamList } from './types';
 import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import { ProductDetailScreen } from '../screens/shop/ProductDetailScreen';
+import { LiveTryOnScreen } from '../screens/shop/LiveTryOnScreen';
 import { CheckoutScreen } from '../screens/cart/CheckoutScreen';
 import { OrderDetailScreen } from '../screens/orders/OrderDetailScreen';
 import { PaymentScreen } from '../screens/payments/PaymentScreen';
@@ -36,6 +37,7 @@ export const AppNavigator: React.FC = () => {
           <>
             <Stack.Screen name="Main" component={MainTabNavigator} />
             <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+            <Stack.Screen name="TryOn" component={LiveTryOnScreen} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
             <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
             <Stack.Screen name="Payment" component={PaymentScreen} />

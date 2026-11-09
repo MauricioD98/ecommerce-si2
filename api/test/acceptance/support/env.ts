@@ -30,6 +30,9 @@ export const ACCEPTANCE_ENV: Record<string, string> = {
   SMTP_USER: '',
   SMTP_PASS: '',
   GROQ_API_KEY: '',
+  // Probador virtual: nunca la clave real de Decart; try-on-photo levanta un Decart falso local
+  DECART_API_KEY: '',
+  DECART_BASE_URL: '',
   VAPID_PUBLIC_KEY: '',
   VAPID_PRIVATE_KEY: '',
   TENANT_BASE_DOMAIN: '',

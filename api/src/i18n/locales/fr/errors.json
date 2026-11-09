@@ -131,5 +131,15 @@
   "BACKUP_CONFIRMATION_MISMATCH": "La confirmation ne correspond pas. Saisissez exactement le texte indiqué et cochez la case.",
   "BACKUP_FILE_REQUIRED": "Sélectionnez un fichier de sauvegarde (.sfbk).",
   "BACKUP_FILE_TOO_LARGE": "Le fichier dépasse la taille maximale autorisée.",
-  "BACKUP_TENANT_NOT_FOUND": "La boutique n'existe pas."
+  "BACKUP_TENANT_NOT_FOUND": "La boutique n'existe pas.",
+  "TRY_ON_PRODUCT_UNAVAILABLE": "Cet article n'est plus disponible dans la boutique.",
+  "TRY_ON_NO_GARMENT_IMAGE": "Cet article n'a pas de photo de référence, il ne peut donc pas être utilisé dans la cabine d'essayage.",
+  "TRY_ON_GARMENT_IMAGE_UNAVAILABLE": "La photo de référence de cet article n'a pas pu être chargée ; il ne peut pas être essayé pour le moment.",
+  "TRY_ON_NOT_ENABLED": "La cabine d'essayage virtuelle n'est pas activée dans cette boutique.",
+  "TRY_ON_IN_PROGRESS": "Vous avez déjà une session d’essayage ouverte. Attendez {seconds} s et réessayez.",
+  "TRY_ON_FAILED": "Impossible de démarrer la cabine d’essayage virtuelle. Réessayez.",
+  "TRY_ON_GARMENT_IMAGE_TOO_SMALL": "La photo de référence de cet article a une résolution trop faible pour l’essayage en direct.",
+  "TRY_ON_STORE_BUSY": "La cabine d’essayage de cette boutique est occupée. Réessayez dans {seconds} s.",
+  "TRY_ON_HOURLY_LIMIT": "Vous avez atteint la limite horaire de sessions d’essayage. Réessayez dans {minutes} min.",
+  "TRY_ON_CLOCK_SKEW": "La date et l’heure du téléphone ne sont pas correctes. Activez l’heure automatique dans les réglages et réessayez."
 }

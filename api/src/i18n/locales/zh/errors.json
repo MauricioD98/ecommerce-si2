@@ -127,5 +127,15 @@
   "BACKUP_CONFIRMATION_MISMATCH": "确认内容不匹配。请准确输入所示文字并勾选复选框。",
   "BACKUP_FILE_REQUIRED": "请选择一个备份文件（.sfbk）。",
   "BACKUP_FILE_TOO_LARGE": "文件超过允许的最大大小。",
-  "BACKUP_TENANT_NOT_FOUND": "店铺不存在。"
+  "BACKUP_TENANT_NOT_FOUND": "店铺不存在。",
+  "TRY_ON_PRODUCT_UNAVAILABLE": "该商品已在本店下架。",
+  "TRY_ON_NO_GARMENT_IMAGE": "该商品没有参考图片，因此无法用于试衣。",
+  "TRY_ON_GARMENT_IMAGE_UNAVAILABLE": "无法获取该商品的参考图片，目前无法用于试衣。",
+  "TRY_ON_NOT_ENABLED": "本店未启用虚拟试衣间。",
+  "TRY_ON_IN_PROGRESS": "您已有一个正在进行的试衣会话。请等待 {seconds} 秒后重试。",
+  "TRY_ON_FAILED": "无法启动虚拟试衣间，请重试。",
+  "TRY_ON_GARMENT_IMAGE_TOO_SMALL": "该商品的参考图片分辨率太低，无法用于实时试衣。",
+  "TRY_ON_STORE_BUSY": "本店试衣间当前繁忙，请在 {seconds} 秒后重试。",
+  "TRY_ON_HOURLY_LIMIT": "您已达到每小时试衣次数上限，请在 {minutes} 分钟后重试。",
+  "TRY_ON_CLOCK_SKEW": "手机的日期和时间不正确。请在设置中开启自动时间后重试。"
 }

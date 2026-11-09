@@ -131,5 +131,15 @@
   "BACKUP_CONFIRMATION_MISMATCH": "La confirmación no coincide. Escribe exactamente el texto indicado y marca la casilla.",
   "BACKUP_FILE_REQUIRED": "Selecciona un archivo de copia (.sfbk).",
   "BACKUP_FILE_TOO_LARGE": "El archivo supera el tamaño máximo permitido.",
-  "BACKUP_TENANT_NOT_FOUND": "La tienda no existe."
+  "BACKUP_TENANT_NOT_FOUND": "La tienda no existe.",
+  "TRY_ON_PRODUCT_UNAVAILABLE": "Esta prenda ya no está disponible en la tienda.",
+  "TRY_ON_NO_GARMENT_IMAGE": "Esta prenda no tiene una foto de referencia, por eso no se puede usar en el probador.",
+  "TRY_ON_GARMENT_IMAGE_UNAVAILABLE": "No se pudo obtener la foto de referencia de esta prenda, por eso no se puede usar en el probador ahora.",
+  "TRY_ON_NOT_ENABLED": "El probador virtual no está habilitado en esta tienda.",
+  "TRY_ON_IN_PROGRESS": "Ya tienes una sesión del probador abierta. Espera {seconds} s y vuelve a intentarlo.",
+  "TRY_ON_FAILED": "No se pudo iniciar el probador virtual. Intenta de nuevo.",
+  "TRY_ON_GARMENT_IMAGE_TOO_SMALL": "La foto de referencia de esta prenda tiene muy poca resolución para el probador en vivo.",
+  "TRY_ON_STORE_BUSY": "El probador de esta tienda está ocupado en este momento. Intenta de nuevo en {seconds} s.",
+  "TRY_ON_HOURLY_LIMIT": "Alcanzaste el límite de sesiones del probador por hora. Intenta de nuevo en {minutes} min.",
+  "TRY_ON_CLOCK_SKEW": "La fecha y hora del teléfono no son correctas. Activa la hora automática en los ajustes e intenta de nuevo."
 }

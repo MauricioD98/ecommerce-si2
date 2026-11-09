@@ -84,6 +84,10 @@ ${t('offline.profile.logoutPending')}` : t('profile.logoutConfirm'),
           text: 'Salir de la Tienda',
           style: 'destructive',
           onPress: async () => {
+            // Primero se cierra la sesión como en «Cerrar sesión»: se revoca en el servidor y se borran
+            // las copias privadas de esta cuenta (perfil, pedidos, carrito), pero NO los cambios
+            // pendientes de sincronizar, que esperan a que esta cuenta vuelva a iniciar sesión.
+            await logout();
             await clearTenant();
           },
         },

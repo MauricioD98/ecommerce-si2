@@ -21,6 +21,9 @@ import { Button } from '../../components/Button';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { Colors, Shadows } from '../../theme/colors';
 import { getErrorMessage } from '../../api/client';
+import { useTranslation } from '../../../node_modules/react-i18next';
+import { tryOnApi } from '../../api/tryOn.api';
+import { garmentIssue } from '../../tryOn/tryOnCore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProductDetail'>;
 
@@ -34,6 +37,37 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const [quantity, setQuantity] = useState<number>(1);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [isAdding, setIsAdding] = useState<boolean>(false);
+  const { t } = useTranslation();
+  // El botón solo aparece si el plan de la tienda incluye el probador (la API lo vuelve a exigir)
+  const [tryOnEnabled, setTryOnEnabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    tryOnApi
+      .getStoreFeatures()
+      .then((features) => active && setTryOnEnabled(features?.virtualTryOn === true))
+      .catch(() => active && setTryOnEnabled(false));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleTryOn = () => {
+    if (!product) return;
+    const issue = garmentIssue(product);
+    if (issue) {
+      Alert.alert(
+        t('tryOn.unavailableTitle'),
+        t(issue === 'no_image' ? 'tryOn.errors.garmentNoImage' : 'tryOn.errors.garmentUnavailable')
+      );
+      return;
+    }
+    navigation.navigate('TryOn', {
+      productId: product.id,
+      productName: product.name,
+      productImageUrl: product.imageUrl ?? null,
+    });
+  };
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -254,6 +288,17 @@ export const ProductDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               'Sin descripción detallada disponible para este producto.'}
           </Text>
 
+          {tryOnEnabled && (
+            <Button
+              title={t('tryOn.button')}
+              onPress={handleTryOn}
+              variant="outline"
+              style={styles.tryOnBtn}
+              testID="try-on-button"
+              icon={<Ionicons name="videocam-outline" size={20} color={Colors.primary} />}
+            />
+          )}
+
           {/* Quantity Stepper */}
           {!isOutOfStock && (
             <View style={styles.quantitySection}>
@@ -470,6 +515,9 @@ const styles = StyleSheet.create({
   },
   quantitySection: {
     marginTop: 20,
+  },
+  tryOnBtn: {
+    marginTop: 16,
   },
   stepperContainer: {
     flexDirection: 'row',

@@ -16,6 +16,7 @@ export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Main: NavigatorScreenParams<MainTabParamList>;
   ProductDetail: { productId: string };
+  TryOn: { productId: string; productName: string; productImageUrl: string | null };
   Checkout: undefined;
   OrderDetail: { orderId: string };
   Payment: { orderId: string; amount: number };

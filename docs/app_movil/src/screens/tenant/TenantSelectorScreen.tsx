@@ -1,93 +1,36 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from '../../../node_modules/react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import apiClient, { getErrorMessage } from '../../api/client';
-import { Input } from '../../components/Input';
-import { Button } from '../../components/Button';
+import { StorePicker } from '../../components/StorePicker';
 import { Colors } from '../../theme/colors';
 
-interface ResolvedTenant {
-  id: string;
-  slug: string;
-  name: string;
-  plan?: string;
-  features?: {
-    mobileApp?: boolean;
-  };
-}
-
-// Se muestra cuando el dispositivo no tiene tienda o el backend la rechazó (TENANT_REQUIRED).
-// Resuelve el slug contra GET /platform/tenants/resolve/:slug (ruta sin tenant) y la activa.
+// Se muestra cuando el backend rechazó la tienda guardada (TENANT_REQUIRED o el plan ya no incluye la
+// app). Sin tienda elegida NO aparece: el login trae su propio selector. Usa el mismo buscador del
+// directorio público (GET /platform/tenants/public), así que no hace falta escribir el identificador.
 // onSelect llega por prop (no useTenant) para no crear un ciclo de imports con TenantContext.
 export const TenantSelectorScreen: React.FC<{
   rejected?: boolean;
-  onSelect: (tenant: { id: string; name: string; slug: string } | string) => Promise<void>;
+  onSelect: (tenant: { id: string; name: string; slug: string; logoUrl?: string | null } | string) => Promise<void>;
 }> = ({ rejected = false, onSelect }) => {
   const { t } = useTranslation();
-  const [slug, setSlug] = useState('');
-  const [error, setError] = useState<string | null>(rejected ? t('mobileAccess.storeUnavailable') : null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleContinue = async () => {
-    const value = slug.trim().toLowerCase();
-    if (!value) return;
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data } = await apiClient.get<{ data: ResolvedTenant }>(
-        `/platform/tenants/resolve/${encodeURIComponent(value)}`
-      );
-      // Solo para avisar antes; la API vuelve a decidirlo con el plan vigente en cada sesión móvil
-      if (data.data.features && data.data.features.mobileApp === false) {
-        setError(t('mobileAccess.planNotIncluded'));
-        setIsLoading(false);
-        return;
-      }
-      await onSelect({ id: data.data.id, name: data.data.name, slug: data.data.slug });
-    } catch (err) {
-      setError(getErrorMessage(err));
-      setIsLoading(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.container}>
         <View style={styles.card}>
           <Ionicons name="storefront-outline" size={40} color={Colors.primary} />
-          <Text style={styles.title}>¿En qué tienda quieres comprar?</Text>
-          <Text style={styles.subtitle}>
-            Escribe el nombre de la tienda tal como aparece en su enlace (por ejemplo, mi-tienda).
-          </Text>
-
-          <Input
-            label="Tienda"
-            icon="search-outline"
-            value={slug}
-            onChangeText={setSlug}
-            placeholder="nombre-de-la-tienda"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={!isLoading}
-            error={error ?? undefined}
-            returnKeyType="go"
-            onSubmitEditing={handleContinue}
-            containerStyle={styles.input}
-          />
-
-          <Button
-            title="Continuar"
-            onPress={handleContinue}
-            isLoading={isLoading}
-            disabled={!slug.trim()}
-            size="lg"
-            style={styles.button}
-          />
+          <Text style={styles.title}>{t('storePicker.screenTitle')}</Text>
+          <Text style={styles.subtitle}>{rejected ? t('mobileAccess.storeUnavailable') : t('storePicker.screenSubtitle')}</Text>
+          <View style={styles.picker}>
+            <StorePicker
+              selected={null}
+              onSelect={(store) => onSelect({ id: store.id, name: store.name, slug: store.slug, logoUrl: store.logoUrl })}
+            />
+          </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -117,6 +60,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-  input: { alignSelf: 'stretch', marginTop: 20 },
-  button: { alignSelf: 'stretch', marginTop: 8 },
+  picker: { alignSelf: 'stretch', marginTop: 20 },
 });

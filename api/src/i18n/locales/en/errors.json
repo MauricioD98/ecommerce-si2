@@ -131,5 +131,15 @@
   "BACKUP_CONFIRMATION_MISMATCH": "The confirmation does not match. Type exactly the text shown and tick the checkbox.",
   "BACKUP_FILE_REQUIRED": "Select a backup file (.sfbk).",
   "BACKUP_FILE_TOO_LARGE": "The file exceeds the maximum allowed size.",
-  "BACKUP_TENANT_NOT_FOUND": "The store does not exist."
+  "BACKUP_TENANT_NOT_FOUND": "The store does not exist.",
+  "TRY_ON_PRODUCT_UNAVAILABLE": "This item is no longer available in the store.",
+  "TRY_ON_NO_GARMENT_IMAGE": "This item has no reference photo, so it cannot be used in the try-on.",
+  "TRY_ON_GARMENT_IMAGE_UNAVAILABLE": "The reference photo of this item could not be loaded, so it cannot be used in the try-on right now.",
+  "TRY_ON_NOT_ENABLED": "The virtual try-on is not enabled in this store.",
+  "TRY_ON_IN_PROGRESS": "You already have a try-on session open. Wait {seconds} s and try again.",
+  "TRY_ON_FAILED": "The virtual try-on could not be started. Try again.",
+  "TRY_ON_GARMENT_IMAGE_TOO_SMALL": "The reference photo of this item has too low a resolution for the live try-on.",
+  "TRY_ON_STORE_BUSY": "This store’s try-on is busy right now. Try again in {seconds} s.",
+  "TRY_ON_HOURLY_LIMIT": "You reached the hourly limit of try-on sessions. Try again in {minutes} min.",
+  "TRY_ON_CLOCK_SKEW": "Your phone’s date and time are not correct. Turn on automatic time in settings and try again."
 }

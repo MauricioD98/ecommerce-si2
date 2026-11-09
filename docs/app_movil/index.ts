@@ -1,3 +1,5 @@
+// Primero: globales de WebRTC de LiveKit para el probador en vivo (no hace nada en Expo Go)
+import './src/tryOn/livekitBootstrap';
 import { registerRootComponent } from 'expo';
 
 import App from './App';

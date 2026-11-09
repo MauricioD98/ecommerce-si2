@@ -122,3 +122,36 @@ Opciones:
 - Presiona `i` para abrir en simulador **iOS** (en macOS).
 - Presiona `w` para abrir en **Navegador Web**.
 - Escanea el código QR con la app **Expo Go** en tu teléfono Android o iOS.
+
+---
+
+## 👗 Probador virtual en vivo (Decart lucy-2.5)
+
+En el detalle de una prenda, **«Probar en vivo»** abre la cámara frontal y transmite el video a Decart
+(`lucy-2.5`, WebRTC por LiveKit), que lo devuelve con la prenda del catálogo puesta. Solo tiendas con el
+probador en su plan (Pro). El cliente no sube ninguna foto: la referencia es la imagen de la prenda.
+
+- **No funciona en Expo Go** (LiveKit necesita módulos nativos): hace falta un *development build*. En
+  Expo Go el resto de la app funciona y el probador explica que necesita la app instalada.
+- La clave permanente de Decart vive solo en la API (`DECART_API_KEY` en `api/.env` o la clave propia de
+  la tienda). La app recibe un token de cliente que solo abre `lucy-2.5`, dura poco y cuya sesión
+  corta Decart a los `TRY_ON_LIVE_MAX_SECONDS` (60 s por defecto). Ver `api/.env.example`.
+- Pruebas con componentes simulados: `npm run test:tryon` (app) y
+  `node test/acceptance/run.js try-on-live` (API, con un Decart falso local).
+
+### Development build en Android (local)
+
+Requisitos: Android Studio (SDK 36, NDK), JDK 17+ y un teléfono con **depuración USB** (o un emulador).
+
+```bash
+# En la carpeta /docs/app_movil
+npm install
+npx expo prebuild --platform android   # genera ./android (ignorado por git)
+npm run android:dev-build              # = npx expo run:android: compila e instala la app de desarrollo
+```
+
+Después, para trabajar: `npm run start:dev-client` y abre la app instalada (no Expo Go). Si el teléfono
+está por USB, `adb reverse tcp:3001 tcp:3001` hace que la app llegue a la API local.
+
+Con EAS (en la nube, sin Android Studio): `npx eas build --profile development --platform android` y se
+instala el APK que entrega el enlace.

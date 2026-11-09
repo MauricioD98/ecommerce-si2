@@ -78,6 +78,16 @@ export const setTenantId = async (tenantId: string | null): Promise<void> => {
   }
 };
 
+// Logo de la última tienda elegida (URL pública del directorio): solo para mostrarla en el login.
+export const TENANT_LOGO_KEY = '@tenant_logo';
+
+export const getTenantLogo = async (): Promise<string | null> => (await appStorage.getItem(TENANT_LOGO_KEY)) ?? null;
+
+export const setTenantLogo = async (logoUrl: string | null): Promise<void> => {
+  if (logoUrl) await appStorage.setItem(TENANT_LOGO_KEY, logoUrl);
+  else await appStorage.removeItem(TENANT_LOGO_KEY);
+};
+
 export const setTenantDetails = async (name: string | null, slug: string | null): Promise<void> => {
   currentTenantName = name;
   currentTenantSlug = slug;
