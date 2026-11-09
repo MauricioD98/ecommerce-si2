@@ -191,6 +191,8 @@ export interface DynamicReportResult {
         moneda: string;
         entidades: { tipo: string; texto: string; nombre: string; metodo: string }[];
         avisos: string[];
+        // Período aplicado, con cómo se tratan los límites ("hasta 14:00 (excluido)")
+        periodo?: string[];
     };
     // Presente cuando un nombre es ambiguo o no existe: la consulta no se ejecutó
     clarification?: {

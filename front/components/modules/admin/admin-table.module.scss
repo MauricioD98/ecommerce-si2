@@ -1035,3 +1035,154 @@ fieldset.field {
     border: 2px solid #0a0a0a;
     color: #0a0a0a;
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Reportes → IA: presentación de resultados (DynamicReportPanel)
+// ---------------------------------------------------------------------------------------------------
+
+// Respuesta sencilla: datos destacados en tarjetas
+.reportSummary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+}
+
+.reportStat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    min-width: 0;
+}
+
+.reportStatLabel {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.reportStatValue {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+    overflow-wrap: anywhere;
+}
+
+.reportStatBig .reportStatValue {
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.reportNumeric {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.reportEmpty {
+    color: var(--muted-foreground);
+}
+
+.reportReference {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    code {
+        font-size: 0.8125rem;
+    }
+}
+
+.reportCopyButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted-foreground);
+    font-size: 0.7rem;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--foreground);
+    }
+}
+
+// Tabla: en pantallas angostas cada fila se apila como tarjeta con la etiqueta de cada dato
+@media (max-width: 640px) {
+    .reportTable {
+        thead {
+            display: none;
+        }
+
+        tr {
+            display: block;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            border: none;
+            padding: 0.3rem 0.75rem;
+            text-align: right;
+            white-space: normal;
+
+            &::before {
+                content: attr(data-label);
+                color: var(--muted-foreground);
+                font-size: 0.75rem;
+                text-align: left;
+            }
+        }
+    }
+}
+
+// Período y avisos (visibles) + detalles técnicos (plegados)
+.reportNotes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+
+    svg {
+        vertical-align: -2px;
+    }
+}
+
+.reportTechnical {
+    margin-top: 0.25rem;
+
+    summary {
+        cursor: pointer;
+        width: fit-content;
+    }
+
+    dl {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.2rem 0.75rem;
+        margin: 0.5rem 0 0;
+    }
+
+    dd {
+        margin: 0;
+        overflow-wrap: anywhere;
+    }
+
+    p {
+        margin: 0.35rem 0 0;
+    }
+}

@@ -25,7 +25,23 @@ export const REPORT_VIEWS: ReadonlySet<string> = new Set([
   'ventas_globales',
   'rendimiento_productos',
   'devoluciones',
+  'empleados',
 ]);
+
+// Vistas que además del permiso de reportes exigen otro permiso del usuario (las concede ReportsService)
+export const RESTRICTED_VIEWS: ReadonlyMap<string, string> = new Map([['empleados', 'MANAGE_USERS']]);
+
+// Columnas de fecha/hora de las vistas (timestamptz en hora local de la tienda)
+const DATE_COLUMNS = new Set(['created_at', 'fecha', 'fecha_venta', 'fecha_alta']);
+
+/** Un límite de fecha/hora que aplica la consulta, para mostrarle al usuario el período interpretado. */
+export interface DateBound {
+  column: string;
+  /** '>=' | '>' | '<' | '<=' | '=' (igualdad sobre la columna convertida a fecha) */
+  op: string;
+  /** Literal tal como lo escribió la consulta ('2026-11-07 09:00'), o la expresión relativa (current_date) */
+  value: string;
+}
 
 // Funciones invocables (nombre sin schema). Agregados, ventanas, fechas, texto y matemática simple.
 const ALLOWED_FUNCTIONS = new Set([
@@ -106,6 +122,11 @@ const nameOf = (node: unknown): string => {
 };
 
 class AstValidator {
+  /** Vistas reales que lee la consulta (no los nombres de CTE) */
+  readonly views = new Set<string>();
+  /** Comparaciones de columnas de fecha con literales o expresiones relativas */
+  readonly bounds: DateBound[] = [];
+
   // scope: nombres de CTE visibles en este punto de la consulta
   walk(value: unknown, scope: ReadonlySet<string>): void {
     if (Array.isArray(value)) {
@@ -142,6 +163,7 @@ class AstValidator {
       case 'A_Expr': {
         const parts = ((body.name as unknown[]) ?? []).map(nameOf);
         if (parts.length > 1 && (parts.length !== 2 || parts[0] !== 'pg_catalog')) reject('operador no permitido');
+        this.collectDateBound(body, parts[parts.length - 1]);
         const { name: _name, ...rest } = body;
         return this.walk(rest, scope);
       }
@@ -193,6 +215,41 @@ class AstValidator {
     const name = String(body.relname);
     if (scope.has(name)) return;
     if (!REPORT_VIEWS.has(name)) reject(`vista no permitida: ${name}`);
+    this.views.add(name);
+  }
+
+  // created_at >= '2026-11-07 09:00', fecha < current_date, created_at::date = '2026-11-07'...
+  private collectDateBound(body: AstObject, op: string): void {
+    if (body.kind !== 'AEXPR_OP' || !['>=', '>', '<', '<=', '='].includes(op)) return;
+    const column = (node: unknown): { name: string; asDate: boolean } | null => {
+      let target = node as AstObject | undefined;
+      let asDate = false;
+      const cast = (target as { TypeCast?: AstObject } | undefined)?.TypeCast;
+      if (cast) {
+        const names = (((cast.typeName as AstObject | undefined)?.names as unknown[]) ?? []).map(nameOf);
+        asDate = names[names.length - 1] === 'date';
+        target = cast.arg as AstObject;
+      }
+      const fields = ((target as { ColumnRef?: { fields?: unknown[] } } | undefined)?.ColumnRef?.fields ?? []) as unknown[];
+      const last = (fields[fields.length - 1] as { String?: { sval?: string } } | undefined)?.String?.sval;
+      return last && DATE_COLUMNS.has(last) ? { name: last, asDate } : null;
+    };
+    const value = (node: unknown): string | null => {
+      const constant = (n: unknown) => (n as { A_Const?: { sval?: { sval?: string } } } | undefined)?.A_Const?.sval?.sval;
+      const direct = constant(node) ?? constant((node as { TypeCast?: AstObject } | undefined)?.TypeCast?.arg);
+      if (direct) return direct;
+      return JSON.stringify(node).includes('SVFOP_CURRENT_DATE') ? 'relativo a current_date' : JSON.stringify(node).includes('"now"') ? 'relativo a now()' : null;
+    };
+    const flip: Record<string, string> = { '>=': '<=', '>': '<', '<': '>', '<=': '>=', '=': '=' };
+    const left = column(body.lexpr);
+    const right = column(body.rexpr);
+    if (left) {
+      const v = value(body.rexpr);
+      if (v) this.bounds.push({ column: left.name, op: left.asDate && op === '=' ? '=' : op, value: v });
+    } else if (right) {
+      const v = value(body.lexpr);
+      if (v) this.bounds.push({ column: right.name, op: flip[op], value: v });
+    }
   }
 
   private checkFunction(body: AstObject): void {
@@ -220,6 +277,17 @@ function assertSingleSelect(sql: string): AstObject {
   if (!select) return reject('solo se permiten consultas SELECT');
   new AstValidator().walk({ SelectStmt: select }, new Set());
   return select;
+}
+
+/**
+ * Vistas que lee y límites de fecha que aplica una consulta YA validada (para permisos por vista y para
+ * mostrar el período interpretado). No valida: llamar después de validateGeneratedSql.
+ */
+export async function inspectSql(sql: string): Promise<{ views: string[]; bounds: DateBound[] }> {
+  await ensureParser();
+  const validator = new AstValidator();
+  validator.walk(parseStatements(sql), new Set());
+  return { views: [...validator.views], bounds: validator.bounds };
 }
 
 /** Devuelve el SQL listo para ejecutar o lanza 403 con el motivo. */

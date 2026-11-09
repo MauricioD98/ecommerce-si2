@@ -1,21 +1,66 @@
 'use client';
 
-import React, { useState } from 'react';
-import { AlertTriangle, Clock, FileDown, FileSpreadsheet, FileText, HelpCircle, Info, Loader2, Lock, Mic, MicOff, SearchX, Send, Sparkles } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, CalendarRange, Check, Copy, FileDown, FileSpreadsheet, FileText, HelpCircle, Info, Loader2, Lock, Mic, MicOff, SearchX, Send, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import { intlLocale } from '@/i18n/config';
 import { DynamicReportEntry, useDynamicReport } from '@/hooks/useReports';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { DynamicReportResult } from '@/types/admin.types';
+import {
+    columnKind,
+    columnLabel,
+    dateTimeParts,
+    exportValue,
+    formatValue,
+    refineKind,
+    type ColumnKind,
+    type FormatContext,
+    type Labels,
+} from '@/utils/reportFormat';
 
-// Las columnas cambian según la pregunta: se muestran tal cual las devuelve la consulta
-const formatCell = (value: unknown, locale: string): string => {
-    if (value === null || value === undefined) return '—';
-    if (typeof value === 'number') return value.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 });
-    if (typeof value === 'object') return JSON.stringify(value);
-    return String(value);
-};
+const DEFAULT_TIMEZONE = 'America/La_Paz';
+
+interface ColumnInfo {
+    key: string;
+    kind: ColumnKind;
+    label: string;
+}
+
+// Contexto de formato: idioma de la interfaz + zona y moneda DEL REPORTE (las mismas que usó la consulta)
+function useFormatContext(result: DynamicReportResult): { ctx: FormatContext; labels: Labels } {
+    const locale = useLocale();
+    const t = useTranslations('Reports.dynamic');
+    return {
+        ctx: {
+            locale: intlLocale(locale),
+            timeZone: result.interpretation?.zonaHoraria ?? DEFAULT_TIMEZONE,
+            currency: result.interpretation?.moneda ?? 'BOB',
+        },
+        labels: { yes: t('view.yes'), no: t('view.no'), empty: '—' },
+    };
+}
+
+// Tipo y nombre legible de cada columna. Un identificador interno (o el número de pedido, que en este
+// sistema es un código como "cmw86c2n…", no un correlativo) se presenta como "Referencia".
+function useColumns(result: DynamicReportResult): ColumnInfo[] {
+    const t = useTranslations('Reports.dynamic');
+    const { ctx } = useFormatContext(result);
+    return useMemo(() => {
+        const keys = result.columns.length > 0 ? result.columns : Object.keys(result.rows[0] ?? {});
+        return keys.map((key) => {
+            const values = result.rows.map((row) => row[key]);
+            const kind = refineKind(columnKind(key, values), values, ctx);
+            let label = columnLabel(key);
+            if (kind === 'reference') {
+                const base = key.toLowerCase().replace(/(^id$|_id$|^order_number$|^numero_(pedido|venta|orden)$|^referencia_?)/, '').replace(/_/g, ' ').trim();
+                label = base ? t('view.referenceOf', { name: base }) : t('view.reference');
+            }
+            return { key, kind, label };
+        });
+    }, [result, t, ctx]);
+}
 
 // Nombre de archivo a partir de la pregunta (sin tildes/símbolos, acotado)
 function buildExportFilename(prompt: string, fallback: string): string {
@@ -29,87 +74,58 @@ function buildExportFilename(prompt: string, fallback: string): string {
     return `stella-femme-${slug || fallback}`;
 }
 
-// Filas con encabezados legibles (sin guiones bajos), en el orden que devolvió la consulta
-function toPrettyRows(result: DynamicReportResult): Record<string, unknown>[] {
-    return result.rows.map((row) => {
-        const pretty: Record<string, unknown> = {};
-        for (const column of result.columns) {
-            pretty[column.replace(/_/g, ' ')] = row[column] ?? null;
-        }
-        return pretty;
-    });
+// Excel/CSV: encabezados legibles; números como números (sin redondear ni símbolo), fechas en la hora
+// local del reporte ("2026-11-08 14:36:55"), referencias completas
+function toExportRows(result: DynamicReportResult, columns: ColumnInfo[], ctx: FormatContext, labels: Labels): Record<string, unknown>[] {
+    return result.rows.map((row) => Object.fromEntries(columns.map((c) => [c.label, exportValue(c.kind, row[c.key], ctx, labels)])));
 }
 
-async function exportToExcel(result: DynamicReportResult, filename: string, sheetName: string) {
+async function exportSheet(rows: Record<string, unknown>[], filename: string, sheetName: string, bookType: 'xlsx' | 'csv') {
     const XLSX = await import('xlsx');
-    const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, `${filename}.xlsx`);
+    XLSX.writeFile(workbook, `${filename}.${bookType}`, bookType === 'csv' ? { bookType: 'csv' } : undefined);
 }
 
-async function exportToCsv(result: DynamicReportResult, filename: string, sheetName: string) {
-    const XLSX = await import('xlsx');
-    const worksheet = XLSX.utils.json_to_sheet(toPrettyRows(result));
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, `${filename}.csv`, { bookType: 'csv' });
-}
-
-async function exportToPdf(result: DynamicReportResult, filename: string, title: string, locale: string) {
+async function exportToPdf(result: DynamicReportResult, columns: ColumnInfo[], ctx: FormatContext, labels: Labels, filename: string, title: string, periodo: string[]) {
     const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-    const doc = new jsPDF();
-
+    const doc = new jsPDF({ orientation: columns.length > 5 ? 'landscape' : 'portrait' });
     doc.setFontSize(12);
     doc.text(title, 14, 15);
-
+    doc.setFontSize(8);
+    periodo.forEach((line, index) => doc.text(line, 14, 21 + index * 4));
     autoTable(doc, {
-        startY: 20,
-        head: [result.columns.map((column) => column.replace(/_/g, ' '))],
-        body: result.rows.map((row) => result.columns.map((column) => formatCell(row[column], locale))),
+        startY: 24 + periodo.length * 4,
+        head: [columns.map((c) => c.label)],
+        // Mismo formato que la pantalla, con las referencias completas
+        body: result.rows.map((row) => columns.map((c) => formatValue(c.kind, row[c.key], ctx, labels, true))),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [0, 0, 0] },
     });
-
     doc.save(`${filename}.pdf`);
 }
 
 function ExportBar({ entry }: { entry: DynamicReportEntry }) {
-    const result = entry.result;
-    const disabled = !result || result.rows.length === 0;
+    const result = entry.result as DynamicReportResult;
     const t = useTranslations('Reports.dynamic');
-    const locale = useLocale();
+    const { ctx, labels } = useFormatContext(result);
+    const columns = useColumns(result);
+    const disabled = result.rows.length === 0;
     const filename = buildExportFilename(entry.prompt, t('fileFallback'));
+    const periodo = result.interpretation?.periodo ?? [];
 
     return (
         <div className={styles.exportBar}>
-            <button
-                type="button"
-                className={styles.exportButton}
-                disabled={disabled}
-                onClick={() => result && exportToPdf(result, filename, entry.prompt, locale)}
-                title={t('exportPdf')}
-            >
+            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportToPdf(result, columns, ctx, labels, filename, entry.prompt, periodo)} title={t('exportPdf')}>
                 <FileText size={14} />
                 PDF
             </button>
-            <button
-                type="button"
-                className={styles.exportButton}
-                disabled={disabled}
-                onClick={() => result && exportToExcel(result, filename, t('sheetName'))}
-                title={t('exportExcel')}
-            >
+            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportSheet(toExportRows(result, columns, ctx, labels), filename, t('sheetName'), 'xlsx')} title={t('exportExcel')}>
                 <FileSpreadsheet size={14} />
                 Excel
             </button>
-            <button
-                type="button"
-                className={styles.exportButton}
-                disabled={disabled}
-                onClick={() => result && exportToCsv(result, filename, t('sheetName'))}
-                title={t('exportCsv')}
-            >
+            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportSheet(toExportRows(result, columns, ctx, labels), filename, t('sheetName'), 'csv')} title={t('exportCsv')}>
                 <FileDown size={14} />
                 CSV
             </button>
@@ -117,29 +133,95 @@ function ExportBar({ entry }: { entry: DynamicReportEntry }) {
     );
 }
 
-function ResultTable({ result }: { result: DynamicReportResult }) {
+// Referencia abreviada con botón para copiar el identificador completo
+function ReferenceValue({ value, text }: { value: string; text: string }) {
     const t = useTranslations('Reports.dynamic');
-    const locale = useLocale();
+    const [copied, setCopied] = useState(false);
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            // Sin permiso de portapapeles: el valor completo sigue disponible en el título
+        }
+    };
+    return (
+        <span className={styles.reportReference} title={value}>
+            <code>{text}</code>
+            <button type="button" className={styles.reportCopyButton} onClick={copy} aria-label={t('view.copyTitle')} title={t('view.copyTitle')}>
+                {copied ? <Check size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+                <span>{copied ? t('view.copied') : t('view.copy')}</span>
+            </button>
+        </span>
+    );
+}
 
-    if (result.rows.length === 0) {
-        return <div className={styles.emptyState}>{t('noResults')}</div>;
+function CellValue({ column, value, ctx, labels }: { column: ColumnInfo; value: unknown; ctx: FormatContext; labels: Labels }) {
+    const text = formatValue(column.kind, value, ctx, labels);
+    if (column.kind === 'reference' && typeof value === 'string' && value) return <ReferenceValue value={value} text={text} />;
+    if (value === null || value === undefined) return <span className={styles.reportEmpty}>{text}</span>;
+    return <>{text}</>;
+}
+
+// Una fila con pocas columnas: datos destacados (las fechas con hora se separan en Fecha y Hora)
+function ResultSummary({ result, columns }: { result: DynamicReportResult; columns: ColumnInfo[] }) {
+    const t = useTranslations('Reports.dynamic');
+    const { ctx, labels } = useFormatContext(result);
+    const row = result.rows[0];
+    const datetimeColumns = columns.filter((c) => c.kind === 'datetime');
+    const items: { key: string; label: string; node: React.ReactNode; big: boolean }[] = [];
+
+    for (const column of columns) {
+        const value = row[column.key];
+        if (column.kind === 'datetime' && typeof value === 'string') {
+            const parts = dateTimeParts(value, ctx, 'long');
+            if (parts) {
+                const prefix = datetimeColumns.length > 1 ? `${column.label} · ` : '';
+                items.push({ key: `${column.key}-date`, label: `${prefix}${t('view.date')}`, node: parts.date, big: false });
+                if (parts.time) items.push({ key: `${column.key}-time`, label: `${prefix}${t('view.time')}`, node: parts.time, big: false });
+                continue;
+            }
+        }
+        const numeric = ['money', 'count', 'number', 'percent'].includes(column.kind);
+        items.push({ key: column.key, label: column.label, node: <CellValue column={column} value={value} ctx={ctx} labels={labels} />, big: numeric });
     }
 
     return (
+        <div className={styles.reportSummary} role="group" aria-label={t('view.result')}>
+            {items.map((item) => (
+                <div key={item.key} className={`${styles.reportStat} ${item.big ? styles.reportStatBig : ''}`}>
+                    <span className={styles.reportStatLabel}>{item.label}</span>
+                    <span className={styles.reportStatValue}>{item.node}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Varias filas: tabla; en pantallas angostas cada fila se apila como tarjeta (data-label)
+function ResultTable({ result, columns }: { result: DynamicReportResult; columns: ColumnInfo[] }) {
+    const { ctx, labels } = useFormatContext(result);
+    const numeric = (kind: ColumnKind) => ['money', 'count', 'number', 'percent'].includes(kind);
+    return (
         <div className={styles.tableWrapper}>
-            <table className={styles.table}>
+            <table className={`${styles.table} ${styles.reportTable}`}>
                 <thead>
                     <tr>
-                        {Object.keys(result.rows[0]).map((column) => (
-                            <th key={column}>{column.replace(/_/g, ' ')}</th>
+                        {columns.map((c) => (
+                            <th key={c.key} className={numeric(c.kind) ? styles.reportNumeric : undefined}>
+                                {c.label}
+                            </th>
                         ))}
                     </tr>
                 </thead>
                 <tbody>
                     {result.rows.map((row, rowIndex) => (
                         <tr key={rowIndex}>
-                            {Object.values(row).map((value, cellIndex) => (
-                                <td key={cellIndex}>{formatCell(value, locale)}</td>
+                            {columns.map((c) => (
+                                <td key={c.key} data-label={c.label} className={numeric(c.kind) ? styles.reportNumeric : undefined}>
+                                    <CellValue column={c} value={row[c.key]} ctx={ctx} labels={labels} />
+                                </td>
                             ))}
                         </tr>
                     ))}
@@ -149,26 +231,62 @@ function ResultTable({ result }: { result: DynamicReportResult }) {
     );
 }
 
-// Cómo se interpretó la pregunta (zona horaria, moneda, nombres resueltos) y avisos del servidor. Los
-// textos de avisos y aclaraciones los redacta la API; aquí solo se muestran.
+function ResultView({ result }: { result: DynamicReportResult }) {
+    const columns = useColumns(result);
+    // Respuesta sencilla (una fila, pocas columnas) -> datos destacados; si no, tabla
+    if (result.rows.length === 1 && columns.length <= 6) return <ResultSummary result={result} columns={columns} />;
+    return <ResultTable result={result} columns={columns} />;
+}
+
+// Lo que cambia cómo leer el resultado queda a la vista (nombres interpretados, período, avisos); los
+// detalles técnicos (zona, hora de la consulta, moneda, filas, nombres originales) van plegados
 function Interpretation({ result }: { result: DynamicReportResult }) {
+    const t = useTranslations('Reports.dynamic');
     const info = result.interpretation;
     if (!info) return null;
+    const columns = result.columns.length > 0 ? result.columns : Object.keys(result.rows[0] ?? {});
     return (
-        <div className={styles.sqlDetails}>
-            <div>
-                <Clock size={12} /> {info.zonaHoraria} · {info.fechaHoraLocal} · {info.moneda}
-                {info.entidades.map((e) => (
-                    <span key={`${e.tipo}-${e.texto}`}>
-                        {' · '}«{e.texto}» → {e.nombre}
-                    </span>
-                ))}
-            </div>
-            {info.avisos.map((aviso) => (
-                <div key={aviso}>
-                    <Info size={12} /> {aviso}
+        <div className={styles.reportNotes}>
+            {info.entidades.length > 0 && (
+                <div>
+                    <Info size={12} aria-hidden="true" /> {t('view.interpreted')}:{' '}
+                    {info.entidades.map((e, index) => (
+                        <span key={`${e.tipo}-${e.texto}`}>
+                            {index > 0 && ' · '}«{e.texto}» → {e.nombre}
+                        </span>
+                    ))}
+                </div>
+            )}
+            {(info.periodo ?? []).map((periodo) => (
+                <div key={periodo}>
+                    <CalendarRange size={12} aria-hidden="true" /> {periodo}
                 </div>
             ))}
+            {info.avisos.map((aviso) => (
+                <div key={aviso}>
+                    <AlertTriangle size={12} aria-hidden="true" /> {aviso}
+                </div>
+            ))}
+            <details className={styles.reportTechnical}>
+                <summary>{t('view.technical')}</summary>
+                <dl>
+                    <dt>{t('view.timeZone')}</dt>
+                    <dd>{info.zonaHoraria}</dd>
+                    <dt>{t('view.queriedAt')}</dt>
+                    <dd>{info.fechaHoraLocal}</dd>
+                    <dt>{t('view.currency')}</dt>
+                    <dd>{info.moneda}</dd>
+                    {columns.length > 0 && (
+                        <>
+                            <dt>{t('view.originalColumns')}</dt>
+                            <dd>
+                                <code>{columns.join(', ')}</code>
+                            </dd>
+                        </>
+                    )}
+                </dl>
+                <p>{t('rows', { count: result.rowCount })}</p>
+            </details>
         </div>
     );
 }
@@ -190,7 +308,6 @@ function StatusTitle({ kind, children }: { kind: 'noData' | 'clarification' | 'f
 }
 
 function EntryCard({ entry, onAsk, disabled }: { entry: DynamicReportEntry; onAsk: (question: string) => void; disabled: boolean }) {
-    const t = useTranslations('Reports.dynamic');
     const result = entry.result;
     const estado = result?.estado ?? (result && result.rowCount === 0 ? 'sin_datos' : 'ok');
     const clarification = result?.clarification;
@@ -252,12 +369,9 @@ function EntryCard({ entry, onAsk, disabled }: { entry: DynamicReportEntry; onAs
 
             {result && estado === 'ok' && (
                 <>
-                    <ResultTable result={result} />
+                    <ResultView result={result} />
+                    {/* El SQL generado no se muestra al usuario final; queda solo en el log del backend (reports.service.ts) */}
                     <Interpretation result={result} />
-                    {/* El SQL generado ya no se muestra al usuario final; queda solo en el log del backend (reports.service.ts) */}
-                    <div className={styles.sqlDetails}>
-                        {t('rows', { count: result.rowCount })}
-                    </div>
                 </>
             )}
         </div>

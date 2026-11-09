@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
+import { appendDictation, mergeSpeechResults } from "@/utils/reportFormat";
 
 // La Web Speech API no viene en los tipos de TypeScript: se declara solo lo que se usa
 interface SpeechRecognitionAlternativeLike {
@@ -105,11 +106,10 @@ export function useSpeechRecognition({ lang = "es-BO", onText }: UseSpeechRecogn
             const prefix = baseText.trim();
 
             recognition.onresult = (event) => {
-                const transcript = Array.from(event.results)
-                    .map((result) => result[0].transcript)
-                    .join("")
-                    .trim();
-                onTextRef.current(prefix ? `${prefix} ${transcript}` : transcript);
+                // Chrome de Android repite en cada resultado lo ya reconocido: unirlos tal cual duplicaba la
+                // pregunta ("dame dame la lista dame la lista de…"). mergeSpeechResults lo une sin repetir.
+                const transcript = mergeSpeechResults(Array.from(event.results).map((result) => result[0].transcript));
+                onTextRef.current(appendDictation(prefix, transcript));
             };
 
             recognition.onerror = (event) => {

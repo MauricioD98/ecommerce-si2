@@ -93,8 +93,15 @@ export class DynamicReportInterpretationDto {
   @ApiProperty({ type: [DynamicReportEntityDto] })
   entidades: DynamicReportEntityDto[];
 
-  @ApiProperty({ type: [String], description: 'Avisos sobre la interpretación (nombres aproximados, monedas de cobro)' })
+  @ApiProperty({ type: [String], description: 'Avisos sobre la interpretación (nombres aproximados, monedas de cobro, rol actual)' })
   avisos: string[];
+
+  @ApiProperty({
+    type: [String],
+    description: 'Período que aplicó la consulta, con cómo se tratan los límites (p. ej. "hasta 14:00 (excluido)")',
+    example: ['fecha del pedido/venta: desde 2026-11-07 09:00 (incluido) hasta 2026-11-07 14:00 (excluido) — hora America/La_Paz'],
+  })
+  periodo: string[];
 }
 
 export class DynamicReportClarificationOptionDto {

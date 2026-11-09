@@ -7,7 +7,7 @@ import { queryRejected } from './report-errors';
 // usuario PUEDE ver (se consultan con el mismo rol y ámbito que el reporte) y los reemplaza por el id.
 // Si hay varias coincidencias se pide aclaración; nunca se elige una al azar.
 
-export type EntityKind = 'sucursal' | 'producto' | 'categoria';
+export type EntityKind = 'sucursal' | 'producto' | 'categoria' | 'empleado';
 
 export interface Placeholder {
   /** Texto exacto del marcador en el SQL, p. ej. "{{producto: set deportivo}}" */
@@ -28,13 +28,17 @@ export type Resolution =
   | { status: 'ambiguous'; options: Candidate[] }
   | { status: 'not_found' };
 
-const PLACEHOLDER_RE = /\{\{\s*(sucursal|producto|categoria)\s*:\s*([^{}\n]{1,80}?)\s*\}\}/gi;
+const PLACEHOLDER_RE = /\{\{\s*(sucursal|producto|categoria|empleado)\s*:\s*([^{}\n]{1,80}?)\s*\}\}/gi;
 const MAX_OPTIONS = 10;
 
 const STOPWORDS: Record<EntityKind, Set<string>> = {
   sucursal: new Set(['sucursal', 'sucursales', 'tienda', 'local', 'agencia', 'la', 'el', 'de', 'del', 'los', 'las']),
   producto: new Set(['producto', 'el', 'la', 'los', 'las', 'de', 'del', 'un', 'una']),
   categoria: new Set(['categoria', 'categorias', 'rubro', 'linea', 'la', 'el', 'de', 'del', 'los', 'las']),
+  empleado: new Set([
+    'empleado', 'empleada', 'cajero', 'cajera', 'vendedor', 'vendedora', 'senor', 'senora', 'senorita', 'don', 'dona',
+    'el', 'la', 'de', 'del',
+  ]),
 };
 
 export function normalizeName(value: string): string {
@@ -105,9 +109,10 @@ export function resolveEntity(kind: EntityKind, text: string, candidates: Candid
       const best = query.map((q) => Math.max(0, ...p.tokens.map((t) => similarity(q, t))));
       const back = p.tokens.map((t) => Math.max(0, ...query.map((q) => similarity(q, t))));
       const all = [...best, ...back];
-      return { c: p.c, score: all.reduce((a, b) => a + b, 0) / all.length, top: Math.max(...best) };
+      return { c: p.c, score: all.reduce((a, b) => a + b, 0) / all.length, top: Math.max(...best), worst: Math.min(...best) };
     })
-    .filter((s) => s.score >= 0.6 && s.top >= 0.8)
+    // Personas: CADA palabra dicha debe parecerse a una del nombre ("María Pérez" nunca es "María López")
+    .filter((s) => s.score >= 0.6 && s.top >= 0.8 && (kind !== 'empleado' || s.worst >= 0.75))
     .sort((a, b) => b.score - a.score);
   if (scored.length === 0) return { status: 'not_found' };
   const close = scored.filter((s) => scored[0].score - s.score < 0.1).map((s) => s.c);
@@ -145,6 +150,11 @@ const LABELS: Record<EntityKind, { one: string; many: string; scope: (branchScop
   },
   producto: { one: 'el producto', many: 'varios productos', scope: () => 'los productos del catálogo' },
   categoria: { one: 'la categoría', many: 'varias categorías', scope: () => 'las categorías de la tienda' },
+  empleado: {
+    one: 'al empleado',
+    many: 'varios empleados',
+    scope: (branchScoped) => (branchScoped ? 'el personal y los cajeros de tu sucursal' : 'el personal y los cajeros de la tienda'),
+  },
 };
 
 export function describeOption(kind: EntityKind, c: Candidate): string {

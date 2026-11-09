@@ -66,6 +66,31 @@ Si hay varias coincidencias o ninguna, **no se ejecuta la consulta**: la respues
 mensaje y las opciones, y el panel las muestra como botones que vuelven a preguntar precisando el nombre.
 Límite: se leen hasta 10 000 opciones por tipo.
 
+## Empleados y ventas por empleado
+
+Migración `20261111120000_reporting_employees` (aplicada a la demo local el 2026-11-09, con respaldo previo).
+
+- **Quién es empleado**: no hay un campo propio. Personal = usuario con sucursal asignada (`users.branchId`, como
+  la pantalla «Personal») **o** con un rol que tiene permisos (los clientes tienen el rol sin permisos). Así entran
+  los dueños/administradores globales sin sucursal, que también cobran en caja (`asignado_a_sucursal = false`).
+- **Vista `empleados`**: nombre, rol (actual), sucursal, `estado_acceso` y fecha de alta. Sin correo, teléfono,
+  contraseña, tokens ni descuento. Solo la recibe quien tiene **`MANAGE_USERS`** (el mismo permiso que la pantalla
+  de personal): se aplica en el servidor (respuesta «sin permiso») y en la base (el rol de reportes no recibe esa
+  vista). Un usuario de una sucursal solo ve el personal asignado a ella.
+- **Estado**: no existe alta/baja; `estado_acceso` solo distingue `HABILITADO` de `BLOQUEADO_TEMPORALMENTE`
+  (bloqueo de login).
+- **Ventas por empleado**: solo las ventas POS registran quién cobró (`orders.cashierId` →
+  `ventas_globales.cajero_id/cajero_nombre`, también en `rendimiento_productos`). Las ventas web no tienen empleado
+  y no se atribuyen a nadie. Cantidad de ventas = `count(DISTINCT order_id)`; importe = `sum(total_amount)` de
+  `ventas_globales`; unidades = `sum(cantidad)` de `rendimiento_productos`.
+- **Rol histórico**: no se guarda. `cajero_rol_actual` es el rol de hoy y la respuesta lo advierte.
+- **Hora de la venta**: creación del pedido (no hay fecha de pago en `orders`; en POS coinciden).
+- **Rangos horarios**: hora final **excluida**: «de 09:00 a 14:00» = `>= '… 09:00' AND < '… 14:00'` (una venta de las
+  14:00:00 no entra). Cada respuesta muestra el período aplicado (`interpretation.periodo`).
+- Nombres de empleados con `{{empleado:texto}}`, resueltos entre quienes cobraron en el ámbito (y el personal, si
+  hay `MANAGE_USERS`). Para personas, la coincidencia aproximada exige que cada palabra se parezca: «María Pérez»
+  nunca se resuelve como «María López».
+
 ## Seguridad (etapa 1)
 
 - Validador sobre el árbol sintáctico real de PostgreSQL (`libpg-query`): solo listas permitidas de vistas,
