@@ -28,14 +28,23 @@ export const platformBrand = () => process.env.PLATFORM_NAME || 'NovaSoft';
 export const layout = (
   title: string,
   content: string,
-  { brand = platformBrand(), footer = `Recibiste este correo porque tienes una cuenta en ${brand}.` } = {},
+  {
+    brand = platformBrand(),
+    footer = `Recibiste este correo porque tienes una cuenta en ${brand}.`,
+    // Logo incrustado como adjunto inline (src="cid:..."): Gmail y Outlook bloquean los data URL
+    logoCid = null as string | null,
+  } = {},
 ): string => `<!DOCTYPE html>
 <html lang="es">
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f5f5;padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
-        <tr><td style="background:#000;color:#fff;padding:20px 32px;font-size:20px;font-weight:800;letter-spacing:-0.02em;">${escapeHtml(brand)}</td></tr>
+        <tr><td style="background:#000;color:#fff;padding:20px 32px;font-size:20px;font-weight:800;letter-spacing:-0.02em;">${
+          logoCid
+            ? `<img src="cid:${escapeHtml(logoCid)}" alt="${escapeHtml(brand)}" height="40" style="height:40px;max-width:160px;vertical-align:middle;margin-right:12px;background:#fff;border-radius:6px;" />`
+            : ''
+        }${escapeHtml(brand)}</td></tr>
         <tr><td style="padding:32px;font-size:15px;line-height:1.6;">
           <h1 style="margin:0 0 16px;font-size:22px;color:#000;">${escapeHtml(title)}</h1>
           ${content}
@@ -66,12 +75,16 @@ export const resetPasswordEmail = (name: string, otp: string, storeName = platfo
   );
 
 // storeName es obligatorio: la factura de una compra siempre lleva el nombre de la tienda donde se hizo
-export const invoiceEmail = (name: string, orderNumber: string, total: string, storeName: string) =>
+export const invoiceEmail = (name: string, orderNumber: string, total: string, storeName: string, logoCid: string | null = null) =>
   layout(
     `Gracias por tu compra en ${storeName}`,
     `<p>Hola ${escapeHtml(name)}, ${escapeHtml(storeName)} recibió el pago de tu pedido <strong>#${escapeHtml(orderNumber)}</strong> por <strong>${escapeHtml(total)}</strong>.</p>
      <p>Adjuntamos la factura de tu compra en ${escapeHtml(storeName)} en PDF.</p>`,
-    { brand: storeName.toUpperCase(), footer: `Recibiste este correo porque realizaste una compra en ${storeName}.` },
+    {
+      brand: storeName.toUpperCase(),
+      footer: `Recibiste este correo porque realizaste una compra en ${storeName}. Enviado por ${platformBrand()} en nombre de la tienda.`,
+      logoCid,
+    },
   );
 
 export const campaignEmail = (subject: string, htmlBody: string, storeName = platformBrand()) =>

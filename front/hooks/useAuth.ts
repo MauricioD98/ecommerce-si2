@@ -11,6 +11,7 @@ import { clearAllCart } from "@/store/slices/cartSlice";
 import { clearProfileSnapshots, saveProfileSnapshot } from "@/utils/offlineProfile";
 import { clearOrdersCache } from "@/utils/offlineOrders";
 import { clearAdminReadCache } from "@/utils/adminOfflineStore";
+import { detachPushForCurrentStore } from "@/hooks/usePushNotifications";
 
 
 export function useAuth() {
@@ -23,6 +24,10 @@ export function useAuth() {
         setIsLoading(true);
         setError(null);
         try {
+            // Antes de revocar la sesión (el backend la necesita): este navegador deja de recibir los
+            // push de esta cuenta en ESTA tienda. La suscripción de otra tienda en el mismo navegador no
+            // se toca. Nunca lanza.
+            await detachPushForCurrentStore({ notifyBackend: true });
             // authService.logout() ya captura sus propios errores (sin red, token vencido) y no
             // relanza: este try/catch es una segunda red de seguridad, no el manejo principal.
             await authService.logout();

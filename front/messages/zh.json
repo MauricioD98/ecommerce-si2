@@ -699,7 +699,36 @@
       "enabled": "此设备已开启推送通知。",
       "blocked": "你已屏蔽本网站的通知。请在浏览器设置中允许后再开启。",
       "enabling": "正在开启...",
-      "enable": "开启推送通知"
+      "enable": "开启推送通知",
+      "disable": "在此浏览器中关闭",
+      "unavailable": {
+        "PLAN_NOT_INCLUDED": "本店当前套餐不包含推送通知。如果你是店主，请在订阅面板升级到 Pro 套餐以开启。",
+        "NOT_CONFIGURED": "本店尚未配置推送通知。如果你是店主，请联系平台管理员配置推送通知密钥。"
+      },
+      "environment": {
+        "INSECURE_CONTEXT": "推送通知仅在安全连接（HTTPS）或 localhost 下可用。请通过本店的安全地址打开后再开启。",
+        "IOS_NEEDS_INSTALL": "在 iPhone 和 iPad 上，请先将本店添加到主屏幕（分享 → 添加到主屏幕），再从主屏幕打开以开启通知。",
+        "UNSUPPORTED_BROWSER": "此浏览器不支持推送通知。请使用较新版本的 Chrome、Edge、Firefox 或 Safari。"
+      },
+      "errors": {
+        "PERMISSION_DISMISSED": "需要你的授权才能发送通知。请重试并选择“允许”。",
+        "SW_FAILED": "浏览器无法准备通知。请刷新页面后重试；如果正在使用无痕模式，请改用普通窗口。",
+        "SUBSCRIBE_FAILED": "浏览器无法订阅通知服务。请确认系统允许此浏览器的通知后重试。",
+        "SERVER": "无法保存订阅。请几分钟后重试。"
+      },
+      "test": {
+        "send": "发送测试通知",
+        "title": "测试通知",
+        "body": "本店的通知可以送达此浏览器。",
+        "accepted": "通知服务已接受测试消息，几秒内应会出现；如果没有看到，请确认已关闭“勿扰模式”，并且系统允许此浏览器的通知。",
+        "failed": {
+          "NOT_SUBSCRIBED": "此浏览器已不再以你的账号订阅。请重新开启通知。",
+          "EXPIRED": "此浏览器的订阅已过期。请重新开启通知。",
+          "NOT_CONFIGURED": "本店尚未配置推送通知。如果你是店主，请联系平台管理员配置推送通知密钥。",
+          "PUSH_SERVICE_ERROR": "通知服务拒绝了此消息。请几分钟后重试。",
+          "SERVER": "无法发送测试。请几分钟后重试。"
+        }
+      }
     },
     "addresses": {
       "title": "我的地址",
@@ -845,7 +874,16 @@
       "unsupportedHint": "此浏览器不支持语音听写（请使用 Chrome、Edge 或 Safari）。",
       "help": "用语音或文字实时生成关于商店销售、库存和业绩的分析查询。",
       "analyzing": "正在分析数据并生成报表...",
-      "failed": "无法生成报表。"
+      "failed": "无法生成报表。",
+      "status": {
+        "noData": "无数据：查询已执行，但没有找到相关记录。",
+        "clarification": "需要进一步说明",
+        "forbidden": "无权限",
+        "unanswerable": "无法根据现有数据回答",
+        "rejected": "查询失败：AI 生成了不被允许的查询",
+        "failed": "查询失败",
+        "unavailable": "服务不可用"
+      }
     },
     "speech": {
       "not-allowed": "麦克风权限被拒绝。请在浏览器设置中开启。",

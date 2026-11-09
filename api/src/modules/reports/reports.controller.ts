@@ -44,8 +44,9 @@ export class ReportsController {
   @ApiOperation({
     summary: 'Dynamic report from a natural-language question (AI Text-to-SQL — Plan Pro)',
     description:
-      'La IA genera un SELECT que se valida y se ejecuta con un rol de solo lectura sobre vistas del esquema "reporting", ' +
-      'que ya aplican el filtro de sucursal del usuario.',
+      'La IA genera un SELECT que se valida sobre el árbol sintáctico (solo vistas y funciones permitidas) y se ejecuta ' +
+      'en una transacción de solo lectura con el rol de reportes de la tienda (ALL_BRANCHES) o de la sucursal del usuario, ' +
+      'cuyas vistas filtran por sucursal en la propia base de datos.',
   })
   @ApiBody({ type: DynamicReportDto })
   @ApiResponse({ status: 200, type: DynamicReportResultDto })

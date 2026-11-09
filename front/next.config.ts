@@ -10,7 +10,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // El service worker no se cachea por HTTP: de otro modo una corrección de seguridad tardaría en llegar
   async headers() {
-    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }] }];
+    const noCache = [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }];
+    return [
+        { source: "/sw.js", headers: noCache },
+        { source: "/push-sw.js", headers: noCache },
+    ];
   },
   images: {
     // Las imágenes vienen del backend desde hosts arbitrarios: sin optimizar para que next/image no falle con hosts no listados

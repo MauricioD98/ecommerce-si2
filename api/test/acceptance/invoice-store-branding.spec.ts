@@ -4,8 +4,10 @@ import { deflateSync, inflateSync } from 'node:zlib';
 import { NotFoundException } from '@nestjs/common';
 import { runInTenant, tenantStorage } from '../../src/tenancy/tenant-context';
 import { InvoiceService } from '../../src/modules/invoices/invoice.service';
-import { InvoiceIssuerUnavailableError } from '../../src/modules/invoices/invoice-issuer';
+import { InvoiceDeliveryError, InvoiceIssuerUnavailableError } from '../../src/modules/invoices/invoice-issuer';
 import { MailService } from '../../src/modules/mail/mail.service';
+import { resolveMailTransport } from '../../src/modules/mail/mail.module';
+import { CheckoutMaintenanceService } from '../../src/modules/payments/checkout-maintenance.service';
 import { PaymentsService } from '../../src/modules/payments/payments.service';
 
 // Facturas de compras con el nombre de la tienda donde se hizo la compra (no el del SaaS ni otro fijo).
@@ -234,9 +236,19 @@ describe('InvoiceService — factura con el nombre de la tienda de la compra', (
 
 // ---------- Correo simulado: transporte capturado, no sale nada ----------
 
-const makeMail = (env: Record<string, string | undefined>) => {
+// Responde como el transporte real: SMTP acepta/rechaza destinatarios, JSON (sin SMTP) no informa ninguno
+type SmtpMode = 'accept' | 'reject' | 'fail' | 'json';
+const makeMail = (env: Record<string, string | undefined>, mode: SmtpMode = 'accept') => {
   const sent: Record<string, unknown>[] = [];
-  const mailer = { sendMail: (async (options: Record<string, unknown>) => void sent.push(options)) };
+  const mailer = {
+    sendMail: async (options: Record<string, unknown>) => {
+      if (mode === 'fail') throw new Error(`getaddrinfo EAI_FAIL ${String(options.to)}`);
+      sent.push(options);
+      if (mode === 'json') return { envelope: {}, messageId: '<json@local>', message: '{}' };
+      if (mode === 'reject') return { accepted: [], rejected: [options.to], response: `550 5.1.1 <${String(options.to)}> no existe` };
+      return { accepted: [options.to], rejected: [], messageId: '<ok@smtp>', response: '250 2.0.0 OK' };
+    },
+  };
   const config = { get: (key: string) => env[key] };
   return { mail: new MailService(mailer as never, config as never, control as never), sent };
 };
@@ -300,9 +312,88 @@ describe('MailService.sendInvoice — asunto, cuerpo, adjunto y remitente', () =
 
   it('sin nombre de tienda no envía', async () => {
     const { mail, sent } = makeMail(env);
-    const ok = await mail.sendInvoice({ to: 'x@example.test', storeName: ' ', orderNumber: '1', total: 1, pdf: Buffer.from(''), filename: 'f.pdf' });
-    assert.equal(ok, false);
+    const result = await mail.sendInvoice({ to: 'x@example.test', storeName: ' ', orderNumber: '1', total: 1, pdf: Buffer.from(''), filename: 'f.pdf' });
+    assert.equal(result.status, 'failed');
     assert.equal(sent.length, 0);
+  });
+
+  it('el logo de la tienda va incrustado en el correo (cid) y es el de esa tienda, no el de la otra', async () => {
+    const { mail, sent } = makeMail(env);
+    for (const [run, orderId] of [[inA, 'order-a'], [inB, 'order-b']] as const) {
+      const doc = await run(() => service.generateOrderInvoice(orderId));
+      await mail.sendInvoice({
+        to: doc.data.customer.email!,
+        storeName: doc.data.store.name,
+        orderNumber: doc.data.number,
+        total: doc.data.total,
+        pdf: doc.buffer,
+        filename: doc.filename,
+        logo: doc.data.store.logo,
+      });
+    }
+    const [mailA, mailB] = sent as { html: string; attachments: { cid?: string; content: Buffer; contentType: string }[] }[];
+    const logoOf = (m: typeof mailA) => m.attachments.find((a) => a.cid);
+    assert.ok(mailA.html.includes('src="cid:store-logo@novasoft"'));
+    assert.equal(logoOf(mailA)!.contentType, 'image/png');
+    assert.ok(logoOf(mailA)!.content.equals(LOGO_A.png), 'logo de A');
+    assert.ok(logoOf(mailB)!.content.equals(LOGO_B.png), 'logo de B');
+    assert.ok(!logoOf(mailA)!.content.equals(LOGO_B.png));
+    assert.doesNotMatch(mailA.html, /data:image/, 'nunca un data URL (los clientes de correo lo bloquean)');
+  });
+
+  it('sin logo compatible el correo sale solo con el nombre', async () => {
+    const { mail, sent } = makeMail(env);
+    await mail.sendInvoice({ to: 'x@example.test', storeName: 'Tienda Starter Demo', orderNumber: '1', total: 1, pdf: Buffer.from(''), filename: 'f.pdf', logo: null });
+    const m = sent[0] as { html: string; attachments: unknown[] };
+    assert.doesNotMatch(m.html, /cid:/);
+    assert.equal(m.attachments.length, 1);
+  });
+
+  it('informa qué pasó: aceptado, rechazado, falla de conexión o sin SMTP', async () => {
+    const args = { to: 'x@example.test', storeName: 'Tienda Starter Demo', orderNumber: '1', total: 1, pdf: Buffer.from(''), filename: 'f.pdf' };
+    assert.equal((await makeMail(env, 'accept').mail.sendInvoice(args)).status, 'sent');
+    assert.equal((await makeMail(env, 'reject').mail.sendInvoice(args)).status, 'rejected');
+    assert.equal((await makeMail(env, 'fail').mail.sendInvoice(args)).status, 'failed');
+    assert.equal((await makeMail({}, 'json').mail.sendInvoice(args)).status, 'simulated');
+  });
+});
+
+describe('Correos de la plataforma NovaSoft: conservan su identidad', () => {
+  const env = { SMTP_HOST: 'smtp.example.test', SMTP_USER: 'no-reply@novasoft.test', SUPPORT_EMAIL: 'soporte@novasoft.test', FRONTEND_URL: 'http://localhost:3000' };
+
+  it('alta de tienda (suscripción) y contacto salen como NovaSoft, aunque se envíen dentro del contexto de una tienda', async () => {
+    const { mail, sent } = makeMail(env);
+    await inA(() =>
+      mail.sendTenantWelcome({ to: 'duena@example.test', tenantName: 'Tienda Nueva', loginUrl: 'http://localhost:3000/admin' }),
+    );
+    await inB(() => mail.sendContactMessage({ name: 'Visitante', email: 'v@example.test', message: 'Hola' }));
+    const [welcome, contact] = sent as { from: string; subject: string; html: string }[];
+    assert.equal(welcome.from, '"NovaSoft" <no-reply@novasoft.test>');
+    assert.match(welcome.subject, /NovaSoft/);
+    assert.doesNotMatch(JSON.stringify(welcome), /Starter|Stella/i);
+    assert.equal(contact.from, '"NovaSoft" <no-reply@novasoft.test>');
+    assert.match(contact.subject, /^\[NovaSoft\]/);
+    assert.doesNotMatch(JSON.stringify(contact), /Starter|Stella/i);
+  });
+});
+
+describe('Configuración de la cuenta SMTP única de la plataforma', () => {
+  const read = (env: Record<string, string | undefined>) => ({ get: (k: string) => env[k] }) as never;
+
+  it('un SMTP_HOST con una dirección de correo (causa de que no saliera nada) se detecta y no se usa', () => {
+    const errors: string[] = [];
+    const cfg = resolveMailTransport(read({ SMTP_HOST: 'alguien@gmail.com', SMTP_USER: 'alguien@gmail.com', SMTP_PASS: 'x' }), { error: (m: string) => errors.push(m) } as never);
+    assert.equal((cfg.transport as { host: string }).host, 'smtp.gmail.com');
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /SMTP_HOST contiene una dirección de correo/);
+    assert.doesNotMatch(errors[0], /alguien@/, 'el aviso no repite la dirección');
+  });
+
+  it('un servidor válido se respeta y sin SMTP se usa el transporte simulado', () => {
+    const ok = resolveMailTransport(read({ SMTP_HOST: 'smtp.example.test', SMTP_USER: 'u@example.test', SMTP_PORT: '587' }), { error: () => undefined } as never);
+    assert.deepEqual({ ...(ok.transport as object), auth: undefined }, { host: 'smtp.example.test', port: 587, secure: false, auth: undefined });
+    const none = resolveMailTransport(read({}), { error: () => undefined } as never);
+    assert.deepEqual(none.transport, { jsonTransport: true });
   });
 });
 
@@ -311,7 +402,7 @@ describe('MailService.sendInvoice — asunto, cuerpo, adjunto y remitente', () =
 describe('PaymentsService.sendInvoiceEmail desde el outbox', () => {
   const build = () => {
     const { mail, sent } = makeMail({ SMTP_HOST: 'smtp.example.test', SMTP_USER: 'no-reply@novasoft.test' });
-    const payments = Object.assign(Object.create(PaymentsService.prototype), { invoiceService: service, mailService: mail }) as PaymentsService;
+    const payments = Object.assign(Object.create(PaymentsService.prototype), { invoiceService: service, mailService: mail, logger: { log() {} } }) as PaymentsService;
     return { payments, sent };
   };
 
@@ -327,5 +418,63 @@ describe('PaymentsService.sendInvoiceEmail desde el outbox', () => {
     const { payments, sent } = build();
     await assert.rejects(payments.sendInvoiceEmail('order-a'), InvoiceIssuerUnavailableError);
     assert.equal(sent.length, 0);
+  });
+
+  it('envío fallido, rechazado o sin SMTP NO se da por hecho: lanza sin datos del cliente', async () => {
+    for (const [mode, env, expected] of [
+      ['fail', { SMTP_HOST: 'smtp.example.test', SMTP_USER: 'no-reply@novasoft.test' }, /no enviada: getaddrinfo EAI_FAIL \*\*\*@\*\*\*/],
+      ['reject', { SMTP_HOST: 'smtp.example.test', SMTP_USER: 'no-reply@novasoft.test' }, /no enviada: el servidor rechazó el destinatario/],
+      ['json', {}, /no enviada: SMTP no configurado/],
+    ] as const) {
+      const { mail } = makeMail(env, mode);
+      const payments = Object.assign(Object.create(PaymentsService.prototype), { invoiceService: service, mailService: mail, logger: { log() {} } }) as PaymentsService;
+      const error = await inA(() => payments.sendInvoiceEmail('order-a')).then(
+        () => null,
+        (e: Error) => e,
+      );
+      assert.ok(error instanceof InvoiceDeliveryError, mode);
+      assert.match(error.message, expected);
+      assert.doesNotMatch(error.message, /cliente-a@example\.test/, 'el error queda en outbox_events.lastError');
+    }
+  });
+
+  // Ciclo real del consumidor del outbox (deliverOutbox) con una tabla en memoria
+  const runOutbox = async (mode: SmtpMode, attempts: number) => {
+    const { mail, sent } = makeMail({ SMTP_HOST: 'smtp.example.test', SMTP_USER: 'no-reply@novasoft.test' }, mode);
+    const payments = Object.assign(Object.create(PaymentsService.prototype), { invoiceService: service, mailService: mail, logger: { log() {} } }) as PaymentsService;
+    const row = { id: 'evt-1', type: 'ORDER_PAID_INVOICE', payload: { orderId: 'order-a' }, attempts, claimed: false };
+    const updates: { status: string; lastError: string | null }[] = [];
+    const fakePrisma = {
+      $queryRaw: async () => {
+        if (row.claimed) return [];
+        row.claimed = true;
+        row.attempts += 1;
+        return [{ id: row.id, type: row.type, payload: row.payload, attempts: row.attempts }];
+      },
+      outboxEvent: { update: async ({ data }: { data: { status: string; lastError: string | null } }) => void updates.push(data) },
+    };
+    const maintenance = new CheckoutMaintenanceService(fakePrisma as never, control as never, payments, {} as never);
+    const delivered = await inA(() => maintenance.deliverOutbox());
+    return { delivered, update: updates[0], sent };
+  };
+
+  it('outbox: aceptado por SMTP → DONE', async () => {
+    const { delivered, update, sent } = await runOutbox('accept', 0);
+    assert.equal(delivered, 1);
+    assert.equal(update.status, 'DONE');
+    assert.equal(sent.length, 1);
+  });
+
+  it('outbox: SMTP caído → vuelve a PENDING con el motivo (se reintenta), nunca DONE', async () => {
+    const { delivered, update } = await runOutbox('fail', 0);
+    assert.equal(delivered, 0);
+    assert.equal(update.status, 'PENDING');
+    assert.match(update.lastError!, /Factura del pedido #A-0001 no enviada/);
+  });
+
+  it('outbox: agotados los intentos queda DEAD (visible en métricas), no DONE', async () => {
+    const { update } = await runOutbox('reject', 9);
+    assert.equal(update.status, 'DEAD');
+    assert.match(update.lastError!, /rechazó el destinatario/);
   });
 });

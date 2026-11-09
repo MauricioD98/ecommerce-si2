@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Branch } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
@@ -7,9 +7,12 @@ import type { AuthUser } from '../../common/decorators/interfaces/request-with-u
 import { hasAllBranches } from '../../common/utils/permission.util';
 import { currentPlanFeatures } from '../platform/plans';
 import { i18nMessage } from '../../i18n/i18n-message';
+import { quoteIdent, requireTenant } from '../../tenancy/tenant-context';
 
 @Injectable()
 export class BranchesService {
+  private readonly logger = new Logger(BranchesService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async create(createBranchDto: CreateBranchDto): Promise<Branch> {
@@ -128,6 +131,18 @@ export class BranchesService {
     }
 
     await this.prisma.branch.delete({ where: { id } });
+    await this.pruneReportScopes();
     return { message: 'Branch deleted successfully' };
+  }
+
+  // Reportes con IA: borra el schema de vistas "rb_*" de las sucursales que ya no existen (migración
+  // 20261109120000). No guarda roles ni permisos, así que si falla (p. ej. migración sin aplicar) solo
+  // queda un schema sin uso: no se interrumpe el borrado.
+  private async pruneReportScopes(): Promise<void> {
+    try {
+      await this.prisma.$queryRawUnsafe(`SELECT ${quoteIdent(requireTenant().schemaName)}.prune_report_branch_scopes() AS dropped`);
+    } catch (error) {
+      this.logger.warn(`No se pudieron limpiar los ámbitos de reportes: ${error instanceof Error ? error.message : error}`);
+    }
   }
 }

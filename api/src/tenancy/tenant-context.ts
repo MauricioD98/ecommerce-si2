@@ -59,16 +59,11 @@ export function tenantSchemaSql(): Prisma.Sql {
   return Prisma.raw(quoteIdent(requireTenant().schemaName));
 }
 
-// Reportes con IA: cada tienda tiene su schema de vistas y su rol de solo lectura (los crea la
-// migración 20261024120000_tenant_scoped_reporting con estos mismos nombres).
+// Reportes con IA: cada tienda tiene su schema de vistas (migración 20261024120000_tenant_scoped_reporting).
+// Ya no hay rol por tienda: la consulta corre con el rol global de report_runtime (migración 20261109120000).
 export function reportingSchemaOf(schemaName: string): string {
   assertTenantSchema(schemaName);
   return `${schemaName}_reporting`;
-}
-
-export function reportingRoleOf(schemaName: string): string {
-  assertTenantSchema(schemaName);
-  return `reports_${schemaName.slice('tenant_'.length)}`;
 }
 
 // Links que salen de la app (emails, QR, push): quien los abre puede no tener la tienda guardada

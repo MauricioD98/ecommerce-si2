@@ -708,7 +708,36 @@
       "enabled": "Push notifications are enabled on this device.",
       "blocked": "You blocked notifications for this site. Allow them in your browser settings to enable them.",
       "enabling": "Enabling...",
-      "enable": "Enable push notifications"
+      "enable": "Enable push notifications",
+      "disable": "Turn off in this browser",
+      "unavailable": {
+        "PLAN_NOT_INCLUDED": "This store's current plan doesn't include push notifications. If you run this store, upgrade to the Pro plan from the subscription panel to enable them.",
+        "NOT_CONFIGURED": "This store hasn't set up push notifications yet. If you run this store, ask the platform administrator to configure its push notification keys."
+      },
+      "environment": {
+        "INSECURE_CONTEXT": "Push notifications only work over a secure connection (HTTPS) or on localhost. Open the store from its secure address to enable them.",
+        "IOS_NEEDS_INSTALL": "On iPhone and iPad, first add the store to your Home Screen (Share → Add to Home Screen) and open it from there to enable notifications.",
+        "UNSUPPORTED_BROWSER": "This browser doesn't support push notifications. Try a recent version of Chrome, Edge, Firefox or Safari."
+      },
+      "errors": {
+        "PERMISSION_DISMISSED": "We need your permission to send you notifications. Try again and choose “Allow”.",
+        "SW_FAILED": "The browser couldn't set up notifications. Reload the page and try again; if you're in a private window, try a normal one.",
+        "SUBSCRIBE_FAILED": "The browser couldn't subscribe to the notification service. Check that your system allows notifications from this browser and try again.",
+        "SERVER": "We couldn't save the subscription. Please try again in a few minutes."
+      },
+      "test": {
+        "send": "Send test notification",
+        "title": "Test notification",
+        "body": "This store's notifications reach this browser.",
+        "accepted": "The notification service accepted the test. It should show up within seconds; if it doesn't, check that Do Not Disturb is off and that your system allows notifications from this browser.",
+        "failed": {
+          "NOT_SUBSCRIBED": "This browser is no longer subscribed with your account. Enable notifications again.",
+          "EXPIRED": "This browser's subscription expired. Enable notifications again.",
+          "NOT_CONFIGURED": "This store hasn't set up push notifications yet. If you run this store, ask the platform administrator to configure its push notification keys.",
+          "PUSH_SERVICE_ERROR": "The notification service rejected the message. Please try again in a few minutes.",
+          "SERVER": "The test couldn't be sent. Please try again in a few minutes."
+        }
+      }
     },
     "addresses": {
       "title": "My addresses",
@@ -854,7 +883,16 @@
       "unsupportedHint": "Voice dictation isn’t available in this browser (use Chrome, Edge or Safari).",
       "help": "Use your voice or type to generate real-time analytical queries about the store’s sales, inventory and performance.",
       "analyzing": "Analyzing data and generating the report...",
-      "failed": "Couldn’t generate the report."
+      "failed": "Couldn’t generate the report.",
+      "status": {
+        "noData": "No data: the query ran and found no records for that question.",
+        "clarification": "I need a clarification",
+        "forbidden": "No permission",
+        "unanswerable": "This can’t be answered with the available data",
+        "rejected": "The query failed: the AI generated a query that isn’t allowed",
+        "failed": "The query failed",
+        "unavailable": "Service unavailable"
+      }
     },
     "speech": {
       "not-allowed": "Microphone permission denied. Enable it in your browser settings.",

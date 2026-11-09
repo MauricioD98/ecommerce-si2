@@ -699,7 +699,36 @@
       "enabled": "Les notifications push sont activées sur cet appareil.",
       "blocked": "Vous avez bloqué les notifications pour ce site. Autorisez-les dans les réglages du navigateur pour les activer.",
       "enabling": "Activation...",
-      "enable": "Activer les notifications push"
+      "enable": "Activer les notifications push",
+      "disable": "Désactiver dans ce navigateur",
+      "unavailable": {
+        "PLAN_NOT_INCLUDED": "L’offre actuelle de cette boutique n’inclut pas les notifications push. Si vous gérez cette boutique, passez à l’offre Pro depuis le panneau d’abonnement pour les activer.",
+        "NOT_CONFIGURED": "Cette boutique n’a pas encore configuré les notifications push. Si vous gérez cette boutique, demandez à l’administrateur de la plateforme de configurer ses clés de notifications push."
+      },
+      "environment": {
+        "INSECURE_CONTEXT": "Les notifications push ne fonctionnent qu'avec une connexion sécurisée (HTTPS) ou sur localhost. Ouvrez la boutique depuis son adresse sécurisée pour les activer.",
+        "IOS_NEEDS_INSTALL": "Sur iPhone et iPad, ajoutez d'abord la boutique à l'écran d'accueil (Partager → Sur l'écran d'accueil) et ouvrez-la depuis là pour activer les notifications.",
+        "UNSUPPORTED_BROWSER": "Ce navigateur ne prend pas en charge les notifications push. Essayez une version récente de Chrome, Edge, Firefox ou Safari."
+      },
+      "errors": {
+        "PERMISSION_DISMISSED": "Nous avons besoin de votre autorisation pour vous envoyer des notifications. Réessayez et choisissez « Autoriser ».",
+        "SW_FAILED": "Le navigateur n'a pas pu préparer les notifications. Rechargez la page et réessayez ; en navigation privée, essayez une fenêtre normale.",
+        "SUBSCRIBE_FAILED": "Le navigateur n'a pas pu s'abonner au service de notifications. Vérifiez que votre système autorise les notifications de ce navigateur et réessayez.",
+        "SERVER": "Impossible d'enregistrer l'abonnement. Réessayez dans quelques minutes."
+      },
+      "test": {
+        "send": "Envoyer une notification de test",
+        "title": "Notification de test",
+        "body": "Les notifications de cette boutique arrivent dans ce navigateur.",
+        "accepted": "Le service de notifications a accepté le test. Elle devrait apparaître dans quelques secondes ; sinon, vérifiez que le mode « Ne pas déranger » est désactivé et que votre système autorise les notifications de ce navigateur.",
+        "failed": {
+          "NOT_SUBSCRIBED": "Ce navigateur n'est plus abonné avec votre compte. Réactivez les notifications.",
+          "EXPIRED": "L'abonnement de ce navigateur a expiré. Réactivez les notifications.",
+          "NOT_CONFIGURED": "Cette boutique n’a pas encore configuré les notifications push. Si vous gérez cette boutique, demandez à l’administrateur de la plateforme de configurer ses clés de notifications push.",
+          "PUSH_SERVICE_ERROR": "Le service de notifications a refusé l'envoi. Réessayez dans quelques minutes.",
+          "SERVER": "Impossible d'envoyer le test. Réessayez dans quelques minutes."
+        }
+      }
     },
     "addresses": {
       "title": "Mes adresses",
@@ -845,7 +874,16 @@
       "unsupportedHint": "La dictée vocale n’est pas disponible dans ce navigateur (utilisez Chrome, Edge ou Safari).",
       "help": "Utilisez votre voix ou écrivez pour générer en temps réel des requêtes analytiques sur les ventes, l’inventaire et la performance de la boutique.",
       "analyzing": "Analyse des données et génération du rapport...",
-      "failed": "Impossible de générer le rapport."
+      "failed": "Impossible de générer le rapport.",
+      "status": {
+        "noData": "Aucune donnée : la requête a été exécutée et n’a trouvé aucun enregistrement.",
+        "clarification": "J’ai besoin d’une précision",
+        "forbidden": "Accès refusé",
+        "unanswerable": "Impossible de répondre avec les données disponibles",
+        "rejected": "La requête a échoué : l’IA a généré une requête non autorisée",
+        "failed": "La requête a échoué",
+        "unavailable": "Service indisponible"
+      }
     },
     "speech": {
       "not-allowed": "Accès au micro refusé. Activez-le dans les réglages du navigateur.",

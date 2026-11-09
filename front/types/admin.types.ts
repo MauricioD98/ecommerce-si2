@@ -177,10 +177,26 @@ export interface TopProduct {
 
 // Las columnas dependen de la pregunta: por eso las filas son objetos genéricos
 export interface DynamicReportResult {
+    // ok | sin_datos (se ejecutó y no hay registros) | aclaracion / sin_permiso (no se ejecutó) |
+    // no_respondible (la IA no puede responder con estos datos). Los errores llegan como error HTTP.
+    estado?: "ok" | "sin_datos" | "aclaracion" | "sin_permiso" | "no_respondible";
     sql: string;
     columns: string[];
     rows: Record<string, unknown>[];
     rowCount: number;
+    // Cómo se interpretó la pregunta: zona horaria, moneda y nombres resueltos
+    interpretation?: {
+        zonaHoraria: string;
+        fechaHoraLocal: string;
+        moneda: string;
+        entidades: { tipo: string; texto: string; nombre: string; metodo: string }[];
+        avisos: string[];
+    };
+    // Presente cuando un nombre es ambiguo o no existe: la consulta no se ejecutó
+    clarification?: {
+        mensaje: string;
+        opciones: { tipo: string; texto: string; opciones: string[] }[];
+    };
 }
 
 // POST /products y PATCH /products/:id. El stock no se envía: un producto nuevo nace con stock 0

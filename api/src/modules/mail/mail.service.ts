@@ -17,6 +17,15 @@ export interface CampaignRecipient {
   email: string;
 }
 
+export type MailDelivery =
+  | { status: 'sent'; messageId?: string }
+  | { status: 'simulated' }
+  | { status: 'rejected'; reason: string }
+  | { status: 'failed'; reason: string };
+
+// Identificador del logo incrustado en el correo de la factura (<img src="cid:...">)
+const STORE_LOGO_CID = 'store-logo@novasoft';
+
 // Envío de correos. Ningún método lanza error: un fallo de SMTP no debe romper el registro, el pago ni
 // la recuperación de contraseña; se registra en el log y se devuelve false.
 @Injectable()
@@ -80,20 +89,41 @@ export class MailService {
     return `"${safeBrand}" <${smtpUser}>`;
   }
 
-  private async send(options: ISendMailOptions): Promise<boolean> {
+  /**
+   * Envía y dice QUÉ pasó realmente, según la respuesta del transporte:
+   *  - sent: el servidor SMTP aceptó al destinatario (no garantiza que llegue a la bandeja: un rebote
+   *    posterior llega como correo a la cuenta remitente);
+   *  - simulated: no hay SMTP configurado (transporte JSON), no salió nada;
+   *  - rejected: el servidor rechazó al destinatario;
+   *  - failed: error de conexión, DNS, autenticación, etc.
+   */
+  async deliver(options: ISendMailOptions): Promise<MailDelivery> {
     try {
-      await this.mailer.sendMail(options);
-      if (!this.config.get<string>('SMTP_HOST') && !this.config.get<string>('SMTP_USER')) {
-        // Modo desarrollo sin SMTP configurado: el correo no sale, solo se registra
+      const info = (await this.mailer.sendMail(options)) as { accepted?: unknown[]; rejected?: unknown[]; messageId?: string; response?: string } | undefined;
+      // El transporte JSON (sin SMTP) no informa destinatarios aceptados
+      if (!info || !Array.isArray(info.accepted)) {
         this.logger.log(`[SMTP no configurado] Correo simulado a ${String(options.to)}: "${options.subject}"`);
+        return { status: 'simulated' };
       }
-      return true;
+      const rejected = Array.isArray(info.rejected) ? info.rejected : [];
+      if (info.accepted.length === 0 || rejected.length > 0) {
+        const reason = `el servidor rechazó el destinatario (${String(info.response ?? 'sin respuesta').slice(0, 160)})`;
+        this.logger.error(`No se pudo enviar el correo a ${String(options.to)}: ${reason}`);
+        return { status: 'rejected', reason };
+      }
+      return { status: 'sent', messageId: info.messageId };
     } catch (error) {
-      this.logger.error(
-        `No se pudo enviar el correo a ${String(options.to)}: ${error instanceof Error ? error.message : error}`,
-      );
-      return false;
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`No se pudo enviar el correo a ${String(options.to)}: ${reason}`);
+      return { status: 'failed', reason: reason.slice(0, 200) };
     }
+  }
+
+  // Correos que no deben romper el flujo que los dispara (bienvenida, recuperación, campañas): false
+  // solo si falló; un envío simulado en desarrollo cuenta como hecho, igual que antes.
+  private async send(options: ISendMailOptions): Promise<boolean> {
+    const result = await this.deliver(options);
+    return result.status === 'sent' || result.status === 'simulated';
   }
 
   async sendWelcome(to: string, firstName?: string | null): Promise<boolean> {
@@ -158,6 +188,9 @@ export class MailService {
 
   // storeName lo resuelve InvoiceService en el backend a partir del tenant del pedido: acá no se
   // vuelve a adivinar (ni se cae a un nombre por defecto) para no mezclar tiendas.
+  // Todas las tiendas envían desde la MISMA cuenta SMTP de la plataforma (no se piden ni guardan
+  // contraseñas de correo por tienda); el cliente ve la tienda en el remitente, el asunto, el cuerpo y
+  // el PDF. Devuelve qué pasó realmente: quien llama decide si un envío no hecho es un error.
   async sendInvoice(params: {
     to: string;
     firstName?: string | null;
@@ -166,19 +199,27 @@ export class MailService {
     total: number;
     pdf: Buffer;
     filename: string;
-  }): Promise<boolean> {
+    // PNG/JPEG ya validado por resolveInvoiceIssuer; se incrusta en el correo (cid), no como enlace
+    logo?: Buffer | null;
+  }): Promise<MailDelivery> {
     const storeName = params.storeName.replace(/[\r\n]+/g, ' ').trim();
     if (!storeName) {
       // No debería pasar (InvoiceService no emite sin tienda), pero sin nombre no se envía con otro
       this.logger.error(`Factura del pedido #${params.orderNumber} sin nombre de tienda: no se envía`);
-      return false;
+      return { status: 'failed', reason: 'factura sin nombre de tienda' };
     }
-    return this.send({
+    const logoType = params.logo ? (params.logo[0] === 0x89 ? 'image/png' : 'image/jpeg') : null;
+    return this.deliver({
       to: params.to,
       from: this.storeViaPlatformFrom(storeName),
       subject: `Tu factura de ${storeName} - pedido #${params.orderNumber}`,
-      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`, storeName),
-      attachments: [{ filename: params.filename, content: params.pdf, contentType: 'application/pdf' }],
+      html: invoiceEmail(params.firstName || 'cliente', params.orderNumber, `Bs ${params.total.toFixed(2)}`, storeName, logoType ? STORE_LOGO_CID : null),
+      attachments: [
+        { filename: params.filename, content: params.pdf, contentType: 'application/pdf' },
+        ...(params.logo && logoType
+          ? [{ filename: logoType === 'image/png' ? 'logo.png' : 'logo.jpg', content: params.logo, contentType: logoType, cid: STORE_LOGO_CID }]
+          : []),
+      ],
     });
   }
 

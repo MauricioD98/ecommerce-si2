@@ -9,6 +9,7 @@ import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { CreatePaymentIntentResponse, PaymentResponseDto } from './dto/payment-response.dto';
 import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 import { InvoiceService } from '../invoices/invoice.service';
+import { InvoiceDeliveryError } from '../invoices/invoice-issuer';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { StripeConnectService } from './stripe-connect.service';
@@ -752,13 +753,16 @@ export class PaymentsService {
     }
   }
 
-  // Genera la factura en PDF de la orden y la envía al cliente. La invoca el consumidor del outbox: si
-  // lanza, el evento se reintenta. El pago ya está confirmado y no depende de esto.
+  // Genera la factura en PDF de la orden y la envía al correo del cliente que hizo la compra. La invoca el
+  // consumidor del outbox: si lanza, el evento se reintenta y, agotados los intentos, queda DEAD con el
+  // motivo. Por eso un envío NO hecho (SMTP caído, mal configurado, sin SMTP o destinatario rechazado)
+  // lanza: antes se ignoraba el resultado y el evento quedaba DONE aunque el correo no hubiera salido.
+  // El pago ya está confirmado y no depende de esto. El mensaje de error no lleva datos del cliente.
   async sendInvoiceEmail(orderId: string): Promise<void> {
     const { buffer, filename, data } = await this.invoiceService.generateOrderInvoice(orderId);
-    if (!data.customer.email) return;
+    if (!data.customer.email) throw new InvoiceDeliveryError(data.number, 'el pedido no tiene correo de cliente');
 
-    await this.mailService.sendInvoice({
+    const result = await this.mailService.sendInvoice({
       to: data.customer.email,
       firstName: data.customer.name,
       storeName: data.store.name,
@@ -766,7 +770,16 @@ export class PaymentsService {
       total: data.total,
       pdf: buffer,
       filename,
+      logo: data.store.logo ?? null,
     });
+    if (result.status === 'sent') {
+      this.logger.log(`Factura del pedido #${data.number} aceptada por el servidor SMTP (${result.messageId ?? 'sin id'})`);
+      return;
+    }
+    throw new InvoiceDeliveryError(
+      data.number,
+      result.status === 'simulated' ? 'SMTP no configurado: el correo no salió' : result.reason,
+    );
   }
 
   async sendPaidPush(userId: string, orderId: string, orderNumber: string): Promise<void> {

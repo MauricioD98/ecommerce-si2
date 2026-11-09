@@ -97,7 +97,12 @@ function forceLogout(): void {
     navigator.serviceWorker?.controller?.postMessage({ type: "CLEAR_USER_CACHE" });
     // Copia local del perfil fuera; el cambio pendiente queda para cuando vuelva a entrar la misma cuenta.
     // Se navega después de borrarla: salir de la página podría cortar la transacción de IndexedDB.
-    void Promise.all([clearProfileSnapshots(), clearOrdersCache(), clearAdminReadCache()]).finally(() => {
+    // Los push de esta cuenta en esta tienda dejan de llegar a este navegador (la sesión ya no sirve para
+    // avisar al backend: borra la fila en el próximo envío, 410). Import dinámico: push.service usa este archivo.
+    const detachPush = import("@/hooks/usePushNotifications")
+        .then((m) => m.detachPushForCurrentStore({ notifyBackend: false }))
+        .catch(() => undefined);
+    void Promise.all([clearProfileSnapshots(), clearOrdersCache(), clearAdminReadCache(), detachPush]).finally(() => {
         // Si ya estamos en el login, redirigir de nuevo solo recargaría la página y repetiría el 401
         if (!window.location.pathname.startsWith("/auth/login")) {
             window.location.href = "/auth/login";

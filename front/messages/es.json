@@ -708,7 +708,36 @@
       "enabled": "Las notificaciones push están activadas en este dispositivo.",
       "blocked": "Bloqueaste las notificaciones para este sitio. Habilítalas desde los ajustes del navegador para activarlas.",
       "enabling": "Activando...",
-      "enable": "Activar notificaciones push"
+      "enable": "Activar notificaciones push",
+      "disable": "Desactivar en este navegador",
+      "unavailable": {
+        "PLAN_NOT_INCLUDED": "Esta tienda no ofrece notificaciones push en su plan actual. Si administras la tienda, cámbiate al plan Pro desde el panel de suscripción para activarlas.",
+        "NOT_CONFIGURED": "Esta tienda todavía no configuró las notificaciones push. Si administras la tienda, pide al administrador de la plataforma que configure sus claves de notificaciones push."
+      },
+      "environment": {
+        "INSECURE_CONTEXT": "Las notificaciones push solo funcionan en una conexión segura (HTTPS) o en localhost. Abre la tienda desde su dirección segura para activarlas.",
+        "IOS_NEEDS_INSTALL": "En iPhone y iPad, agrega primero la tienda a tu pantalla de inicio (Compartir → Agregar a inicio) y ábrela desde ahí para activar las notificaciones.",
+        "UNSUPPORTED_BROWSER": "Este navegador no admite notificaciones push. Prueba con una versión reciente de Chrome, Edge, Firefox o Safari."
+      },
+      "errors": {
+        "PERMISSION_DISMISSED": "Necesitamos tu permiso para enviarte notificaciones. Vuelve a intentarlo y elige «Permitir».",
+        "SW_FAILED": "El navegador no pudo preparar las notificaciones. Recarga la página e inténtalo de nuevo; si usas navegación privada, prueba en una ventana normal.",
+        "SUBSCRIBE_FAILED": "El navegador no pudo suscribirse al servicio de notificaciones. Revisa que las notificaciones del navegador estén permitidas en tu sistema e inténtalo de nuevo.",
+        "SERVER": "No pudimos guardar la suscripción. Inténtalo de nuevo en unos minutos."
+      },
+      "test": {
+        "send": "Enviar notificación de prueba",
+        "title": "Notificación de prueba",
+        "body": "Las notificaciones de esta tienda llegan a este navegador.",
+        "accepted": "El servicio de notificaciones aceptó la prueba. Debería aparecer en unos segundos; si no la ves, revisa que el modo «No molestar» esté apagado y que el sistema permita notificaciones de este navegador.",
+        "failed": {
+          "NOT_SUBSCRIBED": "Este navegador ya no está suscrito con tu cuenta. Vuelve a activar las notificaciones.",
+          "EXPIRED": "La suscripción de este navegador venció. Vuelve a activar las notificaciones.",
+          "NOT_CONFIGURED": "Esta tienda todavía no configuró las notificaciones push. Si administras la tienda, pide al administrador de la plataforma que configure sus claves de notificaciones push.",
+          "PUSH_SERVICE_ERROR": "El servicio de notificaciones rechazó el envío. Inténtalo de nuevo en unos minutos.",
+          "SERVER": "No se pudo enviar la prueba. Inténtalo de nuevo en unos minutos."
+        }
+      }
     },
     "addresses": {
       "title": "Mis direcciones",
@@ -854,7 +883,16 @@
       "unsupportedHint": "El dictado por voz no está disponible en este navegador (usa Chrome, Edge o Safari).",
       "help": "Usa tu voz o escribe para generar consultas analíticas en tiempo real sobre las ventas, inventario y rendimiento de la tienda.",
       "analyzing": "Analizando datos y generando reporte...",
-      "failed": "No se pudo generar el reporte."
+      "failed": "No se pudo generar el reporte.",
+      "status": {
+        "noData": "Sin datos: la consulta se ejecutó y no encontró registros para esa pregunta.",
+        "clarification": "Necesito una aclaración",
+        "forbidden": "Sin permiso",
+        "unanswerable": "No se puede responder con los datos disponibles",
+        "rejected": "La consulta falló: la IA generó una consulta no permitida",
+        "failed": "La consulta falló",
+        "unavailable": "Servicio no disponible"
+      }
     },
     "speech": {
       "not-allowed": "Permiso de micrófono denegado. Actívalo en la configuración del navegador.",

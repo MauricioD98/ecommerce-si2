@@ -47,6 +47,7 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "libpg-query": "18.1.5",
     "nestjs-i18n": "^10.5.1",
     "nodemailer": "^10.0.10",
     "openai": "^7.22.0",

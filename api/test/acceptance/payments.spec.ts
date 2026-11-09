@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, afterEach, before, describe, it } from 'node:test';
 import type { INestApplication } from '@nestjs/common';
+import { MailerService } from '@nestjs-modules/mailer';
 import { FakeStripe } from './support/fake-stripe';
 import { clearFailpoints, setFailpoint } from '../../src/common/checkout/failpoints';
 import { simulatedPaymentsEnabled, toMinorUnits } from '../../src/common/checkout/checkout-policy';
@@ -442,6 +443,14 @@ describe('Pagos, webhooks, vencimientos y compensaciones', () => {
 
     const pending = () => count(schema, 'outbox_events', `"dedupeKey" IN ($1,$2) AND status='PENDING'`, [`order-paid-invoice:${orderId}`, `order-paid-push:${orderId}`]);
     assert.equal(await pending(), 2, 'la compra persiste y sus efectos quedan en el outbox');
+
+    // SMTP simulado que acepta (sin SMTP real la factura NO cuenta como enviada y quedaría pendiente)
+    const mailer = app.get(MailerService, { strict: false });
+    const realSendMail = mailer.sendMail.bind(mailer);
+    mailer.sendMail = (async (options: { to?: unknown }) => ({ accepted: [options.to], rejected: [], messageId: '<p08@test>' })) as never;
+    after(() => {
+      mailer.sendMail = realSendMail;
+    });
 
     // Consumidor cae a mitad: lease vencido, otro consumidor lo retoma
     setFailpoint('outbox.beforeDeliver', () => {

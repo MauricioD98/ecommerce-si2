@@ -186,6 +186,6 @@ export const config = {
     matcher: [
         // Todo menos estáticos: chunks, imágenes optimizadas y service worker. El manifest y los íconos SÍ pasan:
         // el navegador los pide sin cookies, y en un dominio propio solo el Host dice de qué tienda son.
-        "/((?!_next/static|_next/image|favicon.ico|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf)$).*)",
+        "/((?!_next/static|_next/image|favicon.ico|sw.js|push-sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico|woff2?|ttf)$).*)",
     ],
 };

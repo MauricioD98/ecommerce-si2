@@ -25,6 +25,16 @@ export class InvoiceIssuerUnavailableError extends Error {
   }
 }
 
+// La factura se generó pero el correo NO salió (o el servidor lo rechazó). El outbox la reintenta y,
+// agotados los intentos, queda DEAD con este mensaje. Se guarda en outbox_events.lastError: se quitan
+// las direcciones de correo que pueda traer la respuesta del servidor SMTP.
+export class InvoiceDeliveryError extends Error {
+  constructor(orderNumber: string, reason: string) {
+    super(`Factura del pedido #${orderNumber} no enviada: ${reason.replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/g, '***@***')}`.slice(0, 480));
+    this.name = 'InvoiceDeliveryError';
+  }
+}
+
 const logger = new Logger('InvoiceIssuer');
 
 const LOGO_DATA_URL = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/=\s]+)$/;

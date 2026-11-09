@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { ReportsService } from "@/service/api/reports.service";
 import { getApiErrorMessage } from "@/service/api/error.utils";
 import { useTranslations } from "next-intl";
@@ -47,11 +48,28 @@ export function useSalesReport(branchId: string, days: number) {
     return { overview, topProducts, error, isLoading: loadedKey !== key };
 }
 
+// Tipo de error de un reporte con IA: se decide por el `code` de la API, no por el status HTTP (un 403
+// del validador es una consulta rechazada, no falta de permiso)
+export type DynamicReportErrorKind = "rejected" | "failed" | "forbidden" | "unavailable";
+
 export interface DynamicReportEntry {
     id: number;
     prompt: string;
     result?: DynamicReportResult;
     error?: string;
+    errorKind?: DynamicReportErrorKind;
+}
+
+function errorKindOf(error: unknown): DynamicReportErrorKind {
+    if (!axios.isAxiosError(error) || !error.response) return "unavailable";
+    const code = (error.response.data as { code?: string } | undefined)?.code;
+    if (code === "REPORT_QUERY_REJECTED") return "rejected";
+    if (code === "REPORT_QUERY_FAILED") return "failed";
+    if (code === "REPORT_BRANCH_UNKNOWN") return "forbidden";
+    if (code === "REPORT_UNAVAILABLE" || code === "REPORT_AI_UNAVAILABLE" || code === "REPORT_AI_RATE_LIMITED") return "unavailable";
+    // Sin código propio: los guards (permiso VIEW_REPORTS, plan) responden 401/403
+    if (error.response.status === 401 || error.response.status === 403) return "forbidden";
+    return error.response.status >= 500 ? "unavailable" : "failed";
 }
 
 // "Pregúntale a la IA": conserva las últimas preguntas (la más reciente primero)
@@ -67,7 +85,9 @@ export function useDynamicReport() {
             const result = await ReportsService.runDynamicReport(prompt);
             setEntries((prev) => [{ id, prompt, result }, ...prev].slice(0, 5));
         } catch (error) {
-            setEntries((prev) => [{ id, prompt, error: getApiErrorMessage(error, t("failed")) }, ...prev].slice(0, 5));
+            setEntries((prev) =>
+                [{ id, prompt, error: getApiErrorMessage(error, t("failed")), errorKind: errorKindOf(error) }, ...prev].slice(0, 5)
+            );
         } finally {
             setIsLoading(false);
         }

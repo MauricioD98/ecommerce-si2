@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { FileDown, FileSpreadsheet, FileText, Loader2, Mic, MicOff, Send, Sparkles } from 'lucide-react';
+import { AlertTriangle, Clock, FileDown, FileSpreadsheet, FileText, HelpCircle, Info, Loader2, Lock, Mic, MicOff, SearchX, Send, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
 import { intlLocale } from '@/i18n/config';
@@ -149,8 +149,51 @@ function ResultTable({ result }: { result: DynamicReportResult }) {
     );
 }
 
-function EntryCard({ entry }: { entry: DynamicReportEntry }) {
+// Cómo se interpretó la pregunta (zona horaria, moneda, nombres resueltos) y avisos del servidor. Los
+// textos de avisos y aclaraciones los redacta la API; aquí solo se muestran.
+function Interpretation({ result }: { result: DynamicReportResult }) {
+    const info = result.interpretation;
+    if (!info) return null;
+    return (
+        <div className={styles.sqlDetails}>
+            <div>
+                <Clock size={12} /> {info.zonaHoraria} · {info.fechaHoraLocal} · {info.moneda}
+                {info.entidades.map((e) => (
+                    <span key={`${e.tipo}-${e.texto}`}>
+                        {' · '}«{e.texto}» → {e.nombre}
+                    </span>
+                ))}
+            </div>
+            {info.avisos.map((aviso) => (
+                <div key={aviso}>
+                    <Info size={12} /> {aviso}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+// Título del estado de una respuesta: cada caso se ve distinto para que un error nunca parezca
+// "no hubo ventas" (y una consulta rechazada no parezca falta de permiso)
+function StatusTitle({ kind, children }: { kind: 'noData' | 'clarification' | 'forbidden' | 'unanswerable' | 'rejected' | 'failed' | 'unavailable'; children?: React.ReactNode }) {
     const t = useTranslations('Reports.dynamic');
+    const Icon = kind === 'noData' ? SearchX : kind === 'clarification' ? HelpCircle : kind === 'forbidden' ? Lock : AlertTriangle;
+    return (
+        <div className={['rejected', 'failed', 'unavailable'].includes(kind) ? `${styles.errorMessage} ${styles.chatError}` : styles.emptyState} role="status">
+            <p>
+                <Icon size={16} style={{ verticalAlign: 'text-bottom', marginRight: '0.35rem' }} aria-hidden="true" />
+                <strong>{t(`status.${kind}`)}</strong>
+            </p>
+            {children}
+        </div>
+    );
+}
+
+function EntryCard({ entry, onAsk, disabled }: { entry: DynamicReportEntry; onAsk: (question: string) => void; disabled: boolean }) {
+    const t = useTranslations('Reports.dynamic');
+    const result = entry.result;
+    const estado = result?.estado ?? (result && result.rowCount === 0 ? 'sin_datos' : 'ok');
+    const clarification = result?.clarification;
 
     return (
         <div className={styles.tableCard}>
@@ -159,17 +202,61 @@ function EntryCard({ entry }: { entry: DynamicReportEntry }) {
                     <Sparkles size={16} />
                     <span>{entry.prompt}</span>
                 </div>
-                {entry.result && <ExportBar entry={entry} />}
+                {result && estado === 'ok' && <ExportBar entry={entry} />}
             </div>
 
-            {entry.error && <div className={`${styles.errorMessage} ${styles.chatError}`}>{entry.error}</div>}
+            {entry.error && (
+                // Error: la consulta no se ejecutó o falló. Nunca se muestra como "sin datos"
+                <StatusTitle kind={entry.errorKind ?? 'failed'}>
+                    <p>{entry.error}</p>
+                </StatusTitle>
+            )}
 
-            {entry.result && (
+            {estado === 'aclaracion' && clarification && (
+                // Nombre ambiguo o inexistente: no se ejecutó nada. Cada opción vuelve a preguntar precisando el nombre
+                <StatusTitle kind="clarification">
+                    <p>{clarification.mensaje}</p>
+                    <div className={styles.badgeList}>
+                        {clarification.opciones.flatMap((group) =>
+                            group.opciones.map((option) => (
+                                <button
+                                    key={`${group.tipo}-${group.texto}-${option}`}
+                                    type="button"
+                                    className={styles.chip}
+                                    disabled={disabled}
+                                    onClick={() => onAsk(`${entry.prompt} (${group.tipo}: ${option})`)}
+                                >
+                                    {option}
+                                </button>
+                            )),
+                        )}
+                    </div>
+                </StatusTitle>
+            )}
+
+            {estado === 'sin_permiso' && clarification && (
+                <StatusTitle kind="forbidden">
+                    <p>{clarification.mensaje}</p>
+                </StatusTitle>
+            )}
+
+            {estado === 'no_respondible' && <StatusTitle kind="unanswerable" />}
+
+            {result && estado === 'sin_datos' && (
                 <>
-                    <ResultTable result={entry.result} />
+                    <StatusTitle kind="noData" />
+                    {/* Con el período y la zona a la vista, "sin datos" se puede comprobar */}
+                    <Interpretation result={result} />
+                </>
+            )}
+
+            {result && estado === 'ok' && (
+                <>
+                    <ResultTable result={result} />
+                    <Interpretation result={result} />
                     {/* El SQL generado ya no se muestra al usuario final; queda solo en el log del backend (reports.service.ts) */}
                     <div className={styles.sqlDetails}>
-                        {t('rows', { count: entry.result.rowCount })}
+                        {t('rows', { count: result.rowCount })}
                     </div>
                 </>
             )}
@@ -286,7 +373,7 @@ export default function DynamicReportPanel() {
             )}
 
             {entries.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} />
+                <EntryCard key={entry.id} entry={entry} onAsk={submit} disabled={isLoading || isListening} />
             ))}
         </div>
     );

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { getCurrentTenantId } from "@/utils/tenant";
+import { PUSH_SCOPE_PREFIX } from "@/hooks/usePushNotifications";
 
 export const SW_UPDATE_EVENT = "sf-sw-update-available";
 
@@ -29,10 +30,14 @@ export function useRegisterServiceWorker(): void {
         // No registrarlo no alcanza: un SW que quedó de antes en el mismo origen (un build de producción
         // en localhost:3000, o haber activado push) sigue controlando la página y sirve payloads RSC
         // viejos → "chunk.reason.enqueueModel is not a function". En dev se elimina junto con sus cachés.
+        // Las registraciones de push (public/push-sw.js, una por tienda) se respetan: no controlan
+        // páginas ni cachean nada, y eliminarlas se llevaba la suscripción push del navegador mientras
+        // el backend la seguía dando por activa (se "activaban" en dev pero nunca llegaban).
         if (process.env.NODE_ENV !== "production") {
             navigator.serviceWorker
                 .getRegistrations()
-                .then(async (registrations) => {
+                .then(async (all) => {
+                    const registrations = all.filter((registration) => !new URL(registration.scope).pathname.startsWith(PUSH_SCOPE_PREFIX));
                     if (registrations.length === 0) return;
                     await Promise.all(registrations.map((registration) => registration.unregister()));
                     const keys = await caches.keys();
