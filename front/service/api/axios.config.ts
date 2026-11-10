@@ -37,7 +37,7 @@ const tenantRequiredError = (config: InternalAxiosRequestConfig) =>
     } as AxiosResponse);
 
 // Hosts del SaaS (no son dominios de una tienda). Tiene que coincidir con PLATFORM_HOSTS de proxy.ts.
-const PLATFORM_HOSTS = (process.env.NEXT_PUBLIC_PLATFORM_HOSTS ?? "stella-front.wonderfulriver-db5286cd.eastus.azurecontainerapps.io")
+const PLATFORM_HOSTS = (process.env.NEXT_PUBLIC_PLATFORM_HOSTS ?? "localhost,127.0.0.1")
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);

@@ -1,5 +1,6 @@
 node_modules
 .next
+.swc-native-cache
 .env
 .env.*
 !.env.example
