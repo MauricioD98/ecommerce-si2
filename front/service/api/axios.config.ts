@@ -43,17 +43,23 @@ const PLATFORM_HOSTS = (process.env.NEXT_PUBLIC_PLATFORM_HOSTS ?? "localhost,127
     .filter(Boolean);
 
 export const getApiBaseUrl = (): string => {
+    const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
     if (typeof window !== "undefined") {
-        const hostname = window.location.hostname;
+        const hostname = window.location.hostname.toLowerCase();
         const isLocal = hostname.includes("localhost") || hostname.includes("127.0.0.1") || hostname.includes("10.0.") || hostname.includes("192.168.");
         if (!isLocal) {
             // Dominio propio de una tienda: la API va por el mismo origen y front/proxy.ts la reenvía
             // con el x-tenant-id que resolvió del Host (sin CORS, y el cliente no elige la tienda).
             if (!PLATFORM_HOSTS.includes(hostname)) return `${window.location.origin}/api/v1`;
-            return "https://stella-api.wonderfulriver-db5286cd.eastus.azurecontainerapps.io/api/v1";
+
+            // Host central del SaaS: usa la API pública configurada durante el build. El fallback al
+            // mismo origen mantiene el despliegue funcional si en el futuro se sirve mediante un proxy.
+            return configuredApiUrl || `${window.location.origin}/api/v1`;
         }
     }
-    return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
+    return configuredApiUrl || "http://localhost:3001/api/v1";
 };
 
 export const apiClient = axios.create({
@@ -273,3 +279,4 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
     },
 );
+
