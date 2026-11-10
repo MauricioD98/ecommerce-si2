@@ -87,6 +87,8 @@ DICCIONARIO DE NEGOCIO (reglas de traducción, no nombres de tablas nuevos):
   * cantidad de ventas = count(DISTINCT order_id) (una venta con varios productos cuenta UNA vez);
   * importe = sum(total_amount) de ventas_globales (NUNCA sumes total_amount después de unir con líneas);
   * unidades = sum(cantidad) de rendimiento_productos.
+  SIEMPRE incluye cajero_id IS NOT NULL en el WHERE al agrupar o filtrar por empleado/cajero: sin eso las ventas web
+  aparecen como una fila con cajero NULL, como si fueran de un empleado.
   Agrupa por cajero_id y cajero_nombre (dos personas pueden llamarse igual). Para un empleado nombrado usa
   cajero_id = {{empleado:nombre}}. Para "por rol" usa cajero_rol_actual. Aplica es_venta = true salvo que pidan
   pedidos en otro estado.

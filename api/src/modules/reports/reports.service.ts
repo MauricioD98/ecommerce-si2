@@ -244,7 +244,7 @@ export class ReportsService {
         throw error;
       }
       const rows = await run(safeSql, MAX_DYNAMIC_ROWS, 'query');
-      const avisos = [...resolved.avisos, ...(await this.currencyWarnings(safeSql, currency, run)), ...employeeWarnings(safeSql)];
+      const avisos = [...resolved.avisos, ...(await this.currencyWarnings(safeSql, currency, run)), ...employeeWarnings(safeSql, rows)];
       return { safeSql, rows, entidades: resolved.entidades, avisos };
     });
 
@@ -539,8 +539,16 @@ export class ReportsService {
 }
 
 // Ventas por empleado: el rol es el ACTUAL (no hay historial) y las ventas web no tienen empleado
-function employeeWarnings(safeSql: string): string[] {
+function employeeWarnings(safeSql: string, rows: Row[]): string[] {
   const avisos: string[] = [];
+  // Red de seguridad si la IA agrupó por cajero sin "cajero_id IS NOT NULL": la fila con cajero NULL son
+  // ventas SIN empleado (web), no un empleado sin nombre. Columnas de identidad = id/nombre/rol del cajero.
+  const identity = rows.length > 0
+    ? Object.keys(rows[0]).filter((c) => /(cajero|empleado|vendedor)/i.test(c) && /(_id$|^id_|nombre|rol|^cajero$|^empleado$|^vendedor$)/i.test(c))
+    : [];
+  if (identity.length > 0 && rows.some((row) => identity.every((c) => row[c] === null))) {
+    avisos.push('La fila sin empleado (valores vacíos) agrupa ventas que no tienen un empleado registrado, como las ventas web: no corresponde a ningún cajero.');
+  }
   if (/cajero_rol_actual|\bempleados\b[\s\S]*\brol\b|\brol\b[\s\S]*\bempleados\b/i.test(safeSql)) {
     avisos.push('El rol que se muestra es el ACTUAL de cada empleado: el sistema no guarda qué rol tenía al momento de cada venta.');
   }

@@ -305,6 +305,26 @@ describe('Reportes con IA: empleados y ventas por empleado (datos sintéticos)',
       assert.match(missing.body.clarification.mensaje, /No encontré al empleado «pedro»/);
     });
 
+    it('si la consulta olvida "cajero_id IS NOT NULL", la fila sin empleado se explica (no es un cajero)', async () => {
+      // SQL real que generó Groq para un usuario de Centro el 9/11 (agrupaba las ventas web como cajero NULL)
+      const body = await askOk(
+        api(TENANT_A.tenantId, BRANCH_HR, ids['branch:Centro']),
+        `SELECT cajero_id, cajero_nombre, count(distinct order_id) AS cantidad_ventas FROM ventas_globales
+         WHERE es_venta = true AND created_at >= '2026-11-07 09:00' AND created_at < '2026-11-07 14:00' GROUP BY cajero_id, cajero_nombre LIMIT 200`,
+      );
+      const unattributed = body.rows.find((r: any) => r.cajero_id === null);
+      assert.equal(unattributed?.cantidad_ventas, SALES.filter((s) => !s.cashier && isSale(s) && inWindow(s) && s.branch === 'Centro').length);
+      assert.ok(body.interpretation.avisos.some((a: string) => /fila sin empleado/.test(a)), JSON.stringify(body.interpretation.avisos));
+      // Con el filtro correcto no hay fila sin empleado ni ese aviso
+      const ok = await askOk(
+        api(TENANT_A.tenantId, BRANCH_HR, ids['branch:Centro']),
+        `SELECT cajero_id, cajero_nombre, count(distinct order_id) AS cantidad_ventas FROM ventas_globales
+         WHERE es_venta AND cajero_id IS NOT NULL AND created_at >= '2026-11-07 09:00' AND created_at < '2026-11-07 14:00' GROUP BY cajero_id, cajero_nombre`,
+      );
+      assert.ok(!ok.rows.some((r: any) => r.cajero_id === null));
+      assert.ok(!ok.interpretation.avisos.some((a: string) => /fila sin empleado/.test(a)));
+    });
+
     it('las ventas web no se atribuyen a nadie', async () => {
       const body = await askOk(
         api(TENANT_A.tenantId, GLOBAL_HR),
