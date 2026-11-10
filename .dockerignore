@@ -1,0 +1,35 @@
+# Git y editores
+.git
+.github
+.vscode
+.idea
+
+# Proyectos que no necesita la imagen de la API
+front
+app_movil
+docs
+
+# Dependencias y compilaciones locales
+**/node_modules
+**/dist
+**/dist-acceptance
+**/.next
+**/.swc-native-cache
+**/.expo
+**/.venv
+**/__pycache__
+**/*.pyc
+**/*.tsbuildinfo
+
+# Variables y secretos
+**/.env
+**/.env.*
+**/*.log
+
+# Datos generados por los mÃ³dulos Python
+IA/**/salidas
+IA/**/datos_demo
+IA/**/tests
+
+# Pruebas de la API no necesarias en producciÃ³n
+api/test
