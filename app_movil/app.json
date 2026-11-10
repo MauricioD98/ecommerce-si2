@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "app_movil",
-    "slug": "app_movil",
+    "name": "NovaSoft",
+    "slug": "novasoft",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stellafemme.app",
+      "bundleIdentifier": "com.novasoft.si2",
       "infoPlist": {
         "NSCameraUsageDescription": "La cámara se usa solo durante el probador virtual en vivo; el video se envía a Decart para transformarlo y no se guarda."
       }
     },
     "android": {
-      "package": "com.stellafemme.app",
+      "package": "com.novasoft.si2",
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -41,6 +41,12 @@
           "cameraPermission": "La cámara se usa solo durante el probador virtual en vivo; el video se envía a Decart para transformarlo y no se guarda."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f437b30f-0f68-4cc3-b18b-93dd6e26a4e4"
+      }
+    },
+    "owner": "oscar_diego"
   }
 }
