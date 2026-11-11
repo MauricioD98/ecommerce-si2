@@ -1,0 +1,13 @@
+
+.git/
+**/node_modules/
+**/.cache/
+**/.swc-native-cache/
+**/.next/
+front/
+api/
+docs/
+IA/
+app_movil/android/.gradle/
+app_movil/android/build/
+app_movil/android/app/build/
