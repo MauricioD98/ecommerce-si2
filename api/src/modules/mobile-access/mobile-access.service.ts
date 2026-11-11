@@ -10,6 +10,7 @@ import { i18nMessage } from '../../i18n/i18n-message';
 import { getPlanFeatures } from '../platform/plans';
 import { verifyAppAttestAssertion, verifyAppAttestAttestation } from './app-attest.verifier';
 import { AttestationError, AttestationProviderError } from './attestation-error';
+import { KeyAttestationRevocationList, verifyKeyAttestationChain } from './android-key-attestation.verifier';
 import { MobileAttestationDto } from './dto/mobile-attestation.dto';
 import {
   MOBILE_ATTESTATION_INVALID,
@@ -37,6 +38,8 @@ export class MobileAccessService {
   private playClient: { key: string; client: PlayIntegrityClient } | null = null;
   // Inyectable para las pruebas (Google falso). En producción es el fetch global.
   fetchImpl: FetchLike = fetch as unknown as FetchLike;
+  private readonly revocationList = new KeyAttestationRevocationList(() => this.fetchImpl);
+  private lastConfigWarning = '';
 
   constructor(private readonly control: ControlPrismaService) {}
 
@@ -49,6 +52,7 @@ export class MobileAccessService {
   async issueChallenge(tenantId: string) {
     await this.assertMobilePlan(tenantId);
     const config = loadMobileAccessConfig();
+    this.warnIfIncomplete(config);
     const challenge = randomBytes(32).toString('base64url');
     const row = await this.control.mobileAttestationChallenge.create({
       data: { tenantId, challenge, expiresAt: new Date(Date.now() + config.challengeTtlMs) },
@@ -63,12 +67,15 @@ export class MobileAccessService {
       challengeId: row.id,
       challenge,
       expiresAt: row.expiresAt.toISOString(),
-      // Lo que la app debe pasar tal cual al SDK: requestHash (Android) o challenge de App Attest (iOS)
+      // Lo que la app debe pasar tal cual al SDK: requestHash (Android: Play Integrity y también el
+      // attestationChallenge de Key Attestation) o clientData (challenge de App Attest, iOS)
       requestHash: playIntegrityRequestHash(tenantId, challenge),
       clientData: boundClientData(tenantId, challenge),
       // Qué pruebas acepta este servidor; la app lo usa para mostrar un error claro si no hay ninguna
       platforms: {
         android: !!config.android,
+        // APK instalada fuera de Google Play: prueba por Key Attestation del hardware
+        androidKeyAttestation: !!config.androidKeyAttestation,
         ios: !!config.ios,
         development: config.developmentBypass,
       },
@@ -88,8 +95,18 @@ export class MobileAccessService {
           return { platform: 'development', method: 'development-bypass', attestedAt: Date.now() };
 
         case 'android': {
+          if (proof.certificateChain) {
+            if (!config.androidKeyAttestation) throw this.unavailable(`android key attestation: ${config.androidKeyAttestationError}`);
+            const keyConfig = config.androidKeyAttestation;
+            const { serials } = verifyKeyAttestationChain(
+              { certificateChain: proof.certificateChain, challenge: playIntegrityRequestHash(tenantId, challenge) },
+              keyConfig,
+            );
+            await this.revocationList.assertNotRevoked(serials, keyConfig.revocationUrl);
+            return { platform: 'android', method: 'android-key-attestation', attestedAt: Date.now() };
+          }
           if (!config.android) throw this.unavailable(`android: ${config.androidError}`);
-          if (!proof.integrityToken) throw new AttestationError('falta integrityToken');
+          if (!proof.integrityToken) throw new AttestationError('falta integrityToken o certificateChain');
           const payload = await this.playIntegrity(config.android).decode(proof.integrityToken);
           evaluatePlayIntegrityVerdict(payload, { requestHash: playIntegrityRequestHash(tenantId, challenge) }, config.android);
           return { platform: 'android', method: 'play-integrity', attestedAt: Date.now() };
@@ -189,6 +206,21 @@ export class MobileAccessService {
       data: { signCount, lastUsedAt: new Date() },
     });
     if (count !== 1) throw new AttestationError('contador ya usado (carrera o repetición)');
+  }
+
+  // Un aviso por cada configuración distinta (no en cada desafío): sin ningún método Android ni iOS
+  // la app solo puede mostrar "verificación no disponible", y la causa tiene que quedar en los logs.
+  private warnIfIncomplete(config: ReturnType<typeof loadMobileAccessConfig>) {
+    const problems: string[] = [];
+    if (!config.android && !config.androidKeyAttestation) {
+      problems.push(`Android sin método (Play Integrity: ${config.androidError}; Key Attestation: ${config.androidKeyAttestationError})`);
+    }
+    if (!config.ios) problems.push(`iOS: ${config.iosError}`);
+    const summary = problems.join(' | ');
+    if (summary && summary !== this.lastConfigWarning) {
+      this.logger.warn(`Canal móvil con verificación incompleta: ${summary}`);
+    }
+    this.lastConfigWarning = summary;
   }
 
   private unavailable(detail: string) {

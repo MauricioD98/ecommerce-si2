@@ -49,9 +49,9 @@
   },
   "mobileAccess": {
     "noStore": "Choose a store to continue.",
-    "notConfigured": "This version of the app is not set up to verify the device.",
-    "serverNotConfigured": "Mobile app verification is not available yet. You can shop on the web store.",
-    "deviceUnsupported": "We could not verify this device. The app requires a phone that supports Google Play or Apple verification; you can keep shopping on the web store in your browser.",
+    "notConfigured": "This version of the app can't be verified by the store's server. Update the app to the latest version or shop on the web store.",
+    "serverNotConfigured": "The store's server hasn't set up mobile app verification for this system yet, so you can't sign in here. Let the store administrator know; meanwhile you can shop on the web store.",
+    "deviceUnsupported": "We couldn't verify this device. The app requires a phone with Google or Apple security verification and its original system (locked bootloader); you can keep shopping on the web store in your browser.",
     "planNotIncluded": "This store's current plan does not include the mobile app (available on the Pro plan). You can shop on the web store, including from your phone's browser.",
     "storeUnavailable": "The saved store is no longer available or its current plan does not include the mobile app."
   },

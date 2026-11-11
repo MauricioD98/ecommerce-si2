@@ -49,9 +49,9 @@
   },
   "mobileAccess": {
     "noStore": "请选择一家店铺以继续。",
-    "notConfigured": "此版本的应用未配置设备验证。",
-    "serverNotConfigured": "移动应用验证暂不可用。您可以在网页商店购物。",
-    "deviceUnsupported": "无法验证此设备。该应用需要支持 Google Play 或 Apple 验证的手机；您可以继续在浏览器中的网页商店购物。",
+    "notConfigured": "此版本的应用无法通过商店服务器验证。请将应用更新到最新版本，或在网页商店购物。",
+    "serverNotConfigured": "商店服务器尚未为此系统配置移动应用验证，因此无法在此登录。请告知商店管理员；在此期间您可以在网页商店购物。",
+    "deviceUnsupported": "无法验证此设备。应用需要具备 Google 或 Apple 安全验证且使用原厂系统（引导加载程序已锁定）的手机；您可以继续在浏览器中的网页商店购物。",
     "planNotIncluded": "该店铺当前套餐不包含移动应用（Pro 套餐提供）。您可以在网页商店购物，包括使用手机浏览器。",
     "storeUnavailable": "已保存的店铺不再可用，或其当前套餐不包含移动应用。"
   },

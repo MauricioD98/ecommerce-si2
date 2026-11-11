@@ -49,9 +49,9 @@
   },
   "mobileAccess": {
     "noStore": "Choisissez une boutique pour continuer.",
-    "notConfigured": "Cette version de l'application n'est pas configurée pour vérifier l'appareil.",
-    "serverNotConfigured": "La vérification de l'application mobile n'est pas encore disponible. Vous pouvez acheter sur la boutique web.",
-    "deviceUnsupported": "Nous n'avons pas pu vérifier cet appareil. L'application nécessite un téléphone compatible avec la vérification Google Play ou Apple ; vous pouvez continuer vos achats sur la boutique web dans votre navigateur.",
+    "notConfigured": "Cette version de l'application ne peut pas être vérifiée par le serveur de la boutique. Mettez l'application à jour ou achetez sur la boutique web.",
+    "serverNotConfigured": "Le serveur de la boutique n'a pas encore configuré la vérification de l'application mobile pour ce système : la connexion n'est pas possible ici. Prévenez l'administrateur de la boutique ; en attendant, vous pouvez acheter sur la boutique web.",
+    "deviceUnsupported": "Nous n'avons pas pu vérifier cet appareil. L'application nécessite un téléphone avec la vérification de sécurité de Google ou d'Apple et son système d'origine (bootloader verrouillé) ; vous pouvez continuer vos achats sur la boutique web dans le navigateur.",
     "planNotIncluded": "L'offre actuelle de cette boutique n'inclut pas l'application mobile (disponible avec l'offre Pro). Vous pouvez acheter sur la boutique web, y compris depuis le navigateur de votre téléphone.",
     "storeUnavailable": "La boutique enregistrée n'est plus disponible ou son offre actuelle n'inclut pas l'application mobile."
   },

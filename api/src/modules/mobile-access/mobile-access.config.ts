@@ -1,4 +1,5 @@
-import { createHash } from 'crypto';
+import { X509Certificate, createHash } from 'crypto';
+import type { AndroidKeyAttestationConfig } from './android-key-attestation.verifier';
 
 // Configuración del canal móvil. Se lee del entorno en cada uso (no al arrancar) para que las pruebas
 // puedan cambiarla y para que una variable mal cargada falle en la verificación, no tumbe la API.
@@ -7,7 +8,7 @@ import { createHash } from 'crypto';
 // RECHAZAN (fail closed). El atajo de desarrollo solo existe con NODE_ENV=development|test.
 
 export type MobilePlatform = 'android' | 'ios' | 'development';
-export type AttestationMethod = 'play-integrity' | 'app-attest' | 'development-bypass';
+export type AttestationMethod = 'play-integrity' | 'android-key-attestation' | 'app-attest' | 'development-bypass';
 
 // Orden de fuerza de los veredictos de dispositivo de Play Integrity
 export const DEVICE_VERDICTS = ['MEETS_BASIC_INTEGRITY', 'MEETS_DEVICE_INTEGRITY', 'MEETS_STRONG_INTEGRITY'] as const;
@@ -38,6 +39,9 @@ export interface MobileAccessConfig {
   reattestAfterMs: number;
   android: PlayIntegrityConfig | null;
   androidError: string | null;
+  // APK fuera de Google Play (descarga directa): Android Key Attestation
+  androidKeyAttestation: AndroidKeyAttestationConfig | null;
+  androidKeyAttestationError: string | null;
   ios: AppAttestConfig | null;
   iosError: string | null;
 }
@@ -116,6 +120,60 @@ function loadAndroid(env: NodeJS.ProcessEnv): { config: PlayIntegrityConfig | nu
   };
 }
 
+// Huella SHA-256 del certificado de firma: hex con o sin ":" (keytool / apksigner / eas credentials)
+// o base64/base64url (como la muestra Play Console). Devuelve null si no son 32 bytes.
+export function parseCertDigest(raw: string): Buffer | null {
+  const value = raw.trim();
+  const hex = value.replace(/:/g, '');
+  const bytes = /^[0-9a-fA-F]{64}$/.test(hex) ? Buffer.from(hex, 'hex') : Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  return bytes.length === 32 ? bytes : null;
+}
+
+// Uno o varios certificados PEM (concatenados, con \n escapados, o el bloque entero en base64)
+function readRootKeys(raw: string | undefined): Buffer[] | null {
+  let value = raw?.trim();
+  if (!value) return null;
+  if (!value.includes('-----BEGIN')) value = Buffer.from(value, 'base64').toString('utf8');
+  const pems = value.replace(/\\n/g, '\n').match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+  if (!pems) return null;
+  try {
+    return pems.map((pem) => new X509Certificate(pem).publicKey.export({ type: 'spki', format: 'der' }));
+  } catch {
+    return null;
+  }
+}
+
+function loadAndroidKeyAttestation(env: NodeJS.ProcessEnv): { config: AndroidKeyAttestationConfig | null; error: string | null } {
+  const packageName = env.ANDROID_KEY_ATTESTATION_PACKAGE_NAME?.trim();
+  const rawDigests = list(env.ANDROID_KEY_ATTESTATION_CERT_SHA256);
+  const rawRoots = env.ANDROID_KEY_ATTESTATION_ROOT_CA_PEM;
+  if (!packageName && rawDigests.length === 0 && !rawRoots?.trim()) {
+    return { config: null, error: 'Android Key Attestation no configurado' };
+  }
+  if (!packageName) return { config: null, error: 'Falta ANDROID_KEY_ATTESTATION_PACKAGE_NAME' };
+  // Sin Play no hay otra forma de distinguir el APK oficial de uno re-firmado: el certificado es obligatorio siempre
+  if (rawDigests.length === 0) return { config: null, error: 'Falta ANDROID_KEY_ATTESTATION_CERT_SHA256 (certificado de firma del APK)' };
+  const certSha256 = rawDigests.map(parseCertDigest);
+  if (certSha256.some((d) => !d)) return { config: null, error: 'ANDROID_KEY_ATTESTATION_CERT_SHA256 debe ser SHA-256 (64 hex o base64)' };
+  const rootPublicKeys = readRootKeys(rawRoots);
+  if (!rootPublicKeys) return { config: null, error: 'Falta o es inválida ANDROID_KEY_ATTESTATION_ROOT_CA_PEM (raíces de Google Hardware Attestation)' };
+  const rawMin = env.ANDROID_KEY_ATTESTATION_MIN_VERSION_CODE?.trim();
+  const minVersionCode = rawMin ? Number(rawMin) : 1;
+  if (!Number.isInteger(minVersionCode) || minVersionCode < 1) {
+    return { config: null, error: 'ANDROID_KEY_ATTESTATION_MIN_VERSION_CODE debe ser un entero ≥ 1' };
+  }
+  return {
+    config: {
+      packageName,
+      certSha256: certSha256 as Buffer[],
+      rootPublicKeys,
+      minVersionCode,
+      revocationUrl: env.ANDROID_KEY_ATTESTATION_REVOCATION_URL?.trim() || 'https://android.googleapis.com/attestation/status',
+    },
+    error: null,
+  };
+}
+
 function loadIos(env: NodeJS.ProcessEnv): { config: AppAttestConfig | null; error: string | null } {
   const appId = env.APP_ATTEST_APP_ID?.trim();
   const rawRoot = env.APP_ATTEST_ROOT_CA_PEM;
@@ -138,6 +196,7 @@ function loadIos(env: NodeJS.ProcessEnv): { config: AppAttestConfig | null; erro
 
 export function loadMobileAccessConfig(env: NodeJS.ProcessEnv = process.env): MobileAccessConfig {
   const android = loadAndroid(env);
+  const androidKey = loadAndroidKeyAttestation(env);
   const ios = loadIos(env);
   return {
     developmentBypass: isDevelopmentBypassAllowed(env),
@@ -145,6 +204,8 @@ export function loadMobileAccessConfig(env: NodeJS.ProcessEnv = process.env): Mo
     reattestAfterMs: positiveInt(env.MOBILE_REATTEST_AFTER_MS, 24 * 60 * 60_000),
     android: android.config,
     androidError: android.error,
+    androidKeyAttestation: androidKey.config,
+    androidKeyAttestationError: androidKey.error,
     ios: ios.config,
     iosError: ios.error,
   };

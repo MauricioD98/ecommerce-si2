@@ -15,13 +15,16 @@ import i18n from 'i18next';
 // servidor aunque este código se saltee.
 //
 // Requisitos de build (no funcionan en Expo Go ni en simuladores con una prueba válida):
-//   Android: EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER + app distribuida por Google Play
+//   Android desde Google Play: EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER (Play Integrity)
+//   Android fuera de Play (APK de EAS "preview"): nada en la app; la API valida Key Attestation
+//            (cadena del TEE con package + certificado de firma) si tiene ANDROID_KEY_ATTESTATION_*
 //   iOS:     capacidad "App Attest" en el App ID (ver app.json → ios.entitlements)
 
 export interface MobileAttestation {
   challengeId: string;
   platform: 'android' | 'ios' | 'development';
   integrityToken?: string;
+  certificateChain?: string[];
   keyId?: string;
   attestation?: string;
   assertion?: string;
@@ -31,10 +34,13 @@ interface ChallengeResponse {
   challengeId: string;
   requestHash: string;
   clientData: string;
-  platforms: { android: boolean; ios: boolean; development: boolean };
+  // androidKeyAttestation falta en APIs anteriores a ese método
+  platforms: { android: boolean; androidKeyAttestation?: boolean; ios: boolean; development: boolean };
 }
 
 const APP_ATTEST_KEY_ID = '@app_attest_key_id';
+// Alias en el Android Keystore: se reemplaza en cada prueba (el módulo borra la clave anterior)
+const ANDROID_ATTESTATION_KEY_ALIAS = 'stella-mobile-attestation';
 const APP_ATTEST_KEY_ATTESTED = '@app_attest_key_attested';
 export const APP_ATTEST_KEY_UNKNOWN = 'APP_ATTEST_KEY_UNKNOWN';
 
@@ -76,9 +82,9 @@ async function fetchChallenge(): Promise<ChallengeResponse> {
 
 let androidProvider: Promise<void> | null = null;
 
-async function androidIntegrityToken(requestHash: string): Promise<string> {
-  const cloudProjectNumber = process.env.EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER?.trim();
-  if (!cloudProjectNumber) throw unavailable('notConfigured');
+const playCloudProjectNumber = () => process.env.EXPO_PUBLIC_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER?.trim() || '';
+
+async function androidIntegrityToken(requestHash: string, cloudProjectNumber: string): Promise<string> {
   const prepare = () => {
     androidProvider = appIntegrity().prepareIntegrityTokenProviderAsync(cloudProjectNumber).catch((error) => {
       androidProvider = null;
@@ -97,6 +103,35 @@ async function androidIntegrityToken(requestHash: string): Promise<string> {
     }
     throw unavailable('deviceUnsupported');
   }
+}
+
+// Key Attestation: el hardware certifica qué app (package + firma del APK) creó la clave con este
+// desafío y si el arranque está verificado. La API valida la cadena hasta la raíz de Google.
+async function androidKeyAttestation(requestHash: string): Promise<string[]> {
+  try {
+    await appIntegrity().generateHardwareAttestedKeyAsync(ANDROID_ATTESTATION_KEY_ALIAS, requestHash);
+    const chain = await appIntegrity().getAttestationCertificateChainAsync(ANDROID_ATTESTATION_KEY_ALIAS);
+    if (!Array.isArray(chain) || chain.length < 2) throw new Error('cadena vacía');
+    return chain;
+  } catch (error) {
+    if (error instanceof MobileAttestationUnavailableError) throw error;
+    throw unavailable('deviceUnsupported');
+  }
+}
+
+async function androidProof(challenge: ChallengeResponse): Promise<MobileAttestation> {
+  const base = { challengeId: challenge.challengeId, platform: 'android' as const };
+  const cloudProjectNumber = playCloudProjectNumber();
+  // Play Integrity solo si el build trae el proyecto de Cloud (app publicada en Google Play)
+  if (challenge.platforms.android && cloudProjectNumber) {
+    return { ...base, integrityToken: await androidIntegrityToken(challenge.requestHash, cloudProjectNumber) };
+  }
+  if (challenge.platforms.androidKeyAttestation) {
+    return { ...base, certificateChain: await androidKeyAttestation(challenge.requestHash) };
+  }
+  // El servidor solo acepta Play Integrity pero este build no puede generarla
+  if (challenge.platforms.android) throw unavailable('notConfigured');
+  throw unavailable('serverNotConfigured');
 }
 
 async function iosProof(challenge: ChallengeResponse): Promise<MobileAttestation> {
@@ -136,10 +171,7 @@ export async function requestMobileAttestation(): Promise<MobileAttestation> {
   if (devBypassRequested() && challenge.platforms.development) {
     return { challengeId: challenge.challengeId, platform: 'development' };
   }
-  if (Platform.OS === 'android') {
-    if (!challenge.platforms.android) throw unavailable('serverNotConfigured');
-    return { challengeId: challenge.challengeId, platform: 'android', integrityToken: await androidIntegrityToken(challenge.requestHash) };
-  }
+  if (Platform.OS === 'android') return androidProof(challenge);
   if (Platform.OS === 'ios') {
     if (!challenge.platforms.ios) throw unavailable('serverNotConfigured');
     return iosProof(challenge);
