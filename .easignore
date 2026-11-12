@@ -13,3 +13,11 @@
 app_movil/android/.gradle/
 app_movil/android/build/
 app_movil/android/app/build/
+
+# Rutas de esta PC (sdk.dir / cmake.dir de Windows): rompen el build en los servidores Linux de EAS
+app_movil/android/local.properties
+
+# Variables locales de desarrollo (p. ej. EXPO_PUBLIC_MOBILE_ATTESTATION_DEV_BYPASS): nunca deben entrar en un build.
+# El build usa las variables del entorno de EAS (preview/production).
+**/.env.local
+**/.env.*.local
