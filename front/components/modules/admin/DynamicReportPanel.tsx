@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CalendarRange, Check, Copy, FileDown, FileSpreadsheet, FileText, HelpCircle, Info, Loader2, Lock, Mic, MicOff, SearchX, Send, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import styles from './admin-table.module.scss';
@@ -8,6 +8,10 @@ import { intlLocale } from '@/i18n/config';
 import { DynamicReportEntry, useDynamicReport } from '@/hooks/useReports';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { DynamicReportResult } from '@/types/admin.types';
+import type { User } from '@/types/auth.types';
+import { useAuth } from '@/hooks/useAuth';
+import { useStoreName } from '@/providers/StoreInfoProvider';
+import { buildReportDocument, exportReportExcel, exportReportPdf, reportFilename, reportTitle } from '@/utils/reportExport';
 import {
     columnKind,
     columnLabel,
@@ -62,70 +66,87 @@ function useColumns(result: DynamicReportResult): ColumnInfo[] {
     }, [result, t, ctx]);
 }
 
-// Nombre de archivo a partir de la pregunta (sin tildes/símbolos, acotado)
-function buildExportFilename(prompt: string, fallback: string): string {
-    const slug = prompt
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-+|-+$)/g, '')
-        .slice(0, 60);
-    return `stella-femme-${slug || fallback}`;
-}
-
-// Excel/CSV: encabezados legibles; números como números (sin redondear ni símbolo), fechas en la hora
+// CSV: encabezados legibles; números como números (sin redondear ni símbolo), fechas en la hora
 // local del reporte ("2026-11-08 14:36:55"), referencias completas
 function toExportRows(result: DynamicReportResult, columns: ColumnInfo[], ctx: FormatContext, labels: Labels): Record<string, unknown>[] {
     return result.rows.map((row) => Object.fromEntries(columns.map((c) => [c.label, exportValue(c.kind, row[c.key], ctx, labels)])));
 }
 
-async function exportSheet(rows: Record<string, unknown>[], filename: string, sheetName: string, bookType: 'xlsx' | 'csv') {
+async function exportCsv(rows: Record<string, unknown>[], filename: string, sheetName: string) {
     const XLSX = await import('xlsx');
     const worksheet = XLSX.utils.json_to_sheet(rows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    XLSX.writeFile(workbook, `${filename}.${bookType}`, bookType === 'csv' ? { bookType: 'csv' } : undefined);
+    XLSX.writeFile(workbook, `${filename}.csv`, { bookType: 'csv' });
 }
 
-async function exportToPdf(result: DynamicReportResult, columns: ColumnInfo[], ctx: FormatContext, labels: Labels, filename: string, title: string, periodo: string[]) {
-    const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
-    const doc = new jsPDF({ orientation: columns.length > 5 ? 'landscape' : 'portrait' });
-    doc.setFontSize(12);
-    doc.text(title, 14, 15);
-    doc.setFontSize(8);
-    periodo.forEach((line, index) => doc.text(line, 14, 21 + index * 4));
-    autoTable(doc, {
-        startY: 24 + periodo.length * 4,
-        head: [columns.map((c) => c.label)],
-        // Mismo formato que la pantalla, con las referencias completas
-        body: result.rows.map((row) => columns.map((c) => formatValue(c.kind, row[c.key], ctx, labels, true))),
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [0, 0, 0] },
-    });
-    doc.save(`${filename}.pdf`);
+function userDisplayName(user: User | null | undefined): string {
+    if (!user) return '';
+    const full = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return full || user.name || user.email;
 }
 
-function ExportBar({ entry }: { entry: DynamicReportEntry }) {
+// Excel y PDF con formato de informe: el título es la pregunta y también da nombre al archivo
+// (titulo_en_snake_case_AAAA-MM-DD). `primaryColor` permite el color principal del tenant (por defecto azul marino).
+function ExportBar({ entry, viaVoice, primaryColor }: { entry: DynamicReportEntry; viaVoice: boolean; primaryColor?: string }) {
     const result = entry.result as DynamicReportResult;
     const t = useTranslations('Reports.dynamic');
     const { ctx, labels } = useFormatContext(result);
     const columns = useColumns(result);
+    const storeName = useStoreName();
+    const { user } = useAuth();
     const disabled = result.rows.length === 0;
-    const filename = buildExportFilename(entry.prompt, t('fileFallback'));
-    const periodo = result.interpretation?.periodo ?? [];
+    const title = reportTitle(entry.prompt);
+
+    const buildDocument = () => {
+        const generatedAt = new Date();
+        const doc = buildReportDocument(result.rows, columns, ctx, labels, {
+            title,
+            store: storeName,
+            period: result.interpretation?.periodo,
+            user: userDisplayName(user),
+            voiceQuery: viaVoice ? entry.prompt : undefined,
+            generatedAt,
+            primaryColor,
+        });
+        return { doc, filename: reportFilename(title, generatedAt, ctx.timeZone, t('fileFallback')) };
+    };
 
     return (
         <div className={styles.exportBar}>
-            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportToPdf(result, columns, ctx, labels, filename, entry.prompt, periodo)} title={t('exportPdf')}>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => {
+                    const { doc, filename } = buildDocument();
+                    void exportReportPdf(doc, filename);
+                }}
+                title={t('exportPdf')}
+            >
                 <FileText size={14} />
                 PDF
             </button>
-            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportSheet(toExportRows(result, columns, ctx, labels), filename, t('sheetName'), 'xlsx')} title={t('exportExcel')}>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => {
+                    const { doc, filename } = buildDocument();
+                    void exportReportExcel(doc, filename);
+                }}
+                title={t('exportExcel')}
+            >
                 <FileSpreadsheet size={14} />
                 Excel
             </button>
-            <button type="button" className={styles.exportButton} disabled={disabled} onClick={() => exportSheet(toExportRows(result, columns, ctx, labels), filename, t('sheetName'), 'csv')} title={t('exportCsv')}>
+            <button
+                type="button"
+                className={styles.exportButton}
+                disabled={disabled}
+                onClick={() => exportCsv(toExportRows(result, columns, ctx, labels), buildDocument().filename, t('sheetName'))}
+                title={t('exportCsv')}
+            >
                 <FileDown size={14} />
                 CSV
             </button>
@@ -307,7 +328,7 @@ function StatusTitle({ kind, children }: { kind: 'noData' | 'clarification' | 'f
     );
 }
 
-function EntryCard({ entry, onAsk, disabled }: { entry: DynamicReportEntry; onAsk: (question: string) => void; disabled: boolean }) {
+function EntryCard({ entry, onAsk, disabled, viaVoice }: { entry: DynamicReportEntry; onAsk: (question: string) => void; disabled: boolean; viaVoice: boolean }) {
     const result = entry.result;
     const estado = result?.estado ?? (result && result.rowCount === 0 ? 'sin_datos' : 'ok');
     const clarification = result?.clarification;
@@ -319,7 +340,7 @@ function EntryCard({ entry, onAsk, disabled }: { entry: DynamicReportEntry; onAs
                     <Sparkles size={16} />
                     <span>{entry.prompt}</span>
                 </div>
-                {result && estado === 'ok' && <ExportBar entry={entry} />}
+                {result && estado === 'ok' && <ExportBar entry={entry} viaVoice={viaVoice} />}
             </div>
 
             {entry.error && (
@@ -384,13 +405,22 @@ export default function DynamicReportPanel() {
     const locale = useLocale();
     const examples = t.raw('examples') as string[];
     const [prompt, setPrompt] = useState('');
+    // Preguntas que se dictaron: el informe exportado muestra 'Consulta por voz: "…"'
+    const dictatedRef = useRef(false);
+    const [voicePrompts, setVoicePrompts] = useState<Set<string>>(() => new Set());
+    const onDictated = useCallback((text: string) => {
+        dictatedRef.current = true;
+        setPrompt(text);
+    }, []);
     // Lo dictado va actualizando el mismo estado que el input; el usuario revisa y pulsa "Preguntar"
     // Dicta en el idioma elegido: el reconocimiento de voz del navegador necesita la etiqueta completa (es-BO, fr-FR…)
-    const { isSupported, isListening, error: voiceError, toggle: toggleVoice } = useSpeechRecognition({ lang: intlLocale(locale), onText: setPrompt });
+    const { isSupported, isListening, error: voiceError, toggle: toggleVoice } = useSpeechRecognition({ lang: intlLocale(locale), onText: onDictated });
 
     const submit = async (question: string) => {
         const text = question.trim();
         if (!text || isLoading || isListening) return;
+        if (dictatedRef.current && text === prompt.trim()) setVoicePrompts((prev) => new Set(prev).add(text));
+        dictatedRef.current = false;
         setPrompt('');
         await ask(text);
     };
@@ -412,7 +442,11 @@ export default function DynamicReportPanel() {
                                 id="ai-prompt"
                                 className={`${styles.input} ${isLoading ? styles.inputLocked : ''}`}
                                 value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
+                                onChange={(e) => {
+                                    // Si se borra todo y se escribe a mano, ya no es una consulta por voz
+                                    if (!e.target.value.trim()) dictatedRef.current = false;
+                                    setPrompt(e.target.value);
+                                }}
                                 maxLength={500}
                                 placeholder={t('promptPlaceholder')}
                                 disabled={isLoading}
@@ -487,7 +521,7 @@ export default function DynamicReportPanel() {
             )}
 
             {entries.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} onAsk={submit} disabled={isLoading || isListening} />
+                <EntryCard key={entry.id} entry={entry} onAsk={submit} disabled={isLoading || isListening} viaVoice={voicePrompts.has(entry.prompt)} />
             ))}
         </div>
     );
